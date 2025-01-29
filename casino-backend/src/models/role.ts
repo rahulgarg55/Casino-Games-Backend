@@ -36,8 +36,9 @@ const roleSchema: Schema = new Schema({
     maxlength: [255, 'Description cannot exceed 255 characters']
   },
   is_deleted: {
-    type: Boolean,
-    default: false
+    type: Number,
+    enum: [0, 1], // 0 = active, 1 = deleted
+    default: 0
   }
 }, {
   timestamps: { 
@@ -54,11 +55,13 @@ const roleSchema: Schema = new Schema({
 });
 
 // Soft delete middleware
+//means not actually removing a document from the database but marking it as deleted.
+//means data is not lost and can be recovered if needed.
+//Mongoose middleware to auto-filter soft-deleted documents in queries.
 roleSchema.pre(/^find/, function(this: mongoose.Query<any, any> & { options: { withDeleted?: boolean } }, next) {
   if (!this.options.withDeleted) {
-    this.where({ is_deleted: false });
+    this.where({ is_deleted: 0 });
   }
   next();
 });
-
 export default mongoose.model<IRole>('Role', roleSchema);

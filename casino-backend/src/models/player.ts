@@ -11,9 +11,9 @@ export interface IPlayer extends Document {
   password_hash: string;
   registration_date?: Date;
   last_login?: Date;
-  status?: string;
-  is_verified?: boolean;
-  is_2fa?: boolean;
+  status?: number;
+  is_verified?: number;
+  is_2fa?: number;
   currency?: mongoose.Types.ObjectId;
   language?: mongoose.Types.ObjectId;
   country?: mongoose.Types.ObjectId;
@@ -35,9 +35,9 @@ export interface IPlayer extends Document {
  * @property {string} [password_hash] - The hashed password of the player.
  * @property {Date} [registration_date] - The registration date of the player. Defaults to the current date.
  * @property {Date} [last_login] - The last login date of the player.
- * @property {string} [status='active'] - The status of the player. Can be 'active', 'suspended', or 'banned'.
- * @property {boolean} [is_verified=false] - Indicates if the player's email is verified.
- * @property {boolean} [is_2fa=false] - Indicates if the player has two-factor authentication enabled.
+ * @property {number} [status=1] - The status of the player. Can be 1 (active), 0 (inactive).
+ * @property {number} [is_verified=0] - Indicates if the player's email is verified. 1 for true, 0 for false.
+ * @property {number} [is_2fa=0] - Indicates if the player has two-factor authentication enabled. 1 for true, 0 for false.
  * @property {Schema.Types.ObjectId} [currency] - The currency of the player, referenced from the Currency collection.
  * @property {Schema.Types.ObjectId} [language] - The language of the player, referenced from the Language collection.
  * @property {Schema.Types.ObjectId} [country] - The country of the player, referenced from the Country collection.
@@ -102,17 +102,19 @@ const playerSchema: Schema = new Schema({
     type: Date 
   },
   status: { 
-    type: String, 
-    enum: ['active', 'suspended', 'banned'], 
-    default: 'active' 
+    type: Number, 
+    enum: [0, 1], // 0 = inactive, 1 = active
+    default: 1 
   },
   is_verified: { 
-    type: Boolean, 
-    default: false 
+    type: Number, 
+    enum: [0, 1], // 0 = unverified, 1 = verified
+    default: 0 
   },
   is_2fa: { 
-    type: Boolean, 
-    default: false 
+    type: Number, 
+    enum: [0, 1], // 0 = disabled, 1 = enabled
+    default: 0 
   },
   currency: { 
     type: Schema.Types.ObjectId, 

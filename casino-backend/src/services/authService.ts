@@ -3,6 +3,7 @@ import Role from '../models/role';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { Types } from 'mongoose';
+import {STATUS, VERIFICATION, TWO_FA} from '../constants';
 
 interface RegistrationData {
   username: string;
@@ -39,7 +40,10 @@ export const register = async (data: RegistrationData) => {
     password_hash: hashedPassword,
     role_id,
     fullname,
-    patronymic
+    patronymic,
+    status:STATUS.ACTIVE,
+    is_verified:VERIFICATION.UNVERIFIED,
+    is_2fa:TWO_FA.DISABLED
   });
 
   await player.save();
@@ -69,12 +73,15 @@ export const login = async (data: LoginData) => {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT secret not configured');
   }
+  if (player.is_verified === VERIFICATION.UNVERIFIED) {
+    throw new Error('Please verify your email first');
+  }
 
   const token = jwt.sign(
     {
       id: player._id,
       role: player.role_id,
-      status: player.status
+      status: player.status===STATUS.ACTIVE ? 'active' : 'inactive'
     },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
