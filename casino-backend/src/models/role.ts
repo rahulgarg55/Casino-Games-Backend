@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IRole extends Document {
+  role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
   name: string;
   description?: string;
   is_deleted?: boolean;
@@ -23,6 +24,11 @@ export interface IRole extends Document {
  * - `toJSON`: Customizes the JSON output by removing the `__v` and `is_deleted` fields.
  */
 const roleSchema: Schema = new Schema({
+  role_id: { 
+    type: Number, 
+    required: true, 
+    unique: true 
+  },
   name: { 
     type: String, 
     required: true, 

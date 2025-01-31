@@ -15,7 +15,7 @@ import { generateTokenResponse } from '../utils/auth';
 export const register = async (req: Request, res: Response) => {
   try {
     const user = await authService.register(req.body);
-    const tokenData = generateTokenResponse(user);
+    // const tokenData = generateTokenResponse(user);
     res.status(201).json({
       success: true,
       data: {
@@ -23,11 +23,12 @@ export const register = async (req: Request, res: Response) => {
           id: user._id,
           username: user.username,
           email: user.email,
+          phone_number: user.phone_number,
           role_id: user.role_id,
           created_at: user.created_at
         },
-        token: tokenData.token,
-        expiresIn: tokenData.expiresIn
+        // token: tokenData.token,
+        // expiresIn: tokenData.expiresIn
       }
     });
   } catch (error) {
@@ -46,7 +47,7 @@ export const login = async (req: Request, res: Response) => {
       data: {
         user,
         token,
-        expiresIn:28800
+        expiresIn: 28800
       }
     });
   } catch (error) {

@@ -9,7 +9,7 @@ import errorHandler from './middlewares/errorHandler';
 import requestLogger from './middlewares/requestLogger';
 
 const app = express();
-
+app.use(express.json());
 // Security Middlewares
 app.use(helmet());
 app.use(cors({

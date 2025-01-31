@@ -1,62 +1,75 @@
 import Player from '../models/player';
-import Role from '../models/role';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Types } from 'mongoose';
-import {STATUS, VERIFICATION, TWO_FA} from '../constants';
+import { STATUS, VERIFICATION, TWO_FA } from '../constants';
 
 interface RegistrationData {
-  username: string;
-  email: string;
+  username?: string;
+  email?: string;
+  phone_number?: string;
   password: string;
-  role_id: Types.ObjectId;
-  fullname: string;
-  patronymic: string;
+  fullname?: string;
+  patronymic?: string;
+  currency: number; // 0 = USD, 1 = INR, 2 = Pound
 }
 
 interface LoginData {
-  email: string;
+  email?: string;
+  phone_number?: string;
   password: string;
 }
 
 export const register = async (data: RegistrationData) => {
-  const { username, email, password, role_id, fullname, patronymic } = data;
+  const { username, email, phone_number, password, fullname, patronymic, currency } = data;
 
-  const roleExists = await Role.exists({ _id: role_id });
-  if (!roleExists) {
-    throw new Error('Invalid role specified');
+  if (!email && !phone_number) {
+    throw new Error('Either email or phone number is required');
   }
 
-  const existingUser = await Player.findOne({ $or: [{ email }, { username }] });
+  const query: any[] = [];
+  if (email) query.push({ email });
+  if (phone_number) query.push({ phone_number });
+  if (username) query.push({ username });
+
+  const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
-    throw new Error('Username or email already in use');
+    throw new Error('Username, email, or phone number already in use');
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
 
-  const player = new Player({
-    username,
+  const playerData: any = {
     email,
+    phone_number,
     password_hash: hashedPassword,
-    role_id,
-    fullname,
-    patronymic,
-    status:STATUS.ACTIVE,
-    is_verified:VERIFICATION.UNVERIFIED,
-    is_2fa:TWO_FA.DISABLED
-  });
+    role_id: 0, // Default to User
+    currency,
+    status: STATUS.ACTIVE,
+    is_verified: VERIFICATION.UNVERIFIED,
+    is_2fa: TWO_FA.DISABLED
+  };
 
+  if (username) {
+    playerData.username = username;
+  }
+  if (fullname) {
+    playerData.fullname = fullname;
+  }
+  if (patronymic) {
+    playerData.patronymic = patronymic;
+  }
+
+  const player = new Player(playerData);
   await player.save();
 
   return player;
 };
 
 export const login = async (data: LoginData) => {
-  const { email, password } = data;
+  const { email, phone_number, password } = data;
 
-  const player = await Player.findOne({ email })
-    .select('+password_hash')
-    .populate('role_id', 'name permissions');
+  const player = await Player.findOne({ $or: [{ email }, { phone_number }] })
+    .select('+password_hash');
 
   if (!player) {
     throw new Error('Invalid credentials');
@@ -81,7 +94,7 @@ export const login = async (data: LoginData) => {
     {
       id: player._id,
       role: player.role_id,
-      status: player.status===STATUS.ACTIVE ? 'active' : 'inactive'
+      status: player.status === STATUS.ACTIVE ? 'active' : 'inactive'
     },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
@@ -93,6 +106,7 @@ export const login = async (data: LoginData) => {
       id: player._id,
       username: player.username,
       email: player.email,
+      phone_number: player.phone_number,
       role: player.role_id,
       status: player.status
     }

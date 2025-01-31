@@ -1,15 +1,15 @@
 import Role, { IRole } from '../models/role';
-import { Types } from 'mongoose';
 
 interface RoleData {
+  role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
   name: string;
   description?: string;
 }
 
 export const createRole = async (data: RoleData): Promise<IRole> => {
-  const existingRole = await Role.findOne({ name: data.name });
+  const existingRole = await Role.findOne({ role_id:data.role_id });
   if (existingRole) {
-    throw new Error('Role name already exists');
+    throw new Error('Role ID already exists');
   }
 
   const role = new Role(data);
@@ -24,26 +24,26 @@ export const getRoles = async (page: number = 1, limit: number = 10): Promise<IR
 };
 
 export const updateRole = async (
-  id: Types.ObjectId,
+  id: number,
   data: Partial<RoleData>
 ): Promise<IRole | null> => {
-  if (data.name) {
-    const existingRole = await Role.findOne({ name: data.name });
-    if (existingRole && !existingRole._id.equals(id)) {
-      throw new Error('Role name already exists');
+  if (data.role_id!==undefined) {
+    const existingRole = await Role.findOne({ role_id:data.role_id });
+    if (existingRole && existingRole.role_id!==id) {
+      throw new Error('Role ID already exists');
     }
   }
 
   return Role.findByIdAndUpdate(
-    id,
+    {role_id:id},
     data,
     { new: true, runValidators: true }
   );
 };
 
-export const deleteRole = async (id: Types.ObjectId): Promise<IRole | null> => {
+export const deleteRole = async (id: number): Promise<IRole | null> => {
   return Role.findByIdAndUpdate(
-    id,
+    {role_id:id},
     { is_deleted: true },
     { new: true }
   );

@@ -4,6 +4,7 @@ import { Types } from 'mongoose';
 
 interface RoleRequest extends Request {
   body: {
+    role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
     name: string;
     description?: string;
   };
@@ -31,7 +32,7 @@ export const getRoles = async (req: Request, res: Response) => {
 
 export const updateRole = async (req: Request, res: Response) => {
   try {
-    const id = new Types.ObjectId(req.params.id);
+    const id = parseInt(req.params.id);
     const role = await roleService.updateRole(id, req.body);
     if (!role) return res.status(404).json({ error: 'Role not found' });
     res.status(200).json(role);
@@ -55,7 +56,7 @@ export const updateRole = async (req: Request, res: Response) => {
  */
 export const deleteRole = async (req: Request, res: Response) => {
   try {
-    const id = new Types.ObjectId(req.params.id);
+    const id = parseInt(req.params.id);
     const role = await roleService.deleteRole(id);
     if (!role) return res.status(404).json({ error: 'Role not found' });
     res.status(200).json({ message: 'Role soft-deleted successfully' });
