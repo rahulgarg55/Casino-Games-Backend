@@ -2,33 +2,31 @@ import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { generateTokenResponse } from '../utils/auth';
 
-/**
- * Registers a new user and returns the user data along with a token.
- *
- * @param req - The request object containing the user registration data.
- * @param res - The response object used to send the response.
- *
- * @returns A JSON response with the newly created user data and a token.
- *
- * @throws Will return a 400 status code with an error message if registration fails.
- */
+interface CustomRequest extends Request {
+  user?: {
+    id: string;
+    role: number;
+  };
+}
+
 export const register = async (req: Request, res: Response) => {
   try {
-    const user = await authService.register(req.body);
-    // const tokenData = generateTokenResponse(user);
+    const { player, token, expiresIn } = await authService.register(req.body);
+    const message = 'Thank you for registering!';
     res.status(201).json({
       success: true,
+      message,
       data: {
         user: {
-          id: user._id,
-          username: user.username,
-          email: user.email,
-          phone_number: user.phone_number,
-          role_id: user.role_id,
-          created_at: user.created_at
+          id: player._id,
+          username: player.username,
+          email: player.email,
+          phone_number: player.phone_number,
+          role_id: player.role_id,
+          created_at: player.created_at
         },
-        // token: tokenData.token,
-        // expiresIn: tokenData.expiresIn
+        token,
+        expiresIn
       }
     });
   } catch (error) {
@@ -42,8 +40,10 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { user, token } = await authService.login(req.body);
+    const message = 'Login successful!';
     res.status(200).json({
       success: true,
+      message,
       data: {
         user,
         token,
@@ -54,6 +54,54 @@ export const login = async (req: Request, res: Response) => {
     res.status(401).json({
       success: false,
       error: error instanceof Error ? error.message : 'Authentication failed'
+    });
+  }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+  try {
+    await authService.forgotPassword(req.body);
+    res.status(200).json({
+      success: true,
+      message: 'Password reset email sent'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Password reset failed'
+    });
+  }
+};
+
+export const resetPassword = async (req: Request, res: Response) => {
+  try {
+    await authService.resetPassword(req.body);
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successful'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Password reset failed'
+    });
+  }
+};
+
+export const updateProfile = async (req: CustomRequest, res: Response) => {
+  try {
+    console.log("req.user", req.user);
+    const user = await authService.updateProfile(req.user!.id, req.body);
+    console.log("user",user);
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: user
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Profile update failed'
     });
   }
 };

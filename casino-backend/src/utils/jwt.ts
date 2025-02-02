@@ -1,8 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+
 interface CustomRequest extends Request {
-  user?: any;
+  user?: {
+    id: string;
+    role: number;
+  };
 }
+
 export const verifyToken = (
   req: CustomRequest,
   res: Response,
@@ -17,8 +22,11 @@ export const verifyToken = (
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string);
-    req.user = decoded;
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      sub: string;
+      role: number;
+    };
+    req.user = { id: decoded.sub, role: decoded.role };
     next();
   } catch (error) {
     res.status(400).json({ message: 'Invalid token.' });

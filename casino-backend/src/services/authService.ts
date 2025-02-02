@@ -1,7 +1,10 @@
 import Player from '../models/player';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
+import { sendResetEmail } from '../utils/sendResetEmail';
+import { generateTokenResponse } from '../utils/auth';
 
 interface RegistrationData {
   username?: string;
@@ -17,6 +20,31 @@ interface LoginData {
   email?: string;
   phone_number?: string;
   password: string;
+}
+
+interface ForgotPasswordData {
+  email?: string;
+  phone_number?: string;
+}
+
+interface ResetPasswordData {
+  token: string;
+  password: string;
+}
+
+import mongoose from 'mongoose';
+
+interface UpdateProfileData {
+  fullname?: string;
+  email?: string;
+  phone_number?: string;
+  username?: string;
+  language?: number;
+  patronymic?: string;
+  dob?: Date;
+  gender?: number;
+  city?: number;
+  country?: number;
 }
 
 export const register = async (data: RegistrationData) => {
@@ -62,12 +90,16 @@ export const register = async (data: RegistrationData) => {
   const player = new Player(playerData);
   await player.save();
 
-  return player;
+  const tokenData = generateTokenResponse(player);
+
+  return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };
 };
 
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;
-
+  if (!email && !phone_number) {
+    throw new Error('Either email or phone number is required');
+  }
   const player = await Player.findOne({ $or: [{ email }, { phone_number }] })
     .select('+password_hash');
 
@@ -111,4 +143,65 @@ export const login = async (data: LoginData) => {
       status: player.status
     }
   };
+};
+
+export const forgotPassword = async (data: ForgotPasswordData) => {
+  const { email, phone_number } = data;
+  if (!email && !phone_number) {
+    throw new Error('Either email or phone number is required');
+  }
+
+  const player = await Player.findOne({ $or: [{ email }, { phone_number }] });
+  if (!player) {
+    throw new Error('User not found');
+  }
+
+  const token = crypto.randomBytes(20).toString('hex');
+  player.reset_password_token = token;
+  player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
+
+  await player.save();
+
+  await sendResetEmail(email || phone_number!, token);
+};
+
+export const resetPassword = async (data: ResetPasswordData) => {
+  const { token, password } = data;
+
+  const player = await Player.findOne({
+    reset_password_token: token,
+    reset_password_expires: { $gt: new Date() }
+  });
+
+  if (!player) {
+    throw new Error('Password reset token is invalid or has expired');
+  }
+
+  player.password_hash = await bcrypt.hash(password, 12);
+  player.reset_password_token = undefined;
+  player.reset_password_expires = undefined;
+
+  await player.save();
+};
+
+export const updateProfile = async (playerId:string, data: UpdateProfileData) => {
+  const player = await Player.findById(playerId);
+  if (!player) {
+    throw new Error('Player not found');
+  }
+
+  // Object.assign(player, data);
+  if (data.fullname) player.fullname = data.fullname;
+  if (data.email) player.email = data.email;
+  if (data.phone_number) player.phone_number = data.phone_number;
+  if (data.username) player.username = data.username;
+  if (data.language !== undefined) player.language = data.language;
+  if (data.patronymic) player.patronymic = data.patronymic;
+  if (data.dob) player.dob = data.dob;
+  if (data.gender !== undefined) player.gender = data.gender;
+  if (data.city !== undefined) player.city = data.city;
+  if (data.country !== undefined) player.country = data.country;
+  await player.save();
+
+  return player;
 };

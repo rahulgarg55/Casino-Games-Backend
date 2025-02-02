@@ -1,12 +1,12 @@
 import mongoose, { Schema, Document } from 'mongoose';
-
+import {GENDER, LANGUAGE, COUNTRY, CITY,TWO_FA,VERIFICATION,STATUS} from "../constants";
 export interface IPlayer extends Document {
   username?: string;
   fullname?: string;
   patronymic?: string;
   photo?: string;
   dob?: Date;
-  gender?: mongoose.Types.ObjectId;
+  gender?: number;
   email?: string;
   phone_number?: string;
   password_hash: string;
@@ -16,10 +16,12 @@ export interface IPlayer extends Document {
   is_verified?: number;
   is_2fa?: number;
   currency: number; // 0 = USD, 1 = INR, 2 = Pound
-  language?: mongoose.Types.ObjectId;
-  country?: mongoose.Types.ObjectId;
-  city?: mongoose.Types.ObjectId;
+  language?: number;
+  country?: number;
+  city?: number;
   role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
+  reset_password_token?: string;
+  reset_password_expires?: Date;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -55,8 +57,9 @@ const playerSchema: Schema = new Schema({
     }
   },
   gender: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Gender' 
+    type: Number, 
+    enum: [GENDER.MALE, GENDER.FEMALE, GENDER.TRANSGENDER],
+    default: GENDER.MALE
   },
   email: { 
     type: String, 
@@ -89,18 +92,18 @@ const playerSchema: Schema = new Schema({
   },
   status: { 
     type: Number, 
-    enum: [0, 1], // 0 = inactive, 1 = active
-    default: 1 
+    enum: [STATUS.INACTIVE, STATUS.ACTIVE],
+    default: STATUS.ACTIVE 
   },
   is_verified: { 
     type: Number, 
-    enum: [0, 1], // 0 = unverified, 1 = verified
-    default: 0 
+    enum: [VERIFICATION.UNVERIFIED, VERIFICATION.VERIFIED],
+    default: VERIFICATION.UNVERIFIED 
   },
   is_2fa: { 
     type: Number, 
-    enum: [0, 1], // 0 = disabled, 1 = enabled
-    default: 0 
+    enum: [TWO_FA.DISABLED, TWO_FA.ENABLED],
+    default: TWO_FA.DISABLED 
   },
   currency: { 
     type: Number, 
@@ -108,21 +111,32 @@ const playerSchema: Schema = new Schema({
     enum: [0, 1, 2] // 0 = USD, 1 = INR, 2 = Pound
   },
   language: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Language' 
+    type: Number, 
+    enum: [LANGUAGE.ENGLISH, LANGUAGE.SPANISH, LANGUAGE.FRENCH],
+    default: LANGUAGE.ENGLISH
   },
   country: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'Country' 
+    type: Number, 
+    enum: [COUNTRY.USA, COUNTRY.INDIA, COUNTRY.UK],
+    default: COUNTRY.USA
   },
   city: { 
-    type: Schema.Types.ObjectId, 
-    ref: 'City' 
+    type: Number, 
+    enum: [CITY.NEW_YORK, CITY.MUMBAI, CITY.LONDON],
+    default: CITY.NEW_YORK
   },
   role_id: { 
     type: Number, 
     default: 0, // Default to User
     enum: [0, 1, 2] // 0 = User, 1 = Admin, 2 = Game Provider
+  },
+  reset_password_token: {
+    type: String,
+    default: null
+  },
+  reset_password_expires: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: { 
