@@ -32,23 +32,29 @@ interface ResetPasswordData {
   password: string;
 }
 
-import mongoose from 'mongoose';
-
 interface UpdateProfileData {
   fullname?: string;
   email?: string;
   phone_number?: string;
   username?: string;
-  language?: number;
+  language?: string;
   patronymic?: string;
   dob?: Date;
-  gender?: number;
-  city?: number;
-  country?: number;
+  gender?: string;
+  city?: string;
+  country?: string;
 }
 
 export const register = async (data: RegistrationData) => {
-  const { username, email, phone_number, password, fullname, patronymic, currency } = data;
+  const {
+    username,
+    email,
+    phone_number,
+    password,
+    fullname,
+    patronymic,
+    currency,
+  } = data;
 
   if (!email && !phone_number) {
     throw new Error('Either email or phone number is required');
@@ -74,7 +80,7 @@ export const register = async (data: RegistrationData) => {
     currency,
     status: STATUS.ACTIVE,
     is_verified: VERIFICATION.UNVERIFIED,
-    is_2fa: TWO_FA.DISABLED
+    is_2fa: TWO_FA.DISABLED,
   };
 
   if (username) {
@@ -100,8 +106,9 @@ export const login = async (data: LoginData) => {
   if (!email && !phone_number) {
     throw new Error('Either email or phone number is required');
   }
-  const player = await Player.findOne({ $or: [{ email }, { phone_number }] })
-    .select('+password_hash');
+  const player = await Player.findOne({
+    $or: [{ email }, { phone_number }],
+  }).select('+password_hash');
 
   if (!player) {
     throw new Error('Invalid credentials');
@@ -126,10 +133,10 @@ export const login = async (data: LoginData) => {
     {
       id: player._id,
       role: player.role_id,
-      status: player.status === STATUS.ACTIVE ? 'active' : 'inactive'
+      status: player.status === STATUS.ACTIVE ? 'active' : 'inactive',
     },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: '8h' },
   );
 
   return {
@@ -140,8 +147,12 @@ export const login = async (data: LoginData) => {
       email: player.email,
       phone_number: player.phone_number,
       role: player.role_id,
-      status: player.status
-    }
+      status: player.status,
+      gender: player.gender,
+      language: player.language,
+      country: player.country,
+      city: player.city,
+    },
   };
 };
 
@@ -170,7 +181,7 @@ export const resetPassword = async (data: ResetPasswordData) => {
 
   const player = await Player.findOne({
     reset_password_token: token,
-    reset_password_expires: { $gt: new Date() }
+    reset_password_expires: { $gt: new Date() },
   });
 
   if (!player) {
@@ -184,7 +195,10 @@ export const resetPassword = async (data: ResetPasswordData) => {
   await player.save();
 };
 
-export const updateProfile = async (playerId:string, data: UpdateProfileData) => {
+export const updateProfile = async (
+  playerId: string,
+  data: UpdateProfileData,
+) => {
   const player = await Player.findById(playerId);
   if (!player) {
     throw new Error('Player not found');

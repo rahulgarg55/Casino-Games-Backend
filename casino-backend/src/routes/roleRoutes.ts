@@ -20,7 +20,7 @@ const roleValidation = [
   body('description')
     .optional()
     .isLength({ max: 255 })
-    .withMessage('Description cannot exceed 255 characters')
+    .withMessage('Description cannot exceed 255 characters'),
 ];
 
 router.post('/', roleValidation, validateRequest, roleController.createRole);

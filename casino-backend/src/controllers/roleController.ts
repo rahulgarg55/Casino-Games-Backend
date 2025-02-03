@@ -43,15 +43,15 @@ export const updateRole = async (req: Request, res: Response) => {
 
 /**
  * Deletes a role by its ID.
- * 
+ *
  * This function attempts to delete a role using the provided ID from the request parameters.
  * If the role is not found, it returns a 404 status with an error message.
  * If the role is successfully deleted, it returns a 200 status with a success message.
  * In case of any error during the process, it handles the error and returns a 400 status with an error message.
- * 
+ *
  * @param req - The request object containing the role ID in the parameters.
  * @param res - The response object used to send back the appropriate HTTP status and message.
- * 
+ *
  * @returns A JSON response indicating the result of the delete operation.
  */
 export const deleteRole = async (req: Request, res: Response) => {
@@ -70,7 +70,7 @@ function handleRoleError(
   res: Response,
   error: unknown,
   defaultStatus: number,
-  defaultMessage: string
+  defaultMessage: string,
 ) {
   if (error instanceof Error) {
     const status = error.message.includes('not found') ? 404 : defaultStatus;

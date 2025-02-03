@@ -18,7 +18,7 @@ export const generateTokenResponse = (user: IPlayer) => {
     role: user.role_id,
     email: user.email,
   };
-  console.log('payload', payload)
+  console.log('payload', payload);
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: '8h',

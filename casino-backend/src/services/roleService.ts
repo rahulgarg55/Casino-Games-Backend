@@ -7,7 +7,7 @@ interface RoleData {
 }
 
 export const createRole = async (data: RoleData): Promise<IRole> => {
-  const existingRole = await Role.findOne({ role_id:data.role_id });
+  const existingRole = await Role.findOne({ role_id: data.role_id });
   if (existingRole) {
     throw new Error('Role ID already exists');
   }
@@ -16,7 +16,10 @@ export const createRole = async (data: RoleData): Promise<IRole> => {
   return role.save();
 };
 
-export const getRoles = async (page: number = 1, limit: number = 10): Promise<IRole[]> => {
+export const getRoles = async (
+  page: number = 1,
+  limit: number = 10,
+): Promise<IRole[]> => {
   return Role.find({})
     .skip((page - 1) * limit)
     .limit(limit)
@@ -25,26 +28,25 @@ export const getRoles = async (page: number = 1, limit: number = 10): Promise<IR
 
 export const updateRole = async (
   id: number,
-  data: Partial<RoleData>
+  data: Partial<RoleData>,
 ): Promise<IRole | null> => {
-  if (data.role_id!==undefined) {
-    const existingRole = await Role.findOne({ role_id:data.role_id });
-    if (existingRole && existingRole.role_id!==id) {
+  if (data.role_id !== undefined) {
+    const existingRole = await Role.findOne({ role_id: data.role_id });
+    if (existingRole && existingRole.role_id !== id) {
       throw new Error('Role ID already exists');
     }
   }
 
-  return Role.findByIdAndUpdate(
-    {role_id:id},
-    data,
-    { new: true, runValidators: true }
-  );
+  return Role.findByIdAndUpdate({ role_id: id }, data, {
+    new: true,
+    runValidators: true,
+  });
 };
 
 export const deleteRole = async (id: number): Promise<IRole | null> => {
   return Role.findByIdAndUpdate(
-    {role_id:id},
+    { role_id: id },
     { is_deleted: true },
-    { new: true }
+    { new: true },
   );
 };
