@@ -170,15 +170,16 @@ export const forgotPassword = async (data: ForgotPasswordData) => {
   const token = crypto.randomBytes(20).toString('hex');
   player.reset_password_token = token;
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
-
+ 
   await player.save();
-
+  console.log('token', token)
   await sendResetEmail(email || phone_number!, token);
+  console.log('token', token)
 };
 
 export const resetPassword = async (data: ResetPasswordData) => {
   const { token, password } = data;
-
+  console.log('token', token)
   const player = await Player.findOne({
     reset_password_token: token,
     reset_password_expires: { $gt: new Date() },
@@ -193,6 +194,26 @@ export const resetPassword = async (data: ResetPasswordData) => {
   player.reset_password_expires = undefined;
 
   await player.save();
+};
+export const generateResetToken = async (email: string) => {
+  console.log('email', email);
+  const resetToken = crypto.randomBytes(32).toString('hex');
+
+  const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour
+
+  const player = await Player.findOneAndUpdate(
+    { email },
+    { reset_password_token: resetToken, reset_password_expires: resetTokenExpires },
+    { new: true },
+  );
+
+  if (!player) {
+    throw new Error('No account found with this email');
+  }
+
+  await sendResetEmail(player.email, resetToken);
+  console.log('resetToken', resetToken);
+  return resetToken;
 };
 
 export const updateProfile = async (

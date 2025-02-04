@@ -2,6 +2,9 @@ import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { generateTokenResponse } from '../utils/auth';
 import passport from 'passport';
+import { generateResetToken } from '../services/authService';
+import { resetPassword as resetPasswordService } from '../services/authService';
+
 
 interface CustomRequest extends Request {
   user?: {
@@ -71,22 +74,32 @@ export const login = async (req: Request, res: Response) => {
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    await authService.forgotPassword(req.body);
+    const { email, phone_number } = req.body;
+
+    if (!email && !phone_number) {
+      throw new Error('Either email or phone number is required');
+    }
+
+    await authService.forgotPassword({ email, phone_number });
+
     res.status(200).json({
       success: true,
-      message: 'Password reset email sent',
+      message: 'Password reset instructions sent successfully',
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Password reset failed',
+      error: error instanceof Error ? error.message : 'Failed to send reset instructions',
     });
   }
 };
-
 export const resetPassword = async (req: Request, res: Response) => {
   try {
-    await authService.resetPassword(req.body);
+    const { token, password } = req.body;
+
+    await resetPasswordService({ token, password });
+
+    // Respond to the client
     res.status(200).json({
       success: true,
       message: 'Password reset successful',
