@@ -11,17 +11,24 @@
     "prettier": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\""
   },
   "dependencies": {
+    "@types/express-serve-static-core": "^5.0.6",
+    "@types/passport-facebook": "^3.0.3",
+    "@types/passport-google-oauth20": "^2.0.16",
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.3",
     "cors": "^2.8.5",
     "dotenv": "^8.6.0",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
+    "express-session": "^1.18.1",
     "express-validator": "^7.2.1",
     "helmet": "^8.0.0",
     "jsonwebtoken": "^8.5.1",
     "mongoose": "^5.13.23",
     "nodemailer": "^6.10.0",
+    "passport": "^0.7.0",
+    "passport-facebook": "^3.0.0",
+    "passport-google-oauth20": "^2.0.0",
     "rate-limit": "^0.1.1"
   },
   "devDependencies": {
@@ -34,6 +41,7 @@
     "@types/jsonwebtoken": "^9.0.8",
     "@types/node": "^14.14.31",
     "@types/nodemailer": "^6.4.17",
+    "@types/passport": "^1.0.17",
     "jest": "^26.6.3",
     "prettier": "^3.4.2",
     "ts-node": "^10.9.2",

@@ -219,3 +219,11 @@ export const updateProfile = async (
 
   return player;
 };
+export const generateToken = async (player: any) => {
+  const token = jwt.sign(
+    { id: player._id, role: player.role_id }, 
+    process.env.JWT_SECRET!, 
+    { expiresIn: '8h' }
+  );
+  return { token, expiresIn: 28800 };
+};

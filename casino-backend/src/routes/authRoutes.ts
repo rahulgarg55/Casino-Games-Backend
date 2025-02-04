@@ -4,6 +4,7 @@ import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
 import { verifyToken } from '../utils/jwt';
+import passport from 'passport';
 
 const router = Router();
 
@@ -157,6 +158,21 @@ router.put(
   updateProfileValidation,
   validateRequest,
   authController.updateProfile,
+);
+// Google OAuth routes
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  authController.googleCallback,
+);
+
+// Facebook OAuth routes
+router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+router.get(
+  '/facebook/callback',
+  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  authController.facebookCallback,
 );
 
 export default router;

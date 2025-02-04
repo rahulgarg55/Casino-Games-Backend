@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { generateTokenResponse } from '../utils/auth';
+import passport from 'passport';
 
 interface CustomRequest extends Request {
   user?: {
@@ -120,4 +121,75 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
       error: error instanceof Error ? error.message : 'Profile update failed',
     });
   }
+};
+
+export const googleLogin = passport.authenticate('google', {
+  scope: ['profile', 'email'],
+});
+
+export const googleCallback = (req: Request, res: Response) => {
+  console.log('req', req)
+  passport.authenticate('google', (err:any, user:any) => {
+    if (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Authentication failed' });
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Login successful!',
+      data: {
+        user: {
+          id: user.player._id,
+          username: user.player.username,
+          email: user.player.email,
+          phone_number: user.player.phone_number,
+          role_id: user.player.role_id,
+          created_at: user.player.created_at,
+          gender: user.player.gender,
+          language: user.player.language,
+          country: user.player.country,
+          city: user.player.city,
+        },
+        token: user.token,
+        expiresIn: user.expiresIn,
+      },
+    });
+  })(req, res);
+};
+
+export const facebookLogin = passport.authenticate('facebook', {
+  scope: ['email'],
+});
+
+export const facebookCallback = (req: Request, res: Response) => {
+  passport.authenticate('facebook', (err:any, user:any) => {
+    if (err) {
+      return res.status(400).json({ success: false, error: err.message });
+    }
+    if (!user) {
+      return res.status(400).json({ success: false, error: 'Authentication failed' });
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Login successful!',
+      data: {
+        user: {
+          id: user.player._id,
+          username: user.player.username,
+          email: user.player.email,
+          phone_number: user.player.phone_number,
+          role_id: user.player.role_id,
+          created_at: user.player.created_at,
+          gender: user.player.gender,
+          language: user.player.language,
+          country: user.player.country,
+          city: user.player.city,
+        },
+        token: user.token,
+        expiresIn: user.expiresIn,
+      },
+    });
+  })(req, res);
 };
