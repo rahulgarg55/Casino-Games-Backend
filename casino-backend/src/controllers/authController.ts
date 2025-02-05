@@ -6,6 +6,7 @@ import { generateResetToken } from '../services/authService';
 import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player from '../models/player';
+import { VERIFICATION } from '../constants';
 
 
 interface CustomRequest extends Request {
@@ -239,4 +240,41 @@ export const facebookCallback = (req: Request, res: Response) => {
       },
     });
   })(req, res);
+};
+export const verifyEmail = async (req: Request, res: Response) => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({
+      success: false,
+      error: 'Verification token is required and must be a string',
+    });
+  }
+  try {
+    const player = await Player.findOne({
+      verification_token: token,
+      verification_token_expires: { $gt: new Date() }, // Ensure token hasn't expired
+    });
+    if (!player) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid or expired verification token',
+      });
+    }
+    // Mark the user as verified
+    player.is_verified = VERIFICATION.VERIFIED;
+    player.verification_token = undefined;
+    player.verification_token_expires = undefined;
+    await player.save();
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully',
+      redirectUrl: `${process.env.FRONTEND_URL}/login`, // Redirect to login page
+    });
+  } catch (error) {
+    console.error('Error verifying email:', error);
+    res.status(400).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Verification failed',
+    });
+  }
 };

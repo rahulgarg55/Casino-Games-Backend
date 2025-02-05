@@ -160,6 +160,12 @@ router.put(
   validateRequest,
   authController.updateProfile,
 );
+router.get(
+  '/verify-email',
+  body('token').notEmpty().withMessage('Token is required'),
+  validateRequest,
+  authController.verifyEmail
+);
 
 router.post(
   '/upload-photo',

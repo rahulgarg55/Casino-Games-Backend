@@ -6,6 +6,7 @@ import { STATUS, VERIFICATION, TWO_FA } from '../constants';
 import { sendResetEmail } from '../utils/sendResetEmail';
 import { generateTokenResponse } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
+import { sendVerificationEmail } from '../utils/sendEmail';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -71,7 +72,7 @@ export const register = async (data: RegistrationData) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
-
+  const verificationToken = crypto.randomBytes(32).toString('hex');
   const playerData: any = {
     email,
     phone_number,
@@ -80,6 +81,8 @@ export const register = async (data: RegistrationData) => {
     currency,
     status: STATUS.ACTIVE,
     is_verified: VERIFICATION.UNVERIFIED,
+    verification_token: verificationToken, // Store the token in the database
+    verification_token_expires: new Date(Date.now() + 3600000),
     is_2fa: TWO_FA.DISABLED,
   };
 
@@ -95,7 +98,15 @@ export const register = async (data: RegistrationData) => {
 
   const player = new Player(playerData);
   await player.save();
-
+  if (email) {
+    try {
+      await sendVerificationEmail(email, verificationToken);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new Error('Registration successful, but failed to send verification email.');
+    }
+  }
+ 
   const tokenData = generateTokenResponse(player);
 
   return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };

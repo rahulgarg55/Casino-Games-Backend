@@ -22,6 +22,8 @@ export interface IPlayer extends Document {
   role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
   reset_password_token?: string;
   reset_password_expires?: Date;
+  verification_token?: string;
+  verification_token_expires?: Date;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -136,6 +138,14 @@ const playerSchema: Schema = new Schema(
       type: Date,
       default: null,
     },
+    verification_token: {
+      type: String,
+      default: null,
+    },
+    verification_token_expires: {
+      type: Date,
+      default: null,
+    }
   },
   {
     timestamps: {
