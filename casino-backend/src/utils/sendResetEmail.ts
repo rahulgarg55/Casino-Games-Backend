@@ -1,20 +1,6 @@
-import nodemailer from 'nodemailer';
-import { createTransport, TransportOptions } from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
-let transporter = nodemailer.createTransport({
-  service: "gmail",
-  port:465,
-  secure:true,
-  logger:true,
-  secureConnection:false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls:{
-    rejectUnauthorized:true
-  }
-} as TransportOptions);
+sgMail.setApiKey(process.env.SENDGRID_API_KEY || '');
 
 const getEmailContent = (resetUrl: string) => ({
   subject: 'Password Reset Request',
@@ -23,21 +9,19 @@ const getEmailContent = (resetUrl: string) => ({
 });
 
 export const sendResetEmail = async (to: string, token: string) => {
-  console.log('to', to);
-  console.log('token', token)
   try {
     const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
     const { subject, text, html } = getEmailContent(resetUrl);
 
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    const msg = {
       to,
+      from: process.env.SENDGRID_SENDER_EMAIL || 'default@example.com',
       subject,
       text,
       html,
     };
 
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
   } catch (error) {
     console.error('Failed to send reset email:', error);
     throw new Error('Failed to send reset email');
