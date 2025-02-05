@@ -4,7 +4,8 @@ import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
 import { verifyToken } from '../utils/jwt';
-import passport from 'passport';
+import passport, { authenticate } from 'passport';
+import  upload  from '../middlewares/uploadMiddleware';
 
 const router = Router();
 
@@ -159,6 +160,13 @@ router.put(
   validateRequest,
   authController.updateProfile,
 );
+
+router.post(
+  '/upload-photo',
+  verifyToken,
+  upload.single('photo'),
+  authController.uploadPhoto,
+)
 // Google OAuth routes
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 router.get(

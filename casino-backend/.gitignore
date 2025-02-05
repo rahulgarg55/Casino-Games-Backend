@@ -30,3 +30,8 @@ build/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Upload directory
+uploads/
+uploads/*
+!uploads/.gitkeep

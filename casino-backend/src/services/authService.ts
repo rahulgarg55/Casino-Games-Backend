@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
 import { sendResetEmail } from '../utils/sendResetEmail';
 import { generateTokenResponse } from '../utils/auth';
-
+import cloudinary from '../utils/cloudinary';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -240,6 +240,7 @@ export const updateProfile = async (
 
   return player;
 };
+
 export const generateToken = async (player: any) => {
   const token = jwt.sign(
     { id: player._id, role: player.role_id }, 

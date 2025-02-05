@@ -4,6 +4,8 @@ import { generateTokenResponse } from '../utils/auth';
 import passport from 'passport';
 import { generateResetToken } from '../services/authService';
 import { resetPassword as resetPasswordService } from '../services/authService';
+import cloudinary from '../utils/cloudinary';
+import Player from '../models/player';
 
 
 interface CustomRequest extends Request {
@@ -112,6 +114,7 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
     console.log('req.user', req.user);
@@ -135,6 +138,37 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
     });
   }
 };
+
+export const uploadPhoto = async(req:CustomRequest, res: Response)=>{
+  try{
+    if(!req.file){
+      throw new Error('No file uploaded');
+    }
+    const playerId = req.user!.id;
+    const player = await Player.findById(playerId);
+    if(!player){
+      throw new Error('Player not found');
+    }
+    //Upload file to Cloudinary 
+    const result = await cloudinary.uploader.upload(req.file.path,{
+      folder: 'player_photos',
+    });
+    player.photo = result.secure_url;
+    await player.save();
+    res.status(200).json({
+      success: true,
+      message: 'Photo uploaded successfully',
+      data:{
+        photo: player.photo,
+      },
+    });
+  }catch(error){
+    res.status(400).json({
+      success:false,
+      error: error instanceof Error ? error.message : 'Photo upload failed',
+    })
+  }
+}
 
 export const googleLogin = passport.authenticate('google', {
   scope: ['profile', 'email'],
