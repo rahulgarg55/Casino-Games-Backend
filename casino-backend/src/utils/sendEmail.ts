@@ -4,7 +4,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 
 export const sendVerificationEmail = async (
   to: string,
-  verificationToken: string
+  verificationToken: string,
 ) => {
   const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
 

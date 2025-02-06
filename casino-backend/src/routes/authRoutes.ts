@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
 import { verifyToken } from '../utils/jwt';
 import passport, { authenticate } from 'passport';
-import  upload  from '../middlewares/uploadMiddleware';
+import upload from '../middlewares/uploadMiddleware';
 
 const router = Router();
 
@@ -13,6 +13,11 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: 'Too many attempts from this IP, please try again later',
+});
+const resendEmailLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 3,
+  message: 'Too many attempts. Please try again later.',
 });
 
 const registrationValidation = [
@@ -152,6 +157,7 @@ router.post(
   validateRequest,
   authController.resetPassword,
 );
+router.get('/profile', verifyToken, authController.viewProfile);
 
 router.put(
   '/profile',
@@ -164,7 +170,7 @@ router.get(
   '/verify-email',
   body('token').notEmpty().withMessage('Token is required'),
   validateRequest,
-  authController.verifyEmail
+  authController.verifyEmail,
 );
 
 router.post(
@@ -172,9 +178,22 @@ router.post(
   verifyToken,
   upload.single('photo'),
   authController.uploadPhoto,
-)
+);
+router.post(
+  '/resend-verification-email',
+  resendEmailLimiter,
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  validateRequest,
+  authController.resendVerificationEmail,
+);
 // Google OAuth routes
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] }),
+);
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -182,7 +201,10 @@ router.get(
 );
 
 // Facebook OAuth routes
-router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+router.get(
+  '/facebook',
+  passport.authenticate('facebook', { scope: ['email'] }),
+);
 router.get(
   '/facebook/callback',
   passport.authenticate('facebook', { failureRedirect: '/login' }),

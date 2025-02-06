@@ -81,7 +81,7 @@ export const register = async (data: RegistrationData) => {
     currency,
     status: STATUS.ACTIVE,
     is_verified: VERIFICATION.UNVERIFIED,
-    verification_token: verificationToken, // Store the token in the database
+    verification_token: verificationToken,
     verification_token_expires: new Date(Date.now() + 3600000),
     is_2fa: TWO_FA.DISABLED,
   };
@@ -103,25 +103,36 @@ export const register = async (data: RegistrationData) => {
       await sendVerificationEmail(email, verificationToken);
     } catch (error) {
       console.error('Failed to send verification email:', error);
-      throw new Error('Registration successful, but failed to send verification email.');
+      throw new Error(
+        'Registration successful, but failed to send verification email.',
+      );
     }
   }
- 
-  const tokenData = generateTokenResponse(player);
 
+  const tokenData = generateTokenResponse(player);
   return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };
 };
 
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;
+
   if (!email && !phone_number) {
     throw new Error('Either email or phone number is required');
   }
-  const player = await Player.findOne({
-    $or: [{ email }, { phone_number }],
-  }).select('+password_hash');
+  const query = {
+    $or: [
+      { email: { $eq: email, $exists: true } },
+      { phone_number: { $eq: phone_number, $exists: true } },
+    ],
+  };
+
+  const player = await Player.findOne(query).select('+password_hash');
 
   if (!player) {
+    throw new Error('Invalid credentials');
+  }
+
+  if (email && player.email !== email) {
     throw new Error('Invalid credentials');
   }
 
@@ -129,7 +140,6 @@ export const login = async (data: LoginData) => {
   if (!isMatch) {
     throw new Error('Invalid credentials');
   }
-
   player.last_login = new Date();
   await player.save();
 
@@ -140,18 +150,10 @@ export const login = async (data: LoginData) => {
     throw new Error('Please verify your email first');
   }
 
-  const token = jwt.sign(
-    {
-      id: player._id,
-      role: player.role_id,
-      status: player.status === STATUS.ACTIVE ? 'active' : 'inactive',
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: '8h' },
-  );
+  const tokenData = generateTokenResponse(player);
 
   return {
-    token,
+    token: tokenData.token,
     user: {
       id: player._id,
       username: player.username,
@@ -167,6 +169,39 @@ export const login = async (data: LoginData) => {
   };
 };
 
+// if (player.is_verified === VERIFICATION.UNVERIFIED) {
+//   throw new Error('Please verify your email first');
+// }
+
+// const token = jwt.sign(
+//   {
+//     sub: player._id,
+//     role: player.role_id,
+//     status: player.status === STATUS.ACTIVE ? 'active' : 'inactive',
+//   },
+//   process.env.JWT_SECRET,
+//   { expiresIn: '8h' },
+// );
+//   const tokenData = generateTokenResponse(player);
+//   console.log('token', tokenData)
+
+//   return {
+//     token:tokenData.token,
+//     user: {
+//       id: player._id,
+//       username: player.username,
+//       email: player.email,
+//       phone_number: player.phone_number,
+//       role: player.role_id,
+//       status: player.status,
+//       gender: player.gender,
+//       language: player.language,
+//       country: player.country,
+//       city: player.city,
+//     },
+//   };
+// };
+
 export const forgotPassword = async (data: ForgotPasswordData) => {
   const { email, phone_number } = data;
   if (!email && !phone_number) {
@@ -181,16 +216,13 @@ export const forgotPassword = async (data: ForgotPasswordData) => {
   const token = crypto.randomBytes(20).toString('hex');
   player.reset_password_token = token;
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
- 
+
   await player.save();
-  console.log('token', token)
   await sendResetEmail(email || phone_number!, token);
-  console.log('token', token)
 };
 
 export const resetPassword = async (data: ResetPasswordData) => {
   const { token, password } = data;
-  console.log('token', token)
   const player = await Player.findOne({
     reset_password_token: token,
     reset_password_expires: { $gt: new Date() },
@@ -207,14 +239,16 @@ export const resetPassword = async (data: ResetPasswordData) => {
   await player.save();
 };
 export const generateResetToken = async (email: string) => {
-  console.log('email', email);
   const resetToken = crypto.randomBytes(32).toString('hex');
 
   const resetTokenExpires = new Date(Date.now() + 3600000); // 1 hour
 
   const player = await Player.findOneAndUpdate(
     { email },
-    { reset_password_token: resetToken, reset_password_expires: resetTokenExpires },
+    {
+      reset_password_token: resetToken,
+      reset_password_expires: resetTokenExpires,
+    },
     { new: true },
   );
 
@@ -223,7 +257,6 @@ export const generateResetToken = async (email: string) => {
   }
 
   await sendResetEmail(player.email, resetToken);
-  console.log('resetToken', resetToken);
   return resetToken;
 };
 
@@ -254,9 +287,9 @@ export const updateProfile = async (
 
 export const generateToken = async (player: any) => {
   const token = jwt.sign(
-    { id: player._id, role: player.role_id }, 
-    process.env.JWT_SECRET!, 
-    { expiresIn: '8h' }
+    { id: player._id, role: player.role_id },
+    process.env.JWT_SECRET!,
+    { expiresIn: '8h' },
   );
   return { token, expiresIn: 28800 };
 };

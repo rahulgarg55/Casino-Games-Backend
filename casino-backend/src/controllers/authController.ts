@@ -7,10 +7,12 @@ import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player from '../models/player';
 import { VERIFICATION } from '../constants';
-
+import crypto from 'crypto';
+import { sendVerificationEmail } from '../utils/sendEmail';
 
 interface CustomRequest extends Request {
   user?: {
+    sub: string;
     id: string;
     role: number;
   };
@@ -92,7 +94,10 @@ export const forgotPassword = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to send reset instructions',
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to send reset instructions',
     });
   }
 };
@@ -115,12 +120,39 @@ export const resetPassword = async (req: Request, res: Response) => {
   }
 };
 
+export const viewProfile = async (req: CustomRequest, res: Response) => {
+  try {
+    const playerId = req.user!.id;
+    const player = await Player.findById(playerId).select('-password_hash');
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+    res.status(200).json({
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: {
+        user: player.toObject(),
+        gender: player.gender,
+        language: player.language,
+        country: player.country,
+        city: player.city,
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error:
+        error instanceof Error ? error.message : 'Failed to retrieve profile',
+    });
+  }
+};
 
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
-    console.log('req.user', req.user);
-    const user = await authService.updateProfile(req.user!.id, req.body);
-    console.log('user', user);
+    const user = await authService.updateProfile(req.user!.sub, req.body);
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
@@ -140,18 +172,18 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
   }
 };
 
-export const uploadPhoto = async(req:CustomRequest, res: Response)=>{
-  try{
-    if(!req.file){
+export const uploadPhoto = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.file) {
       throw new Error('No file uploaded');
     }
     const playerId = req.user!.id;
     const player = await Player.findById(playerId);
-    if(!player){
+    if (!player) {
       throw new Error('Player not found');
     }
-    //Upload file to Cloudinary 
-    const result = await cloudinary.uploader.upload(req.file.path,{
+    //Upload file to Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'player_photos',
     });
     player.photo = result.secure_url;
@@ -159,30 +191,31 @@ export const uploadPhoto = async(req:CustomRequest, res: Response)=>{
     res.status(200).json({
       success: true,
       message: 'Photo uploaded successfully',
-      data:{
+      data: {
         photo: player.photo,
       },
     });
-  }catch(error){
+  } catch (error) {
     res.status(400).json({
-      success:false,
+      success: false,
       error: error instanceof Error ? error.message : 'Photo upload failed',
-    })
+    });
   }
-}
+};
 
 export const googleLogin = passport.authenticate('google', {
   scope: ['profile', 'email'],
 });
 
 export const googleCallback = (req: Request, res: Response) => {
-  console.log('req', req)
-  passport.authenticate('google', (err:any, user:any) => {
+  passport.authenticate('google', (err: any, user: any) => {
     if (err) {
       return res.status(400).json({ success: false, error: err.message });
     }
     if (!user) {
-      return res.status(400).json({ success: false, error: 'Authentication failed' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Authentication failed' });
     }
     res.status(200).json({
       success: true,
@@ -212,12 +245,14 @@ export const facebookLogin = passport.authenticate('facebook', {
 });
 
 export const facebookCallback = (req: Request, res: Response) => {
-  passport.authenticate('facebook', (err:any, user:any) => {
+  passport.authenticate('facebook', (err: any, user: any) => {
     if (err) {
       return res.status(400).json({ success: false, error: err.message });
     }
     if (!user) {
-      return res.status(400).json({ success: false, error: 'Authentication failed' });
+      return res
+        .status(400)
+        .json({ success: false, error: 'Authentication failed' });
     }
     res.status(200).json({
       success: true,
@@ -275,6 +310,50 @@ export const verifyEmail = async (req: Request, res: Response) => {
     res.status(400).json({
       success: false,
       error: error instanceof Error ? error.message : 'Verification failed',
+    });
+  }
+};
+
+export const resendVerificationEmail = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  try {
+    const player = await Player.findOne({ email });
+
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        error: 'User not found',
+      });
+    }
+
+    if (player.is_verified === VERIFICATION.VERIFIED) {
+      return res.status(400).json({
+        success: false,
+        error: 'Email is already verified',
+      });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    player.verification_token = verificationToken;
+    player.verification_token_expires = new Date(Date.now() + 3600000);
+    await player.save();
+
+    // Send the verification email
+    await sendVerificationEmail(email, verificationToken);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email resent successfully',
+    });
+  } catch (error) {
+    console.error('Error resending verification email:', error);
+    res.status(400).json({
+      success: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to resend verification email',
     });
   }
 };

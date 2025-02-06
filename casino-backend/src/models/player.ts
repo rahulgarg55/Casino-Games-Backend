@@ -145,7 +145,7 @@ const playerSchema: Schema = new Schema(
     verification_token_expires: {
       type: Date,
       default: null,
-    }
+    },
   },
   {
     timestamps: {
