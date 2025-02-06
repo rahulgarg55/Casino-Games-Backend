@@ -15,7 +15,7 @@ export const sendResetEmail = async (to: string, token: string) => {
 
     const msg = {
       to,
-      from: process.env.SENDGRID_SENDER_EMAIL || 'default@example.com',
+      from: process.env.EMAIL_FROM || 'default@example.com',
       subject,
       text,
       html,
