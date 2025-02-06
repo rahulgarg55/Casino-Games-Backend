@@ -152,7 +152,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
 
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
-    const user = await authService.updateProfile(req.user!.sub, req.body);
+    const user = await authService.updateProfile(req.user!.id, req.body);
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',

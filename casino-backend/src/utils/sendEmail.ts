@@ -6,8 +6,7 @@ export const sendVerificationEmail = async (
   to: string,
   verificationToken: string,
 ) => {
-  const verificationLink = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
-
+  const verificationLink = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
   const msg = {
     to,
     from: process.env.EMAIL_FROM!,
