@@ -6,7 +6,7 @@
   "scripts": {
     "start": "ts-node src/server.ts",
     "build": "tsc",
-"dev": "ts-node-dev --watch .env src/server.ts",
+    "dev": "ts-node-dev --watch .env src/server.ts",
     "test": "jest",
     "prettier": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,scss,md}\""
   },
@@ -34,7 +34,8 @@
     "passport": "^0.7.0",
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
-    "rate-limit": "^0.1.1"
+    "rate-limit": "^0.1.1",
+    "twilio": "^5.4.3"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

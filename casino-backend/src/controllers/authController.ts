@@ -21,10 +21,9 @@ interface CustomRequest extends Request {
 export const register = async (req: Request, res: Response) => {
   try {
     const { player, token, expiresIn } = await authService.register(req.body);
-    const message = 'Thank you for registering!';
     res.status(201).json({
       success: true,
-      message,
+      message: 'User registered successfully',
       data: {
         user: {
           id: player._id,
@@ -43,9 +42,10 @@ export const register = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Invalid request. Please check your input';
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Registration failed',
+      error: errorMessage
     });
   }
 };
@@ -53,10 +53,9 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { user, token } = await authService.login(req.body);
-    const message = 'Login successful!';
     res.status(200).json({
       success: true,
-      message,
+      message: 'Login successful',
       data: {
         user: {
           ...user,
@@ -70,9 +69,10 @@ export const login = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Invalid username or password';
     res.status(401).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Authentication failed',
+      error: errorMessage
     });
   }
 };
@@ -82,22 +82,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
     const { email, phone_number } = req.body;
 
     if (!email && !phone_number) {
-      throw new Error('Either email or phone number is required');
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide all required fields: username, password, email'
+      });
     }
-
     await authService.forgotPassword({ email, phone_number });
 
+  
     res.status(200).json({
       success: true,
-      message: 'Password reset instructions sent successfully',
+      message: 'Password reset link has been sent to your email'
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Invalid request. Please check your input';
     res.status(400).json({
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Failed to send reset instructions',
+      error: errorMessage
     });
   }
 };
@@ -107,15 +108,15 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     await resetPasswordService({ token, password });
 
-    // Respond to the client
     res.status(200).json({
       success: true,
-      message: 'Password reset successful',
+      message: 'Password updated successfully'
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Invalid or expired reset token';
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Password reset failed',
+      error: errorMessage
     });
   }
 };
@@ -132,7 +133,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     }
     res.status(200).json({
       success: true,
-      message: 'Profile retrieved successfully',
+      message: 'User profile retrieved successfully',
       data: {
         user: player.toObject(),
         gender: player.gender,
@@ -144,8 +145,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
   } catch (error) {
     res.status(400).json({
       success: false,
-      error:
-        error instanceof Error ? error.message : 'Failed to retrieve profile',
+      error: 'An unexpected error occurred. Please try again later'
     });
   }
 };
@@ -155,7 +155,7 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
     const user = await authService.updateProfile(req.user!.id, req.body);
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
+      message: 'User profile retrieved successfully',
       data: {
         ...user.toObject(),
         gender: user.gender,
@@ -165,9 +165,10 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
       },
     });
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later';
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Profile update failed',
+      error: errorMessage
     });
   }
 };
@@ -175,14 +176,19 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 export const uploadPhoto = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.file) {
-      throw new Error('No file uploaded');
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid request. Please check your input'
+      });
     }
     const playerId = req.user!.id;
     const player = await Player.findById(playerId);
     if (!player) {
-      throw new Error('Player not found');
+      return res.status(404).json({
+        success: false,
+        error: 'User not found'
+      });
     }
-    //Upload file to Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'player_photos',
     });
@@ -198,7 +204,7 @@ export const uploadPhoto = async (req: CustomRequest, res: Response) => {
   } catch (error) {
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Photo upload failed',
+      error: 'An unexpected error occurred. Please try again later'
     });
   }
 };
@@ -210,12 +216,16 @@ export const googleLogin = passport.authenticate('google', {
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', (err: any, user: any) => {
     if (err) {
-      return res.status(400).json({ success: false, error: err.message });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'An unexpected error occurred. Please try again later'
+      });
     }
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Authentication failed' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid username or password'
+      });
     }
     res.status(200).json({
       success: true,
@@ -247,12 +257,16 @@ export const facebookLogin = passport.authenticate('facebook', {
 export const facebookCallback = (req: Request, res: Response) => {
   passport.authenticate('facebook', (err: any, user: any) => {
     if (err) {
-      return res.status(400).json({ success: false, error: err.message });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'An unexpected error occurred. Please try again later'
+      });
     }
     if (!user) {
-      return res
-        .status(400)
-        .json({ success: false, error: 'Authentication failed' });
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid username or password'
+      });
     }
     res.status(200).json({
       success: true,
@@ -278,38 +292,40 @@ export const facebookCallback = (req: Request, res: Response) => {
 };
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
+  console.log('token', token)
   if (!token || typeof token !== 'string') {
     return res.status(400).json({
       success: false,
-      error: 'Verification token is required and must be a string',
+      error: 'Invalid or expired token. Please login again'
     });
   }
   try {
     const player = await Player.findOne({
       verification_token: token,
-      verification_token_expires: { $gt: new Date() }, // Ensure token hasn't expired
+      verification_token_expires: { $gt: new Date() },
     });
+    console.log('player', player)
     if (!player) {
       return res.status(400).json({
         success: false,
-        error: 'Invalid or expired verification token',
+        error: 'Invalid or expired token. Please login again'
       });
     }
-    // Mark the user as verified
+
     player.is_verified = VERIFICATION.VERIFIED;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
+    console.log('player', player)
     await player.save();
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully',
-      redirectUrl: `${process.env.FRONTEND_URL}/login`, // Redirect to login page
+      message: 'User registered successfully',
+      redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
-    console.error('Error verifying email:', error);
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Verification failed',
+      error: 'An unexpected error occurred. Please try again later'
     });
   }
 };
@@ -323,14 +339,14 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     if (!player) {
       return res.status(404).json({
         success: false,
-        error: 'User not found',
+        error: 'No account found with this email address'
       });
     }
 
     if (player.is_verified === VERIFICATION.VERIFIED) {
       return res.status(400).json({
         success: false,
-        error: 'Email is already verified',
+        error: 'Email is already registered',
       });
     }
 
@@ -339,21 +355,33 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     player.verification_token_expires = new Date(Date.now() + 3600000);
     await player.save();
 
-    // Send the verification email
     await sendVerificationEmail(email, verificationToken);
 
     res.status(200).json({
       success: true,
-      message: 'Verification email resent successfully',
+      message: 'Verification email has been sent'
     });
   } catch (error) {
-    console.error('Error resending verification email:', error);
     res.status(400).json({
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Failed to resend verification email',
+      error: 'An unexpected error occurred. Please try again later'
     });
   }
 };
+
+export const verifyPhone = async(req: Request, res:Response)=>{
+  try{
+    const {phone_number, code} = req.body;
+    await authService.verifyPhoneNumber(phone_number, code);
+    res.status(200).json({
+      success: true,
+      message: 'Phone number verified successfully'
+    });
+  }catch (error) {
+      res.status(400).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Verification failed'
+      });
+  }
+
+}

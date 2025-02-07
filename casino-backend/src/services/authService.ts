@@ -7,6 +7,7 @@ import { sendResetEmail } from '../utils/sendResetEmail';
 import { generateTokenResponse } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
+import { sendSmsVerification } from '../utils/sendSms';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -58,8 +59,9 @@ export const register = async (data: RegistrationData) => {
   } = data;
 
   if (!email && !phone_number) {
-    throw new Error('Either email or phone number is required');
+    throw new Error('Please provide all required fields: username, password, email');
   }
+
 
   const query: any[] = [];
   if (email) query.push({ email });
@@ -68,11 +70,25 @@ export const register = async (data: RegistrationData) => {
 
   const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
-    throw new Error('Username, email, or phone number already in use');
+    if (existingUser.username === username) {
+      throw new Error('Username is already taken');
+    }
+    if (existingUser.email === email) {
+      throw new Error('Email is already registered');
+    }
+    if (existingUser.phone_number === phone_number) {
+      throw new Error('Phone number is already registered');
+    }
+
+  }
+  if (password.length < 8 || !/\d/.test(password)) {
+    throw new Error('Password must be at least 8 characters long and include a number');
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
+  const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
+  console.log('verificationToken', verificationToken)
   const playerData: any = {
     email,
     phone_number,
@@ -83,6 +99,8 @@ export const register = async (data: RegistrationData) => {
     is_verified: VERIFICATION.UNVERIFIED,
     verification_token: verificationToken,
     verification_token_expires: new Date(Date.now() + 3600000),
+    sms_code: phone_number ? smsCode : undefined,
+    sms_code_expires: phone_number ? new Date(Date.now() + 600000) : undefined, // 10 minutes
     is_2fa: TWO_FA.DISABLED,
   };
 
@@ -99,25 +117,38 @@ export const register = async (data: RegistrationData) => {
   const player = new Player(playerData);
   await player.save();
   if (email) {
-    try {
-      await sendVerificationEmail(email, verificationToken);
-    } catch (error) {
-      console.error('Failed to send verification email:', error);
-      throw new Error(
-        'Registration successful, but failed to send verification email.',
-      );
-    }
+    await sendVerificationEmail(email, verificationToken);
+  } else if (phone_number) {
+    await sendSmsVerification(phone_number, smsCode);
   }
+
 
   const tokenData = generateTokenResponse(player);
   return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };
 };
 
+export const verifyPhoneNumber = async (phoneNumber: string, code: string)=>{
+  const player = await Player.findOne({
+    phone_number: phoneNumber,
+    sms_code: code,
+    sms_code_expires: { $gt: new Date() },
+  });
+  if(!player){
+    throw new Error('Invalid or expired verification code');
+  }
+  player.is_verified = VERIFICATION.VERIFIED;
+  player.sms_code = undefined;  
+  player.sms_code_expires = undefined;
+  await player.save();
+
+  return {message: 'Phone number verified successfully'};
+}
+
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;
 
   if (!email && !phone_number) {
-    throw new Error('Either email or phone number is required');
+    throw new Error('Invalid request. Please check your input');
   }
   const query = {
     $or: [
@@ -129,25 +160,26 @@ export const login = async (data: LoginData) => {
   const player = await Player.findOne(query).select('+password_hash');
 
   if (!player) {
-    throw new Error('Invalid credentials');
-  }
-
-  if (email && player.email !== email) {
-    throw new Error('Invalid credentials');
+    throw new Error('Invalid username or password');
   }
 
   const isMatch = await bcrypt.compare(password, player.password_hash);
   if (!isMatch) {
-    throw new Error('Invalid credentials');
+    throw new Error('Invalid username or password');
   }
+  if (player.is_verified === VERIFICATION.UNVERIFIED) {
+    throw new Error('Please verify your account');
+  }
+
+  if (player.status !== STATUS.ACTIVE) {
+    throw new Error('Your account has been locked. Please contact support');
+  }
+
   player.last_login = new Date();
   await player.save();
 
   if (!process.env.JWT_SECRET) {
-    throw new Error('JWT secret not configured');
-  }
-  if (player.is_verified === VERIFICATION.UNVERIFIED) {
-    throw new Error('Please verify your email first');
+    throw new Error('An unexpected error occurred. Please try again later');
   }
 
   const tokenData = generateTokenResponse(player);
@@ -169,51 +201,19 @@ export const login = async (data: LoginData) => {
   };
 };
 
-// if (player.is_verified === VERIFICATION.UNVERIFIED) {
-//   throw new Error('Please verify your email first');
-// }
-
-// const token = jwt.sign(
-//   {
-//     sub: player._id,
-//     role: player.role_id,
-//     status: player.status === STATUS.ACTIVE ? 'active' : 'inactive',
-//   },
-//   process.env.JWT_SECRET,
-//   { expiresIn: '8h' },
-// );
-//   const tokenData = generateTokenResponse(player);
-//   console.log('token', tokenData)
-
-//   return {
-//     token:tokenData.token,
-//     user: {
-//       id: player._id,
-//       username: player.username,
-//       email: player.email,
-//       phone_number: player.phone_number,
-//       role: player.role_id,
-//       status: player.status,
-//       gender: player.gender,
-//       language: player.language,
-//       country: player.country,
-//       city: player.city,
-//     },
-//   };
-// };
-
 export const forgotPassword = async (data: ForgotPasswordData) => {
   const { email, phone_number } = data;
   if (!email && !phone_number) {
-    throw new Error('Either email or phone number is required');
+    throw new Error('Invalid request. Please check your input');
   }
 
   const player = await Player.findOne({ $or: [{ email }, { phone_number }] });
   if (!player) {
-    throw new Error('User not found');
+    throw new Error('No account found with this email address');
   }
 
   const token = crypto.randomBytes(20).toString('hex');
+  console.log('token', token)
   player.reset_password_token = token;
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
 
@@ -228,10 +228,10 @@ export const resetPassword = async (data: ResetPasswordData) => {
     reset_password_expires: { $gt: new Date() },
   });
 
+ 
   if (!player) {
-    throw new Error('Password reset token is invalid or has expired');
+    throw new Error('Invalid or expired reset token');
   }
-
   player.password_hash = await bcrypt.hash(password, 12);
   player.reset_password_token = undefined;
   player.reset_password_expires = undefined;
@@ -266,10 +266,12 @@ export const updateProfile = async (
 ) => {
   const player = await Player.findById(playerId);
   if (!player) {
-    throw new Error('Player not found');
+    throw new Error('User not found');
+  }
+  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    throw new Error('Invalid email format');
   }
 
-  // Object.assign(player, data);
   if (data.fullname) player.fullname = data.fullname;
   if (data.email) player.email = data.email;
   if (data.phone_number) player.phone_number = data.phone_number;
@@ -280,9 +282,21 @@ export const updateProfile = async (
   if (data.gender !== undefined) player.gender = data.gender;
   if (data.city !== undefined) player.city = data.city;
   if (data.country !== undefined) player.country = data.country;
-  await player.save();
-
-  return player;
+ 
+  try {
+    await player.save();
+    return player;
+  } catch (error) {
+    if (error.code === 11000) {
+      if (error.keyPattern.username) {
+        throw new Error('Username is already taken');
+      }
+      if (error.keyPattern.email) {
+        throw new Error('Email is already registered');
+      }
+    }
+    throw error;
+  }
 };
 
 export const generateToken = async (player: any) => {

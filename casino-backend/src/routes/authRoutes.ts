@@ -168,9 +168,15 @@ router.put(
 );
 router.get(
   '/verify-email',
-  body('token').notEmpty().withMessage('Token is required'),
   validateRequest,
   authController.verifyEmail,
+);
+
+router.post('/verify-phone',
+  body('phone_number').matches(/^\+?[1-9]\d{1,14}$/),
+  body('code').isLength({ min: 6, max: 6 }),
+  validateRequest,
+  authController.verifyPhone
 );
 
 router.post(

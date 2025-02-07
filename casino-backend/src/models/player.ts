@@ -24,6 +24,8 @@ export interface IPlayer extends Document {
   reset_password_expires?: Date;
   verification_token?: string;
   verification_token_expires?: Date;
+  sms_code?: string;
+  sms_code_expires?: Date;
   created_at?: Date;
   updated_at?: Date;
 }
@@ -146,6 +148,15 @@ const playerSchema: Schema = new Schema(
       type: Date,
       default: null,
     },
+    sms_code: {
+      type: String,
+      select: false
+    },
+    sms_code_expires: {
+      type: Date,
+      select: false
+    }
+    
   },
   {
     timestamps: {
