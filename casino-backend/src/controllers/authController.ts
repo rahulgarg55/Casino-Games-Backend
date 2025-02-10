@@ -150,6 +150,41 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
   }
 };
 
+export const getAllPlayers = async (req: Request, res: Response) => {
+  try {
+    const players = await Player.find()
+      .select('-password_hash')
+      .sort({ created_at: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: 'Players retrieved successfully',
+      data: {
+        players: players.map(player => ({
+          id: player._id,
+          username: player.username,
+          email: player.email,
+          phone_number: player.phone_number,
+          role_id: player.role_id,
+          status: player.status,
+          is_verified: player.is_verified,
+          created_at: player.created_at,
+          gender: player.gender,
+          language: player.language,
+          country: player.country,
+          city: player.city,
+        }))
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: 'An unexpected error occurred. Please try again later'
+    });
+  }
+};
+
+
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
     const user = await authService.updateProfile(req.user!.id, req.body);
