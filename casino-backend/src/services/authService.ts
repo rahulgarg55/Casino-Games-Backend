@@ -127,22 +127,22 @@ export const register = async (data: RegistrationData) => {
   return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };
 };
 
-export const verifyPhoneNumber = async (phoneNumber: string, code: string)=>{
-  const player = await Player.findOne({
-    phone_number: phoneNumber,
-    sms_code: code,
-    sms_code_expires: { $gt: new Date() },
-  });
-  if(!player){
-    throw new Error('Invalid or expired verification code');
-  }
-  player.is_verified = VERIFICATION.VERIFIED;
-  player.sms_code = undefined;  
-  player.sms_code_expires = undefined;
-  await player.save();
+  export const verifyPhoneNumber = async (phoneNumber: string, code: string)=>{
+    const player = await Player.findOne({
+      phone_number: phoneNumber,
+      sms_code: code,
+      sms_code_expires: { $gt: new Date() },
+    });
+    if(!player){
+      throw new Error('Invalid or expired verification code');
+    }
+    player.is_verified = VERIFICATION.VERIFIED;
+    player.sms_code = undefined;  
+    player.sms_code_expires = undefined;
+    await player.save();
 
-  return {message: 'Phone number verified successfully'};
-}
+    return {message: 'Phone number verified successfully'};
+  }
 
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;

@@ -369,19 +369,18 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
   }
 };
 
-export const verifyPhone = async(req: Request, res:Response)=>{
-  try{
-    const {phone_number, code} = req.body;
-    await authService.verifyPhoneNumber(phone_number, code);
-    res.status(200).json({
-      success: true,
-      message: 'Phone number verified successfully'
-    });
-  }catch (error) {
+export const verifyPhone = async (req: Request, res: Response) => {
+  try {
+      const { phone_number, code } = req.body;
+      await authService.verifyPhoneNumber(phone_number, code);
+      res.status(200).json({
+          success: true,
+          message: 'Phone number verified successfully'
+      });
+  } catch (error) {
       res.status(400).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Verification failed'
+          success: false,
+          error: error instanceof Error ? error.message : 'Verification failed'
       });
   }
-
-}
+};
