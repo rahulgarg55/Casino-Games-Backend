@@ -28,6 +28,7 @@ export const register = async (req: Request, res: Response) => {
         user: {
           id: player._id,
           username: player.username,
+          fullname:player.fullname,
           email: player.email,
           phone_number: player.phone_number,
           role_id: player.role_id,
@@ -36,6 +37,8 @@ export const register = async (req: Request, res: Response) => {
           language: player.language,
           country: player.country,
           city: player.city,
+          status: player.status,
+          is_verified: player.is_verified,
         },
         token,
         expiresIn,
@@ -163,7 +166,9 @@ export const getAllPlayers = async (req: Request, res: Response) => {
         players: players.map(player => ({
           id: player._id,
           username: player.username,
+          fullname: player.fullname,
           email: player.email,
+          currency: player.currency,
           phone_number: player.phone_number,
           role_id: player.role_id,
           status: player.status,

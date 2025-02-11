@@ -8,6 +8,7 @@ import { generateTokenResponse } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
+import language from '../models/language';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -16,6 +17,10 @@ interface RegistrationData {
   fullname?: string;
   patronymic?: string;
   currency: number; // 0 = USD, 1 = INR, 2 = Pound
+  language: string;
+  gender?: string;
+  city?: string;
+  country?: string;
 }
 
 interface LoginData {
@@ -56,6 +61,10 @@ export const register = async (data: RegistrationData) => {
     fullname,
     patronymic,
     currency,
+    language,
+    gender,
+    city,
+    country,
   } = data;
 
   if (!email && !phone_number) {
@@ -92,9 +101,11 @@ export const register = async (data: RegistrationData) => {
   const playerData: any = {
     email,
     phone_number,
+    fullname,
     password_hash: hashedPassword,
     role_id: 0, // Default to User
     currency,
+    language,
     status: STATUS.ACTIVE,
     is_verified: VERIFICATION.UNVERIFIED,
     verification_token: verificationToken,
@@ -102,6 +113,9 @@ export const register = async (data: RegistrationData) => {
     sms_code: phone_number ? smsCode : undefined,
     sms_code_expires: phone_number ? new Date(Date.now() + 600000) : undefined, // 10 minutes
     is_2fa: TWO_FA.DISABLED,
+    city,
+    country,
+    gender,
   };
 
   if (username) {
@@ -113,7 +127,6 @@ export const register = async (data: RegistrationData) => {
   if (patronymic) {
     playerData.patronymic = patronymic;
   }
-
   const player = new Player(playerData);
   await player.save();
   if (email) {
