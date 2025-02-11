@@ -189,7 +189,78 @@ export const getAllPlayers = async (req: Request, res: Response) => {
   }
 };
 
+export const updatePlayerStatus = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { status } = req.body;
+    console.log('userId', userId)
+    console.log('status', status)
 
+    if (status !== 0 && status !== 1) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid status value. Status must be 0 (inactive) or 1 (active).',
+      });
+    }
+
+    const player = await Player.findByIdAndUpdate(
+      userId,
+      { status },
+      { new: true }
+    );
+
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        error: 'Player not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Player status updated successfully',
+      data: {
+        id: player._id,
+        status: player.status,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later';
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+};
+
+export const deletePlayer = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    const player = await Player.findByIdAndDelete(userId);
+
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        error: 'Player not found',
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Player deleted successfully',
+      data: {
+        id: player._id,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later';
+    res.status(500).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+};
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
     const user = await authService.updateProfile(req.user!.id, req.body);

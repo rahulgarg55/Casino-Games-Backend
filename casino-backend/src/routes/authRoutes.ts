@@ -161,6 +161,14 @@ router.get('/profile', authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
 
+router.delete('/players/:userId', authController.deletePlayer);
+router.put(
+  '/players/:userId/status',
+  body('status').isInt({ min: 0, max: 1 }).withMessage('Status must be 0 or 1'),
+  validateRequest,
+  authController.updatePlayerStatus
+);
+
 router.put(
   '/profile',
   verifyToken,
