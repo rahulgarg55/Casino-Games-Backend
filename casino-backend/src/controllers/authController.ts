@@ -6,6 +6,7 @@ import { generateResetToken } from '../services/authService';
 import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player from '../models/player';
+import PlayerBalance from '../models/playerBalance';
 import { VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail } from '../utils/sendEmail';
@@ -20,7 +21,7 @@ interface CustomRequest extends Request {
 
 export const register = async (req: Request, res: Response) => {
   try {
-    const { player, token, expiresIn } = await authService.register(req.body);
+    const { player, balance, token, expiresIn } = await authService.register(req.body);
     res.status(201).json({
       success: true,
       message: 'User registered successfully',
@@ -39,6 +40,9 @@ export const register = async (req: Request, res: Response) => {
           city: player.city,
           status: player.status,
           is_verified: player.is_verified,
+          is_2fa: player.is_2fa,
+          balance: balance.balance,
+          currency: player.currency,
         },
         token,
         expiresIn,
@@ -134,16 +138,18 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
         error: 'User not found',
       });
     }
+
+    const balance = await PlayerBalance.findOne({ player_id: playerId });
+
     res.status(200).json({
       success: true,
       message: 'User profile retrieved successfully',
       data: {
-        user: player.toObject(),
-        gender: player.gender,
-        language: player.language,
-        country: player.country,
-        city: player.city,
-      },
+        user: {
+          ...player.toObject(),
+          balance: balance?.balance || 0
+        }
+      }
     });
   } catch (error) {
     res.status(400).json({
@@ -159,11 +165,10 @@ export const getAllPlayers = async (req: Request, res: Response) => {
       .select('-password_hash')
       .sort({ created_at: -1 });
 
-    res.status(200).json({
-      success: true,
-      message: 'Players retrieved successfully',
-      data: {
-        players: players.map(player => ({
+    const playersWithBalance = await Promise.all(
+      players.map(async (player) => {
+        const balance = await PlayerBalance.findOne({ player_id: player._id });
+        return {
           id: player._id,
           username: player.username,
           fullname: player.fullname,
@@ -178,7 +183,17 @@ export const getAllPlayers = async (req: Request, res: Response) => {
           language: player.language,
           country: player.country,
           city: player.city,
-        }))
+          is_2fa: player.is_2fa,
+          balance: balance?.balance || 0
+        };
+      })
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Players retrieved successfully',
+      data: {
+        players: playersWithBalance
       }
     });
   } catch (error) {
@@ -188,7 +203,6 @@ export const getAllPlayers = async (req: Request, res: Response) => {
     });
   }
 };
-
 export const updatePlayerStatus = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
@@ -263,20 +277,22 @@ export const deletePlayer = async (req: Request, res: Response) => {
 };
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
-    const user = await authService.updateProfile(req.user!.id, req.body);
+    const playerId = req.user!.id;
+    const player = await authService.updateProfile(playerId, req.body);
+    const balance = await PlayerBalance.findOne({ player_id: playerId });
+
     res.status(200).json({
       success: true,
-      message: 'User profile retrieved successfully',
+      message: 'Profile updated successfully',
       data: {
-        ...user.toObject(),
-        gender: user.gender,
-        language: user.language,
-        country: user.country,
-        city: user.city,
-      },
+        user: {
+          ...player.toObject(),
+          balance: balance?.balance || 0
+        }
+      }
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again later';
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
     res.status(400).json({
       success: false,
       error: errorMessage

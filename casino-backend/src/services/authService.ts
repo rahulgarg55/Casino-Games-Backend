@@ -1,4 +1,5 @@
 import Player from '../models/player';
+import PlayerBalance from '../models/playerBalance';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
@@ -9,6 +10,8 @@ import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
 import language from '../models/language';
+import  mongoose  from 'mongoose';
+import { session } from 'passport';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -127,17 +130,33 @@ export const register = async (data: RegistrationData) => {
   if (patronymic) {
     playerData.patronymic = patronymic;
   }
+
+  // const session = await mongoose.startSession();
+  // session.startTransaction();
+  try{
   const player = new Player(playerData);
   await player.save();
+
+  const playerBalance = new PlayerBalance({
+    player_id: player._id,
+    balance: 0,
+    currency: currency,
+    is_deleted:0
+  });
+  await playerBalance.save();
   if (email) {
     await sendVerificationEmail(email, verificationToken);
   } else if (phone_number) {
     await sendSmsVerification(phone_number, smsCode);
   }
 
-
+  // await session.commitTransaction();
   const tokenData = generateTokenResponse(player);
-  return { player, token: tokenData.token, expiresIn: tokenData.expiresIn };
+  return { player, balance:playerBalance, token: tokenData.token, expiresIn: tokenData.expiresIn };
+}catch(error){
+  // await session.abortTransaction();
+  throw error;
+}
 };
 
   export const verifyPhoneNumber = async (phoneNumber: string, code: string)=>{
@@ -191,6 +210,8 @@ export const login = async (data: LoginData) => {
   player.last_login = new Date();
   await player.save();
 
+  const playerBalance = await PlayerBalance.findOne({player_id: player._id});
+
   if (!process.env.JWT_SECRET) {
     throw new Error('An unexpected error occurred. Please try again later');
   }
@@ -210,6 +231,8 @@ export const login = async (data: LoginData) => {
       language: player.language,
       country: player.country,
       city: player.city,
+      balance: playerBalance?.balance || 0,
+      currency: playerBalance?.currency || 'USD',
     },
   };
 };
