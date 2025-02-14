@@ -205,6 +205,8 @@ router.post(
   validateRequest,
   authController.resendVerificationEmail,
 );
+
+router.get('/notifications', authController.getAdminNotifications)
 // Google OAuth routes
 router.get(
   '/google',

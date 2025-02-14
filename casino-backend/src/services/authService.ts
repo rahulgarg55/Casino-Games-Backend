@@ -9,6 +9,7 @@ import { generateTokenResponse } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
+import Notification,{NotificationType} from '../models/notification';
 import language from '../models/language';
 import  mongoose  from 'mongoose';
 import { session } from 'passport';
@@ -144,6 +145,21 @@ export const register = async (data: RegistrationData) => {
     is_deleted:0
   });
   await playerBalance.save();
+
+  const notification = new Notification({
+    type: NotificationType.USER_REGISTERED,
+    message: `New user ${username || email || phone_number} has registered`,
+    user_id: player._id,
+    metadata: {
+      username,
+      email,
+      phone_number,
+      country,
+      registration_date: new Date()
+    }
+  });
+  await notification.save();
+
   if (email) {
     await sendVerificationEmail(email, verificationToken);
   } else if (phone_number) {
@@ -333,6 +349,25 @@ export const updateProfile = async (
     }
     throw error;
   }
+};
+
+export const getNotifications = async (page: number = 1, limit: number = 20) => {
+  const notifications = await Notification.find()
+    .sort({ created_at: -1 })
+    .skip((page - 1) * limit)
+    .limit(limit)
+    .populate('user_id', 'username email phone_number');
+
+  const total = await Notification.countDocuments();
+
+  return {
+    notifications,
+    pagination: {
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    }
+  };
 };
 
 export const generateToken = async (player: any) => {

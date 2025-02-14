@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { generateTokenResponse } from '../utils/auth';
 import passport from 'passport';
-import { generateResetToken } from '../services/authService';
+import { generateResetToken, getNotifications } from '../services/authService';
 import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player from '../models/player';
@@ -272,6 +272,24 @@ export const deletePlayer = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: errorMessage,
+    });
+  }
+};
+export const getAdminNotifications = async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await getNotifications(page, limit);
+
+    res.json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch notifications'
     });
   }
 };
