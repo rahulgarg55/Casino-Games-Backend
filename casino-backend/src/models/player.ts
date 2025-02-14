@@ -26,6 +26,7 @@ export interface IPlayer extends Document {
   verification_token_expires?: Date;
   sms_code?: string;
   sms_code_expires?: Date;
+  payment_methods?: mongoose.Types.ObjectId[];
   created_at?: Date;
   updated_at?: Date;
 }
@@ -150,13 +151,18 @@ const playerSchema: Schema = new Schema(
     },
     sms_code: {
       type: String,
-      select: false
+      select: false,
     },
     sms_code_expires: {
       type: Date,
-      select: false
-    }
-    
+      select: false,
+    },
+    payment_methods: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'PaymentMethod',
+      },
+    ],
   },
   {
     timestamps: {

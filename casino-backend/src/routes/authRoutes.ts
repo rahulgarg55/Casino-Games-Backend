@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
+import * as paymentController from '../controllers/paymentController';
 import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
@@ -166,7 +167,7 @@ router.put(
   '/players/:userId/status',
   body('status').isInt({ min: 0, max: 1 }).withMessage('Status must be 0 or 1'),
   validateRequest,
-  authController.updatePlayerStatus
+  authController.updatePlayerStatus,
 );
 
 router.put(
@@ -176,17 +177,14 @@ router.put(
   validateRequest,
   authController.updateProfile,
 );
-router.get(
-  '/verify-email',
-  validateRequest,
-  authController.verifyEmail,
-);
+router.get('/verify-email', validateRequest, authController.verifyEmail);
 
-router.post('/verify-phone',
+router.post(
+  '/verify-phone',
   body('phone_number').matches(/^\+?[1-9]\d{1,14}$/),
   body('code').isLength({ min: 6, max: 6 }),
   validateRequest,
-  authController.verifyPhone
+  authController.verifyPhone,
 );
 
 router.post(
@@ -206,7 +204,44 @@ router.post(
   authController.resendVerificationEmail,
 );
 
-router.get('/notifications', authController.getAdminNotifications)
+router.get('/notifications', authController.getAdminNotifications);
+
+router.post(
+  '/payment-methods',
+  verifyToken,
+  [
+    body('method_type').isIn(['credit_card', 'paypal', 'bank_transfer']),
+    body('details').isObject(),
+    body('is_default').isBoolean(),
+  ],
+  paymentController.addPaymentMethod,
+);
+
+router.get(
+  '/payment-methods',
+  verifyToken,
+  paymentController.getPaymentMethods,
+);
+
+router.put(
+  '/payment-methods/:id',
+  verifyToken,
+  [
+    body('method_type')
+      .optional()
+      .isIn(['credit_card', 'paypal', 'bank_transfer']),
+    body('details').optional().isObject(),
+    body('is_default').optional().isBoolean(),
+  ],
+  paymentController.updatePaymentMethod,
+);
+
+// Delete a payment method
+router.delete(
+  '/payment-methods/:id',
+  verifyToken,
+  paymentController.deletePaymentMethod,
+);
 // Google OAuth routes
 router.get(
   '/google',

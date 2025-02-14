@@ -9,9 +9,9 @@ import { generateTokenResponse } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
-import Notification,{NotificationType} from '../models/notification';
+import Notification, { NotificationType } from '../models/notification';
 import language from '../models/language';
-import  mongoose  from 'mongoose';
+import mongoose from 'mongoose';
 import { session } from 'passport';
 interface RegistrationData {
   username?: string;
@@ -72,9 +72,10 @@ export const register = async (data: RegistrationData) => {
   } = data;
 
   if (!email && !phone_number) {
-    throw new Error('Please provide all required fields: username, password, email');
+    throw new Error(
+      'Please provide all required fields: username, password, email',
+    );
   }
-
 
   const query: any[] = [];
   if (email) query.push({ email });
@@ -92,16 +93,17 @@ export const register = async (data: RegistrationData) => {
     if (existingUser.phone_number === phone_number) {
       throw new Error('Phone number is already registered');
     }
-
   }
   if (password.length < 8 || !/\d/.test(password)) {
-    throw new Error('Password must be at least 8 characters long and include a number');
+    throw new Error(
+      'Password must be at least 8 characters long and include a number',
+    );
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log('verificationToken', verificationToken)
+  console.log('verificationToken', verificationToken);
   const playerData: any = {
     email,
     phone_number,
@@ -134,63 +136,68 @@ export const register = async (data: RegistrationData) => {
 
   // const session = await mongoose.startSession();
   // session.startTransaction();
-  try{
-  const player = new Player(playerData);
-  await player.save();
-
-  const playerBalance = new PlayerBalance({
-    player_id: player._id,
-    balance: 0,
-    currency: currency,
-    is_deleted:0
-  });
-  await playerBalance.save();
-
-  const notification = new Notification({
-    type: NotificationType.USER_REGISTERED,
-    message: `New user ${username || email || phone_number} has registered`,
-    user_id: player._id,
-    metadata: {
-      username,
-      email,
-      phone_number,
-      country,
-      registration_date: new Date()
-    }
-  });
-  await notification.save();
-
-  if (email) {
-    await sendVerificationEmail(email, verificationToken);
-  } else if (phone_number) {
-    await sendSmsVerification(phone_number, smsCode);
-  }
-
-  // await session.commitTransaction();
-  const tokenData = generateTokenResponse(player);
-  return { player, balance:playerBalance, token: tokenData.token, expiresIn: tokenData.expiresIn };
-}catch(error){
-  // await session.abortTransaction();
-  throw error;
-}
-};
-
-  export const verifyPhoneNumber = async (phoneNumber: string, code: string)=>{
-    const player = await Player.findOne({
-      phone_number: phoneNumber,
-      sms_code: code,
-      sms_code_expires: { $gt: new Date() },
-    });
-    if(!player){
-      throw new Error('Invalid or expired verification code');
-    }
-    player.is_verified = VERIFICATION.VERIFIED;
-    player.sms_code = undefined;  
-    player.sms_code_expires = undefined;
+  try {
+    const player = new Player(playerData);
     await player.save();
 
-    return {message: 'Phone number verified successfully'};
+    const playerBalance = new PlayerBalance({
+      player_id: player._id,
+      balance: 0,
+      currency: currency,
+      is_deleted: 0,
+    });
+    await playerBalance.save();
+
+    const notification = new Notification({
+      type: NotificationType.USER_REGISTERED,
+      message: `New user ${username || email || phone_number} has registered`,
+      user_id: player._id,
+      metadata: {
+        username,
+        email,
+        phone_number,
+        country,
+        registration_date: new Date(),
+      },
+    });
+    await notification.save();
+
+    if (email) {
+      await sendVerificationEmail(email, verificationToken);
+    } else if (phone_number) {
+      await sendSmsVerification(phone_number, smsCode);
+    }
+
+    // await session.commitTransaction();
+    const tokenData = generateTokenResponse(player);
+    return {
+      player,
+      balance: playerBalance,
+      token: tokenData.token,
+      expiresIn: tokenData.expiresIn,
+    };
+  } catch (error) {
+    // await session.abortTransaction();
+    throw error;
   }
+};
+
+export const verifyPhoneNumber = async (phoneNumber: string, code: string) => {
+  const player = await Player.findOne({
+    phone_number: phoneNumber,
+    sms_code: code,
+    sms_code_expires: { $gt: new Date() },
+  });
+  if (!player) {
+    throw new Error('Invalid or expired verification code');
+  }
+  player.is_verified = VERIFICATION.VERIFIED;
+  player.sms_code = undefined;
+  player.sms_code_expires = undefined;
+  await player.save();
+
+  return { message: 'Phone number verified successfully' };
+};
 
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;
@@ -226,7 +233,7 @@ export const login = async (data: LoginData) => {
   player.last_login = new Date();
   await player.save();
 
-  const playerBalance = await PlayerBalance.findOne({player_id: player._id});
+  const playerBalance = await PlayerBalance.findOne({ player_id: player._id });
 
   if (!process.env.JWT_SECRET) {
     throw new Error('An unexpected error occurred. Please try again later');
@@ -265,7 +272,7 @@ export const forgotPassword = async (data: ForgotPasswordData) => {
   }
 
   const token = crypto.randomBytes(20).toString('hex');
-  console.log('token', token)
+  console.log('token', token);
   player.reset_password_token = token;
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
 
@@ -280,7 +287,6 @@ export const resetPassword = async (data: ResetPasswordData) => {
     reset_password_expires: { $gt: new Date() },
   });
 
- 
   if (!player) {
     throw new Error('Invalid or expired reset token');
   }
@@ -334,7 +340,7 @@ export const updateProfile = async (
   if (data.gender !== undefined) player.gender = data.gender;
   if (data.city !== undefined) player.city = data.city;
   if (data.country !== undefined) player.country = data.country;
- 
+
   try {
     await player.save();
     return player;
@@ -351,7 +357,10 @@ export const updateProfile = async (
   }
 };
 
-export const getNotifications = async (page: number = 1, limit: number = 20) => {
+export const getNotifications = async (
+  page: number = 1,
+  limit: number = 20,
+) => {
   const notifications = await Notification.find()
     .sort({ created_at: -1 })
     .skip((page - 1) * limit)
@@ -365,8 +374,8 @@ export const getNotifications = async (page: number = 1, limit: number = 20) => 
     pagination: {
       total,
       page,
-      totalPages: Math.ceil(total / limit)
-    }
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 

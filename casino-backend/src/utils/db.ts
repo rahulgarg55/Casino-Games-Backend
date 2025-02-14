@@ -7,7 +7,7 @@ const connectDB = async () => {
       serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
       family: 4,
-      maxPoolSize: 50
+      maxPoolSize: 50,
     };
 
     mongoose.connection.on('connected', () => {
@@ -28,11 +28,13 @@ const connectDB = async () => {
       process.exit(0);
     });
 
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/Casino', options);
+    await mongoose.connect(
+      process.env.MONGODB_URI || 'mongodb://localhost:27017/Casino',
+      options,
+    );
 
     await mongoose.connection.db.command({ ping: 1 });
     console.log('Database indexes ensured');
-
   } catch (error) {
     console.error('MongoDB connection failed:', error);
     process.exit(1);
