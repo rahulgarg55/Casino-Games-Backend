@@ -3,17 +3,17 @@ import path from 'path';
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Save files in the 'uploads' folder
+    cb(null, 'game-images/');
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`); // Generate a unique filename
+    cb(null, `${Date.now()}-${file.originalname}`);
   },
 });
 
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png|gif/;
+    const filetypes = /jpeg|jpg|png|gif|webp/;
     const mimetype = filetypes.test(file.mimetype);
     const extname = filetypes.test(
       path.extname(file.originalname).toLowerCase(),
@@ -21,11 +21,10 @@ const upload = multer({
 
     if (mimetype && extname) {
       return cb(null, true);
-    } else {
-      cb(new Error('Only images are allowed'));
     }
+    cb(new Error('Only images (jpeg, jpg, png, gif, webp) are allowed'));
   },
-  limits: { fileSize: 5 * 1024 * 1024 }, // Limit file size to 5MB
+  limits: { fileSize: 5 * 1024 * 1024 },
 });
 
 export default upload;
