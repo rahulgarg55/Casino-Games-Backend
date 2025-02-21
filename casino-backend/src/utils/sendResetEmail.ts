@@ -10,7 +10,7 @@ const getEmailContent = (resetUrl: string) => ({
 
 export const sendResetEmail = async (to: string, token: string) => {
   try {
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}`;
+    const resetUrl = `${process.env.CLIENT_URL}/reset-new-password?token=${token}`;
     const { subject, text, html } = getEmailContent(resetUrl);
 
     const msg = {
