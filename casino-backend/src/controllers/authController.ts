@@ -375,40 +375,31 @@ export const googleLogin = passport.authenticate('google', {
   scope: ['profile', 'email'],
 });
 
+// authController.ts
+
 export const googleCallback = (req: Request, res: Response) => {
-  passport.authenticate('google', (err: any, user: any) => {
-    if (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'An unexpected error occurred. Please try again later',
-      });
+  passport.authenticate('google', { session: false }, (err: any, user: any) => {
+    console.log("Google Callback - User:", user);
+    console.log("Google Callback - Error:", err);
+
+    if (err || !user) {
+      let errorMessage = err?.message || 'Authentication failed';
+
+      // Log the full error object for detailed debugging
+      console.error("Google Callback Authentication Error:", err);
+
+      if (err?.code) {
+        errorMessage += ` (Error Code: ${err.code})`;  // Include the error code
+      }
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`
+      );
     }
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid username or password',
-      });
-    }
-    res.status(200).json({
-      success: true,
-      message: 'Login successful!',
-      data: {
-        user: {
-          id: user.player._id,
-          username: user.player.username,
-          email: user.player.email,
-          phone_number: user.player.phone_number,
-          role_id: user.player.role_id,
-          created_at: user.player.created_at,
-          gender: user.player.gender,
-          language: user.player.language,
-          country: user.player.country,
-          city: user.player.city,
-        },
-        token: user.token,
-        expiresIn: user.expiresIn,
-      },
-    });
+
+    // If authentication was successful
+    res.redirect(
+      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`
+    );
   })(req, res);
 };
 
@@ -417,39 +408,27 @@ export const facebookLogin = passport.authenticate('facebook', {
 });
 
 export const facebookCallback = (req: Request, res: Response) => {
-  passport.authenticate('facebook', (err: any, user: any) => {
+  passport.authenticate('facebook', { session: false }, (err: any, user: any) => {
     if (err) {
-      return res.status(400).json({
-        success: false,
-        error: 'An unexpected error occurred. Please try again later',
-      });
+      // Redirect to frontend with error message
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
+          'An unexpected error occurred. Please try again later',
+        )}`,
+      );
     }
     if (!user) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid username or password',
-      });
+      // Redirect to frontend with authentication failure message
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
+          'Invalid credentials',
+        )}`,
+      );
     }
-    res.status(200).json({
-      success: true,
-      message: 'Login successful!',
-      data: {
-        user: {
-          id: user.player._id,
-          username: user.player.username,
-          email: user.player.email,
-          phone_number: user.player.phone_number,
-          role_id: user.player.role_id,
-          created_at: user.player.created_at,
-          gender: user.player.gender,
-          language: user.player.language,
-          country: user.player.country,
-          city: user.player.city,
-        },
-        token: user.token,
-        expiresIn: user.expiresIn,
-      },
-    });
+    // Redirect to frontend with token
+    res.redirect(
+      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
+    );
   })(req, res);
 };
 export const verifyEmail = async (req: Request, res: Response) => {

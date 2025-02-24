@@ -29,6 +29,7 @@ export interface IPlayer extends Document {
   payment_methods?: mongoose.Types.ObjectId[];
   created_at?: Date;
   updated_at?: Date;
+  refreshToken?: string;
 }
 
 const playerSchema: Schema = new Schema(
@@ -163,6 +164,10 @@ const playerSchema: Schema = new Schema(
         ref: 'PaymentMethod',
       },
     ],
+    refreshToken: {   // Add the refreshToken field here in the Schema
+      type: String,
+      default: null, // Or you can set it to undefined if you prefer
+    },
   },
   {
     timestamps: {

@@ -126,7 +126,6 @@ router.post(
 
 router.post(
   '/login',
-  authLimiter,
   loginValidation,
   validateRequest,
   authController.login,
@@ -243,14 +242,24 @@ router.delete(
   paymentController.deletePaymentMethod,
 );
 // Google OAuth routes
+// authRoutes.ts
 router.get(
   '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] }),
+  passport.authenticate('google', {
+    scope: ['profile', 'email'],
+    session: false,
+    accessType: 'offline',
+    prompt: 'consent',
+  }),
 );
+
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  authController.googleCallback,
+  passport.authenticate('google', { 
+    session: false,
+    failureRedirect: '/login?error=Authentication failed' 
+  }),
+  authController.googleCallback
 );
 
 // Facebook OAuth routes
