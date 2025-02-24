@@ -375,8 +375,6 @@ export const googleLogin = passport.authenticate('google', {
   scope: ['profile', 'email'],
 });
 
-// authController.ts
-
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', { session: false }, (err: any, user: any) => {
     console.log("Google Callback - User:", user);
@@ -384,19 +382,15 @@ export const googleCallback = (req: Request, res: Response) => {
 
     if (err || !user) {
       let errorMessage = err?.message || 'Authentication failed';
-
-      // Log the full error object for detailed debugging
       console.error("Google Callback Authentication Error:", err);
-
       if (err?.code) {
-        errorMessage += ` (Error Code: ${err.code})`;  // Include the error code
+        errorMessage += ` (Error Code: ${err.code})`;
       }
       return res.redirect(
         `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`
       );
     }
 
-    // If authentication was successful
     res.redirect(
       `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`
     );
@@ -410,7 +404,6 @@ export const facebookLogin = passport.authenticate('facebook', {
 export const facebookCallback = (req: Request, res: Response) => {
   passport.authenticate('facebook', { session: false }, (err: any, user: any) => {
     if (err) {
-      // Redirect to frontend with error message
       return res.redirect(
         `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
           'An unexpected error occurred. Please try again later',
@@ -418,14 +411,12 @@ export const facebookCallback = (req: Request, res: Response) => {
       );
     }
     if (!user) {
-      // Redirect to frontend with authentication failure message
       return res.redirect(
         `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
           'Invalid credentials',
         )}`,
       );
     }
-    // Redirect to frontend with token
     res.redirect(
       `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
     );

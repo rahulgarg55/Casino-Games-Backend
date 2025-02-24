@@ -37,6 +37,7 @@ passport.deserializeUser(
     }
   },
 );
+
 passport.use(
   new GoogleStrategy(
     {
@@ -49,7 +50,7 @@ passport.use(
       try {
         console.log("Google Strategy - Profile:", profile);
         console.log("Google Strategy - Access Token:", accessToken);
-        console.log("Google Strategy - Refresh Token:", refreshToken); // Log refresh token
+        console.log("Google Strategy - Refresh Token:", refreshToken);
 
         if (!profile.emails || !profile.emails[0].value) {
           return done(new Error("Email not provided by Google"));
@@ -59,7 +60,7 @@ passport.use(
         let player = await Player.findOne({ email });
 
         if (!player) {
-          const password_hash = crypto.randomBytes(32).toString('hex');
+          const password_hash = generateRandomPassword();
           player = new Player({
             email,
             username: profile.displayName || `user_${profile.id}`,
@@ -74,8 +75,8 @@ passport.use(
           });
           await player.save();
         } else {
-             player.refreshToken = refreshToken; 
-             await player.save();
+          player.refreshToken = refreshToken;
+          await player.save();
         }
 
         const tokenData = generateTokenResponse(player);
@@ -90,9 +91,6 @@ passport.use(
     }
   )
 );
-
-
-
 passport.use(
   new FacebookStrategy(
     {
@@ -110,16 +108,14 @@ passport.use(
         }
 
         let player = await Player.findOne({ email });
-        
+
         if (!player) {
-          // Generate a random password for the new user
-          const password_hash = await generateRandomPassword();
-          
+          const password_hash = generateRandomPassword();
           player = await Player.create({
             email,
             username: `${profile.name?.givenName} ${profile.name?.familyName}`,
             facebookId: profile.id,
-            password_hash, // Add the password hash
+            password_hash,
             is_verified: VERIFICATION.VERIFIED,
             status: STATUS.ACTIVE,
             role_id: 0,

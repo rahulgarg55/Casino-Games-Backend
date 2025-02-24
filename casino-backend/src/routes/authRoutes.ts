@@ -242,13 +242,12 @@ router.delete(
   paymentController.deletePaymentMethod,
 );
 // Google OAuth routes
-// authRoutes.ts
 router.get(
   '/google',
   passport.authenticate('google', {
     scope: ['profile', 'email'],
     session: false,
-    accessType: 'offline',
+    accessType: 'offline', 
     prompt: 'consent',
   }),
 );
@@ -262,11 +261,11 @@ router.get(
   authController.googleCallback
 );
 
-// Facebook OAuth routes
 router.get(
   '/facebook',
   passport.authenticate('facebook', { scope: ['email'] }),
 );
+
 router.get(
   '/facebook/callback',
   passport.authenticate('facebook', { failureRedirect: '/login' }),
