@@ -18,14 +18,14 @@ export const createGame = async (data: {
 export const getAllGames = async (
   page: number = 1,
   limit: number = 20,
-  filters: GameFilters = {}
+  filters: GameFilters = {},
 ) => {
   const query: any = {};
-  
+
   if (filters.provider) {
     query.provider = filters.provider;
   }
-  
+
   if (typeof filters.status !== 'undefined') {
     query.status = filters.status;
   }
@@ -42,19 +42,19 @@ export const getAllGames = async (
     pagination: {
       total,
       page,
-      totalPages: Math.ceil(total / limit)
-    }
+      totalPages: Math.ceil(total / limit),
+    },
   };
 };
 
 export const updateGameStatus = async (
   gameId: string,
-  status: number
+  status: number,
 ): Promise<IGame> => {
   const game = await Game.findByIdAndUpdate(
     gameId,
     { status, updated_at: new Date() },
-    { new: true }
+    { new: true },
   );
 
   if (!game) {

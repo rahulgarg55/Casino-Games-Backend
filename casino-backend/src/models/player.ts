@@ -164,7 +164,8 @@ const playerSchema: Schema = new Schema(
         ref: 'PaymentMethod',
       },
     ],
-    refreshToken: {   // Add the refreshToken field here in the Schema
+    refreshToken: {
+      // Add the refreshToken field here in the Schema
       type: String,
       default: null, // Or you can set it to undefined if you prefer
     },

@@ -7,6 +7,8 @@ import validateRequest from '../middlewares/validateRequest';
 import { verifyToken } from '../utils/jwt';
 import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
+import { generateTokenResponse } from '../utils/auth';
+import { IPlayer } from '../models/player';
 
 const router = Router();
 
@@ -124,12 +126,7 @@ router.post(
   authController.register,
 );
 
-router.post(
-  '/login',
-  loginValidation,
-  validateRequest,
-  authController.login,
-);
+router.post('/login', loginValidation, validateRequest, authController.login);
 router.post(
   '/forgot-password',
   oneOf(
@@ -244,21 +241,16 @@ router.delete(
 // Google OAuth routes
 router.get(
   '/google',
-  passport.authenticate('google', {
-    scope: ['profile', 'email'],
-    session: false,
-    accessType: 'offline', 
-    prompt: 'consent',
-  }),
+  passport.authenticate('google', { scope: ['profile', 'email'] }),
 );
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', { 
-    session: false,
-    failureRedirect: '/login?error=Authentication failed' 
-  }),
-  authController.googleCallback
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    const tokenResponse = generateTokenResponse(req.user as IPlayer);
+    res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
+  },
 );
 
 router.get(
@@ -269,7 +261,10 @@ router.get(
 router.get(
   '/facebook/callback',
   passport.authenticate('facebook', { failureRedirect: '/login' }),
-  authController.facebookCallback,
+  (req, res) => {
+    const tokenResponse = generateTokenResponse(req.user as IPlayer);
+    res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
+  },
 );
 
 export default router;

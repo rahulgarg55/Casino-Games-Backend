@@ -377,22 +377,22 @@ export const googleLogin = passport.authenticate('google', {
 
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', { session: false }, (err: any, user: any) => {
-    console.log("Google Callback - User:", user);
-    console.log("Google Callback - Error:", err);
+    console.log('Google Callback - User:', user);
+    console.log('Google Callback - Error:', err);
 
     if (err || !user) {
       let errorMessage = err?.message || 'Authentication failed';
-      console.error("Google Callback Authentication Error:", err);
+      console.error('Google Callback Authentication Error:', err);
       if (err?.code) {
         errorMessage += ` (Error Code: ${err.code})`;
       }
       return res.redirect(
-        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`
+        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`,
       );
     }
 
     res.redirect(
-      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`
+      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
     );
   })(req, res);
 };
@@ -402,25 +402,29 @@ export const facebookLogin = passport.authenticate('facebook', {
 });
 
 export const facebookCallback = (req: Request, res: Response) => {
-  passport.authenticate('facebook', { session: false }, (err: any, user: any) => {
-    if (err) {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
-          'An unexpected error occurred. Please try again later',
-        )}`,
+  passport.authenticate(
+    'facebook',
+    { session: false },
+    (err: any, user: any) => {
+      if (err) {
+        return res.redirect(
+          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
+            'An unexpected error occurred. Please try again later',
+          )}`,
+        );
+      }
+      if (!user) {
+        return res.redirect(
+          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
+            'Invalid credentials',
+          )}`,
+        );
+      }
+      res.redirect(
+        `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
       );
-    }
-    if (!user) {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
-          'Invalid credentials',
-        )}`,
-      );
-    }
-    res.redirect(
-      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
-    );
-  })(req, res);
+    },
+  )(req, res);
 };
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
