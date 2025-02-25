@@ -30,6 +30,7 @@ export interface IPlayer extends Document {
   created_at?: Date;
   updated_at?: Date;
   refreshToken?: string;
+  profile_picture?: string;
 }
 
 const playerSchema: Schema = new Schema(
@@ -165,10 +166,13 @@ const playerSchema: Schema = new Schema(
       },
     ],
     refreshToken: {
-      // Add the refreshToken field here in the Schema
       type: String,
-      default: null, // Or you can set it to undefined if you prefer
+      default: null,
     },
+    profile_picture:{
+      type: String,
+      default: null,
+    }
   },
   {
     timestamps: {

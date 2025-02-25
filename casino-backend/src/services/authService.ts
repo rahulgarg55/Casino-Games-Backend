@@ -256,6 +256,10 @@ export const login = async (data: LoginData) => {
       city: player.city,
       balance: playerBalance?.balance || 0,
       currency: playerBalance?.currency || 'USD',
+      is_2fa: player.is_2fa,
+      profile_picture:player.profile_picture,
+      is_verified: player.is_verified,
+      fullname: player.fullname,
     },
   };
 };

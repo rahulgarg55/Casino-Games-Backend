@@ -30,7 +30,11 @@ passport.use(
             role_id: 0,
             registration_date: new Date(),
             last_login: new Date(),
+            profile_picture: profile.photos?.[0].value,
           });
+          await player.save();
+        }else{
+          player.profile_picture = profile.photos?.[0].value;
           await player.save();
         }
 
@@ -64,7 +68,11 @@ passport.use(
             role_id: 0, // Default to User
             registration_date: new Date(),
             last_login: new Date(),
+            profile_picture: profile.photos?.[0].value,
           });
+          await player.save();
+        }else{
+          player.profile_picture = profile.photos?.[0].value;
           await player.save();
         }
 
