@@ -155,7 +155,7 @@ router.post(
   validateRequest,
   authController.resetPassword,
 );
-router.get('/profile', authController.viewProfile);
+router.get('/profile',verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
 

@@ -139,7 +139,16 @@ export const resetPassword = async (req: Request, res: Response) => {
 
 export const viewProfile = async (req: CustomRequest, res: Response) => {
   try {
-    const playerId = req.user!.id;
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
+    }
+
+    const playerId = req.user.id;
+    console.log("playerId", playerId);
+
     const player = await Player.findById(playerId).select('-password_hash');
     if (!player) {
       return res.status(404).json({
@@ -161,13 +170,13 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
       },
     });
   } catch (error) {
+    console.error("Error in viewProfile:", error);
     res.status(400).json({
       success: false,
-      error: 'An unexpected error occurred. Please try again later',
+      error: error.message || 'An unexpected error occurred. Please try again later',
     });
   }
 };
-
 export const getAllPlayers = async (req: Request, res: Response) => {
   try {
     const players = await Player.find()
