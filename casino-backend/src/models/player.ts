@@ -31,6 +31,7 @@ export interface IPlayer extends Document {
   updated_at?: Date;
   refreshToken?: string;
   profile_picture?: string;
+  stripeCustomerId?: string;
 }
 
 const playerSchema: Schema = new Schema(
@@ -172,7 +173,12 @@ const playerSchema: Schema = new Schema(
     profile_picture:{
       type: String,
       default: null,
-    }
+    },
+    stripeCustomerId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   {
     timestamps: {

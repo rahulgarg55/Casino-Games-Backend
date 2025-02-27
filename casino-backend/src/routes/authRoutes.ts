@@ -5,6 +5,7 @@ import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
 import { verifyToken } from '../utils/jwt';
+import bodyParser from 'body-parser';
 import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
 import { generateTokenResponse } from '../utils/auth';
@@ -237,6 +238,22 @@ router.delete(
   '/payment-methods/:id',
   verifyToken,
   paymentController.deletePaymentMethod,
+);
+
+router.post(
+  '/stripe/webhook',
+  bodyParser.raw({ type: 'application/json' }),
+  paymentController.handleStripeWebhook
+);
+router.post(
+  '/create-payment-intent',
+  verifyToken,
+  [
+    body('amount').isInt({ min: 1 }).withMessage('Amount must be at least 1'),
+    body('currency').isString().withMessage('Currency is required'),
+  ],
+  validateRequest,
+  paymentController.createPaymentIntent,
 );
 // Google OAuth routes
 router.get(

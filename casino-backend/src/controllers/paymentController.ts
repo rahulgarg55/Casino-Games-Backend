@@ -1,5 +1,8 @@
 import { Request, Response } from 'express';
 import * as paymentService from '../services/paymentService';
+import * as stripeService from '../services/stripeService';
+import Player from '../models/player';
+import {IPlayer} from '../models/player';
 
 interface CustomRequest extends Request {
   user?: {
@@ -94,5 +97,52 @@ export const deletePaymentMethod = async (
           ? error.message
           : 'Failed to delete payment method',
     });
+  }
+};
+
+export const handleStripeWebhook = async (req: Request, res: Response) => {
+  const sig = req.headers['stripe-signature'] as string;
+  const payload = req.body;
+
+  if (!sig) {
+    return res.status(400).json({ error: 'No Stripe signature found' });
+  }
+  
+  try {
+    const result = await stripeService.handleStripeWebhook(payload, sig);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Webhook Error:', error.message);
+    res.status(400).json({ error: 'Webhook Error' });
+  }
+};
+
+export const createPaymentIntent = async (req: CustomRequest, res: Response) => {
+  const { amount, currency } = req.body;
+  const playerId = req.user!.id;
+
+  try {
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+
+    if (!player.stripeCustomerId) {
+      const customer = await stripeService.createStripeCustomer(player);
+      player.stripeCustomerId = customer.id;
+      await player.save();
+    }
+
+    const paymentIntent = await stripeService.createPaymentIntent(
+      amount,
+      currency,
+      player.stripeCustomerId,
+    );
+
+    res.status(200).json({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create payment intent' });
   }
 };

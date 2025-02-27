@@ -240,6 +240,7 @@ export const login = async (data: LoginData) => {
   }
 
   const tokenData = generateTokenResponse(player);
+  console.log('tokenData', tokenData.token)
 
   return {
     token: tokenData.token,
