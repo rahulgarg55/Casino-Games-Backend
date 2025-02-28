@@ -32,6 +32,8 @@ export interface IPlayer extends Document {
   refreshToken?: string;
   profile_picture?: string;
   stripeCustomerId?: string;
+  balance?: number;
+  balance_updated_at?: Date;
 }
 
 const playerSchema: Schema = new Schema(
@@ -178,6 +180,15 @@ const playerSchema: Schema = new Schema(
       type: String,
       unique: true,
       sparse: true,
+    },
+    balance: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    balance_updated_at: {
+      type: Date,
+      default: Date.now,
     },
   },
   {

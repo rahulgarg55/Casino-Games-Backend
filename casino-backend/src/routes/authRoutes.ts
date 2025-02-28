@@ -1,3 +1,4 @@
+import express, { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
 import * as paymentController from '../controllers/paymentController';
@@ -12,7 +13,6 @@ import { generateTokenResponse } from '../utils/auth';
 import { IPlayer } from '../models/player';
 
 const router = Router();
-
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -255,6 +255,39 @@ router.post(
   validateRequest,
   paymentController.createPaymentIntent,
 );
+router.post(
+  '/process-withdrawal',
+  verifyToken,
+  [
+    body('amount').isInt({ min: 1 }).withMessage('Amount must be at least 1'),
+    body('currency').isString().withMessage('Currency is required'),
+    body('paymentMethodId').optional().isString(),
+  ],
+  validateRequest,
+  paymentController.processWithdrawal,
+);
+
+// Update the Stripe webhook route
+router.post(
+  '/stripe/webhook',
+  express.raw({ type: 'application/json' }),
+  paymentController.handleStripeWebhook
+);
+
+// Add transaction history route  
+router.get(
+  '/transactions',
+  verifyToken,
+  paymentController.getTransactionHistory
+);
+
+// Add route to get transaction detail
+router.get(
+  '/transactions/:id',
+  verifyToken,
+  paymentController.getTransactionDetail
+);
+
 // Google OAuth routes
 router.get(
   '/google',
