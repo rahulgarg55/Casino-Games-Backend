@@ -39,7 +39,7 @@ const transactionSchema: Schema = new Schema(
     payment_method: {
       type: String,
       required: true,
-      enum: ['stripe', 'basta_pay'],
+      enum: ['stripe', 'basta_pay', 'credit_card', 'paypal', 'bank_transfer'],
     },
     status: {
       type: String,

@@ -240,11 +240,11 @@ router.delete(
   paymentController.deletePaymentMethod,
 );
 
-router.post(
-  '/stripe/webhook',
-  bodyParser.raw({ type: 'application/json' }),
-  paymentController.handleStripeWebhook
-);
+// router.post(
+//   '/stripe/webhook',
+//   bodyParser.raw({ type: 'application/json' }),
+//   paymentController.handleStripeWebhook
+// );
 router.post(
   '/create-payment-intent',
   verifyToken,
@@ -268,11 +268,11 @@ router.post(
 );
 
 // Update the Stripe webhook route
-router.post(
-  '/stripe/webhook',
-  express.raw({ type: 'application/json' }),
-  paymentController.handleStripeWebhook
-);
+// router.post(
+//   '/stripe/webhook',
+//   express.raw({ type: 'application/json' }),
+//   paymentController.handleStripeWebhook
+// );
 
 // Add transaction history route  
 router.get(

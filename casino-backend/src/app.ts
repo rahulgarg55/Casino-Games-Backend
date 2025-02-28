@@ -1,5 +1,4 @@
 import express, { Request, Response, NextFunction } from 'express';
-import bodyParser from 'body-parser';
 import helmet from 'helmet';
 import cors from 'cors';
 import router from './routes';
@@ -13,17 +12,25 @@ import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 
 const app = express();
-const webhookRouter = express.Router();
 
+// Logger configuration
 const logLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
-
 const logger = winston.createLogger({
   level: logLevel,
   format: format.combine(
     format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     format.colorize(),
-    format.printf(({ timestamp, level, message, meta }: { timestamp: string; level: string; message: string; meta?: { req: { method: string; url: string }; res: { statusCode: number }; responseTime: number } }) => {
-      if (meta && meta.req) {
+    format.printf(({ timestamp, level, message, meta }: { 
+      timestamp: string; 
+      level: string; 
+      message: string; 
+      meta?: { 
+        req: { method: string; url: string }; 
+        res: { statusCode: number }; 
+        responseTime: number 
+      } 
+    }) => {
+      if (meta?.req) {
         return `${timestamp} ${level}: ${message} - ${meta.req.method} ${meta.req.url} - Status: ${meta.res.statusCode} - ${meta.responseTime}ms`;
       }
       return `${timestamp} ${level}: ${message}`;
@@ -41,6 +48,7 @@ const logger = winston.createLogger({
   ],
 });
 
+// Request logging middleware
 app.use(expressWinston.logger({
   winstonInstance: logger,
   meta: true,
@@ -49,53 +57,56 @@ app.use(expressWinston.logger({
   colorize: true,
 }));
 
-webhookRouter.post(
+// Important: Stripe webhook route must come before body parsers
+app.post(
   '/api/auth/stripe/webhook',
   express.raw({ type: 'application/json' }),
-  paymentController.handleStripeWebhook,
+  paymentController.handleStripeWebhook
 );
 
-app.use(webhookRouter);
-
+// Security middleware
 app.use(helmet());
-app.use(
-  cors({
-    origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  }),
-);
+app.use(cors({
+  origin: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature'],
+  credentials: true,
+}));
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET!,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 24 * 60 * 60 * 1000,
-    },
-  }),
-);
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET!,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000,
+  },
+}));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+// Body parsers - after webhook route
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+// Authentication
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Database connection
 connectDB();
 
+// Routes
 app.use('/', router);
 
+// Error logging
 app.use(expressWinston.errorLogger({
   winstonInstance: logger,
 }));
 
+// Error handling
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   logger.error(err.message, { stack: err.stack });
-  res.status(500).send('Something went wrong!');
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
 export default app;
