@@ -40,10 +40,13 @@ const paymentMethodSchema: Schema = new Schema(
       createdAt: 'created_at',
       updatedAt: 'updated_at',
     },
-  }
+  },
 );
 
 // Create index for faster queries
 paymentMethodSchema.index({ player_id: 1 });
 
-export default mongoose.model<IPaymentMethod>('PaymentMethod', paymentMethodSchema);
+export default mongoose.model<IPaymentMethod>(
+  'PaymentMethod',
+  paymentMethodSchema,
+);

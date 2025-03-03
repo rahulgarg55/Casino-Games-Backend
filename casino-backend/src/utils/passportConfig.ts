@@ -33,7 +33,7 @@ passport.use(
             profile_picture: profile.photos?.[0].value,
           });
           await player.save();
-        }else{
+        } else {
           player.profile_picture = profile.photos?.[0].value;
           await player.save();
         }
@@ -71,7 +71,7 @@ passport.use(
             profile_picture: profile.photos?.[0].value,
           });
           await player.save();
-        }else{
+        } else {
           player.profile_picture = profile.photos?.[0].value;
           await player.save();
         }

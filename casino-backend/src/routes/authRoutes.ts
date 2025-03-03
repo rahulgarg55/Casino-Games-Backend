@@ -155,7 +155,7 @@ router.post(
   validateRequest,
   authController.resetPassword,
 );
-router.get('/profile',verifyToken, authController.viewProfile);
+router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
 
@@ -261,17 +261,17 @@ router.post(
   validateRequest,
   paymentController.processWithdrawal,
 );
- 
+
 router.get(
   '/transactions',
   verifyToken,
-  paymentController.getTransactionHistory
+  paymentController.getTransactionHistory,
 );
 
 router.get(
   '/transactions/:id',
   verifyToken,
-  paymentController.getTransactionDetail
+  paymentController.getTransactionDetail,
 );
 
 // Google OAuth routes
@@ -282,7 +282,10 @@ router.get(
 
 router.get(
   '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  passport.authenticate('google', {
+    failureRedirect: '/login',
+    session: false,
+  }),
   (req, res) => {
     const tokenResponse = generateTokenResponse(req.user as IPlayer);
     res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
@@ -296,11 +299,40 @@ router.get(
 
 router.get(
   '/facebook/callback',
-  passport.authenticate('facebook', { failureRedirect: '/login' }),
+  passport.authenticate('facebook', {
+    failureRedirect: '/login',
+    session: false,
+  }),
   (req, res) => {
     const tokenResponse = generateTokenResponse(req.user as IPlayer);
     res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
   },
+);
+
+router.post(
+  '/verify-2fa',
+  [
+    body('playerId').notEmpty().withMessage('Player ID is required'),
+    body('otp')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('OTP must be 6 digits'),
+  ],
+  validateRequest,
+  authController.verify2FA,
+);
+
+router.post(
+  '/toggle-2fa',
+  verifyToken,
+  [
+    body('enabled').isBoolean().withMessage('Enabled must be a boolean'),
+    body('method')
+      .optional()
+      .isIn(['email', 'phone'])
+      .withMessage('Method must be "email" or "phone"'),
+  ],
+  validateRequest,
+  authController.toggle2FA,
 );
 
 export default router;

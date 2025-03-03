@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
-
+import { TWO_FA, STATUS, VERIFICATION } from '../constants';
 export interface IPlayer extends Document {
   username?: string;
   fullname?: string;
@@ -34,6 +34,10 @@ export interface IPlayer extends Document {
   stripeCustomerId?: string;
   balance?: number;
   balance_updated_at?: Date;
+  is_2fa_enabled: number;
+  two_factor_secret?: string; // Temporary OTP for 2FA
+  two_factor_expires?: Date; // OTP expiration
+  two_factor_method?: 'email' | 'phone'; // Preferred 2FA method
 }
 
 const playerSchema: Schema = new Schema(
@@ -172,7 +176,7 @@ const playerSchema: Schema = new Schema(
       type: String,
       default: null,
     },
-    profile_picture:{
+    profile_picture: {
       type: String,
       default: null,
     },
@@ -189,6 +193,24 @@ const playerSchema: Schema = new Schema(
     balance_updated_at: {
       type: Date,
       default: Date.now,
+    },
+    is_2fa_enabled: {
+      type: Number,
+      enum: [TWO_FA.DISABLED, TWO_FA.ENABLED],
+      default: TWO_FA.DISABLED,
+    },
+    two_factor_secret: {
+      type: String,
+      select: false,
+    },
+    two_factor_expires: {
+      type: Date,
+      select: false,
+    },
+    two_factor_method: {
+      type: String,
+      enum: ['email', 'phone'],
+      default: 'email',
     },
   },
   {

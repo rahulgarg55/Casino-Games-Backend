@@ -6,7 +6,7 @@ const logFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.errors({ stack: true }),
   winston.format.splat(),
-  winston.format.json()
+  winston.format.json(),
 );
 
 const consoleFormat = winston.format.combine(
@@ -14,7 +14,7 @@ const consoleFormat = winston.format.combine(
   winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
   winston.format.printf(({ timestamp, level, message }) => {
     return `${timestamp} ${level}: ${message}`;
-  })
+  }),
 );
 
 export const logger = winston.createLogger({
@@ -41,7 +41,9 @@ export const logger = winston.createLogger({
 
 // If we're not in production, log to the console with colors
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-  }));
+  logger.add(
+    new winston.transports.Console({
+      format: consoleFormat,
+    }),
+  );
 }

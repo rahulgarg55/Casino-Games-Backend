@@ -42,7 +42,7 @@ export const register = async (req: Request, res: Response) => {
           city: player.city,
           status: player.status,
           is_verified: player.is_verified,
-          is_2fa: player.is_2fa,
+          is_2fa_enabled: player.is_2fa_enabled,
           balance: balance.balance,
           currency: player.currency,
         },
@@ -65,6 +65,18 @@ export const register = async (req: Request, res: Response) => {
 export const login = async (req: Request, res: Response) => {
   try {
     const { user, token } = await authService.login(req.body);
+
+    if (user.requires2FA) {
+      await authService.initiate2FA(user.id);
+      return res.status(200).json({
+        success: true,
+        message: 'OTP sent for 2FA verification',
+        data: {
+          requires2FA: true,
+          playerId: user.id,
+        },
+      });
+    }
     res.status(200).json({
       success: true,
       message: 'Login successful',
@@ -84,6 +96,59 @@ export const login = async (req: Request, res: Response) => {
     const errorMessage =
       error instanceof Error ? error.message : 'Invalid username or password';
     res.status(401).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+};
+
+export const verify2FA = async (req: Request, res: Response) => {
+  try {
+    const { playerId, otp } = req.body;
+    const { token, expiresIn, user } = await authService.verify2FA(
+      playerId,
+      otp,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: '2FA verification successful',
+      data: {
+        user,
+        token,
+        expiresIn,
+      },
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Invalid OTP or server error';
+    res.status(401).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+};
+
+export const toggle2FA = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+    const { enabled, method } = req.body;
+    const result = await authService.toggle2FA(req.user.id, enabled, method);
+
+    res.status(200).json({
+      success: true,
+      message: `2FA ${enabled ? 'enabled' : 'disabled'} successfully`,
+      data: result,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Server error toggling 2FA';
+    res.status(500).json({
       success: false,
       error: errorMessage,
     });
@@ -147,7 +212,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     }
 
     const playerId = req.user.id;
-    console.log("playerId", playerId);
+    console.log('playerId', playerId);
 
     const player = await Player.findById(playerId).select('-password_hash');
     if (!player) {
@@ -166,14 +231,17 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
         user: {
           ...player.toObject(),
           balance: balance?.balance || 0,
+          is_2fa_enabled: player.is_2fa_enabled,
+          two_factor_method: player.two_factor_method,
         },
       },
     });
   } catch (error) {
-    console.error("Error in viewProfile:", error);
+    console.error('Error in viewProfile:', error);
     res.status(400).json({
       success: false,
-      error: error.message || 'An unexpected error occurred. Please try again later',
+      error:
+        error.message || 'An unexpected error occurred. Please try again later',
     });
   }
 };
@@ -201,7 +269,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
           language: player.language,
           country: player.country,
           city: player.city,
-          is_2fa: player.is_2fa,
+          is_2fa_enabled: player.is_2fa_enabled,
           balance: balance?.balance || 0,
         };
       }),
@@ -225,8 +293,6 @@ export const updatePlayerStatus = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { status } = req.body;
-    console.log('userId', userId);
-    console.log('status', status);
 
     if (status !== 0 && status !== 1) {
       return res.status(400).json({
@@ -306,7 +372,7 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 20;
 
     const result = await getNotifications(page, limit);
-    console.log('result', result);
+    // console.log('result', result);
     res.json({
       success: true,
       data: result,
@@ -320,6 +386,12 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
 };
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
     const playerId = req.user!.id;
     const player = await authService.updateProfile(playerId, req.body);
     const balance = await PlayerBalance.findOne({ player_id: playerId });
@@ -331,6 +403,7 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
         user: {
           ...player.toObject(),
           balance: balance?.balance || 0,
+          is_2fa_enabled: player.is_2fa_enabled,
         },
       },
     });

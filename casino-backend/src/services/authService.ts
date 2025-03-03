@@ -118,7 +118,8 @@ export const register = async (data: RegistrationData) => {
     verification_token_expires: new Date(Date.now() + 3600000),
     sms_code: phone_number ? smsCode : undefined,
     sms_code_expires: phone_number ? new Date(Date.now() + 600000) : undefined, // 10 minutes
-    is_2fa: TWO_FA.DISABLED,
+    is_2fa_enabled: TWO_FA.DISABLED,
+    two_factor_method: 'email', // Default to email
     city,
     country,
     gender,
@@ -199,6 +200,10 @@ export const verifyPhoneNumber = async (phoneNumber: string, code: string) => {
   return { message: 'Phone number verified successfully' };
 };
 
+const generateOTP = (): string => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
 export const login = async (data: LoginData) => {
   const { email, phone_number, password } = data;
 
@@ -240,10 +245,10 @@ export const login = async (data: LoginData) => {
   }
 
   const tokenData = generateTokenResponse(player);
-  console.log('tokenData', tokenData.token)
+  console.log('tokenData', tokenData.token);
 
   return {
-    token: tokenData.token,
+    token: player.is_2fa_enabled ? undefined : tokenData.token, // Only return token if 2FA is disabled
     user: {
       id: player._id,
       username: player.username,
@@ -257,12 +262,130 @@ export const login = async (data: LoginData) => {
       city: player.city,
       balance: playerBalance?.balance || 0,
       currency: playerBalance?.currency || 'USD',
-      is_2fa: player.is_2fa,
-      profile_picture:player.profile_picture,
+      is_2fa_enabled: player.is_2fa_enabled,
+      profile_picture: player.profile_picture,
+      is_verified: player.is_verified,
+      fullname: player.fullname,
+      requires2FA: player.is_2fa_enabled === TWO_FA.ENABLED,
+    },
+  };
+};
+export const initiate2FA = async (playerId: string) => {
+  const player = await Player.findById(playerId).select(
+    '+two_factor_secret +two_factor_expires',
+  );
+  if (!player) {
+    throw new Error('Player not found');
+  }
+  if (player.is_2fa_enabled !== TWO_FA.ENABLED)
+    throw new Error('2FA is not enabled for this account');
+
+  const otp = generateOTP();
+  player.two_factor_secret = otp;
+  player.two_factor_expires = new Date(Date.now() + 600000); // 10 minutes
+  await player.save();
+
+  if (player.two_factor_method === 'email' && player.email) {
+    await sendOTPByEmail(player.email, otp);
+  } else if (player.two_factor_method === 'phone' && player.phone_number) {
+    await sendOTPBySMS(player.phone_number, otp);
+  } else {
+    throw new Error('No valid 2FA method configured');
+  }
+
+  return { message: 'OTP sent successfully' };
+};
+export const verify2FA = async (playerId: string, otp: string) => {
+  const player = await Player.findById(playerId).select(
+    '+two_factor_secret +two_factor_expires',
+  );
+  if (!player) {
+    throw new Error('Player not found');
+  }
+  if (!player.two_factor_secret || !player.two_factor_expires) {
+    throw new Error('2FA not initiated');
+  }
+  if (new Date() > player.two_factor_expires) {
+    throw new Error('OTP has expired');
+  }
+  if (player.two_factor_secret !== otp) {
+    throw new Error('Invalid OTP');
+  }
+
+  player.two_factor_secret = undefined;
+  player.two_factor_expires = undefined;
+  await player.save();
+
+  const tokenData = generateTokenResponse(player);
+  return {
+    token: tokenData.token,
+    expiresIn: tokenData.expiresIn,
+    user: {
+      id: player._id,
+      username: player.username,
+      email: player.email,
+      phone_number: player.phone_number,
+      role: player.role_id,
+      status: player.status,
+      gender: player.gender,
+      language: player.language,
+      country: player.country,
+      city: player.city,
+      is_2fa_enabled: player.is_2fa_enabled,
+      profile_picture: player.profile_picture,
       is_verified: player.is_verified,
       fullname: player.fullname,
     },
   };
+};
+
+export const toggle2FA = async (
+  playerId: string,
+  enabled: boolean,
+  method?: 'email' | 'phone',
+) => {
+  const player = await Player.findById(playerId);
+  if (!player) {
+    throw new Error('Player not found');
+  }
+
+  player.is_2fa_enabled = enabled ? TWO_FA.ENABLED : TWO_FA.DISABLED;
+  if (method) player.two_factor_method = method;
+  await player.save();
+
+  return {
+    is_2fa_enabled: player.is_2fa_enabled,
+    two_factor_method: player.two_factor_method,
+  };
+};
+
+const sendOTPByEmail = async (to: string, otp: string) => {
+  const sgMail = (await import('@sendgrid/mail')).default;
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
+
+  const msg = {
+    to,
+    from: process.env.EMAIL_FROM!,
+    subject: 'Your 2FA One-Time Password',
+    text: `Your OTP is: ${otp}. It expires in 10 minutes.`,
+    html: `<h1>Your 2FA OTP</h1><p>Your OTP is: <strong>${otp}</strong>. It expires in 10 minutes.</p>`,
+  };
+  await sgMail.send(msg);
+};
+
+// Send OTP via SMS (Twilio)
+const sendOTPBySMS = async (to: string, otp: string) => {
+  const twilio = (await import('twilio')).default;
+  const twilioClient = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN,
+  );
+
+  await twilioClient.messages.create({
+    body: `Your OTP is: ${otp}. It expires in 10 minutes.`,
+    from: process.env.TWILIO_PHONE_NUMBER,
+    to,
+  });
 };
 
 export const forgotPassword = async (data: ForgotPasswordData) => {
