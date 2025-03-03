@@ -13,7 +13,6 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 
 const app = express();
 
-// Logger configuration
 const logLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
 const logger = winston.createLogger({
   level: logLevel,
@@ -48,7 +47,6 @@ const logger = winston.createLogger({
   ],
 });
 
-// Request logging middleware
 app.use(expressWinston.logger({
   winstonInstance: logger,
   meta: true,
@@ -57,14 +55,12 @@ app.use(expressWinston.logger({
   colorize: true,
 }));
 
-// Important: Stripe webhook route must come before body parsers
 app.post(
   '/api/auth/stripe/webhook',
   express.raw({ type: 'application/json' }),
   paymentController.handleStripeWebhook
 );
 
-// Security middleware
 app.use(helmet());
 app.use(cors({
   origin: true,
@@ -73,7 +69,6 @@ app.use(cors({
   credentials: true,
 }));
 
-// Session configuration
 app.use(session({
   secret: process.env.SESSION_SECRET!,
   resave: false,
@@ -84,26 +79,20 @@ app.use(session({
   },
 }));
 
-// Body parsers - after webhook route
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Authentication
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Database connection
 connectDB();
 
-// Routes
 app.use('/', router);
 
-// Error logging
 app.use(expressWinston.errorLogger({
   winstonInstance: logger,
 }));
 
-// Error handling
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   logger.error(err.message, { stack: err.stack });
   res.status(500).json({ error: 'Something went wrong!' });

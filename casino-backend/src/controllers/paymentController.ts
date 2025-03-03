@@ -14,7 +14,6 @@ interface CustomRequest extends Request {
   };
 }
 
-// Create a Stripe customer for a player
 export const createStripeCustomer = async (player: IPlayer) => {
   try {
     const customer = await stripe.customers.create({
@@ -32,7 +31,6 @@ export const createStripeCustomer = async (player: IPlayer) => {
   }
 };
 
-// Add a payment method to Stripe and store it in our database
 export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -125,7 +123,6 @@ export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
   }
 };
 
-// Get player's payment methods
 export const getPaymentMethods = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -150,7 +147,6 @@ export const getPaymentMethods = async (req: CustomRequest, res: Response) => {
   }
 };
 
-// Update a payment method
 export const updatePaymentMethod = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -204,7 +200,6 @@ export const updatePaymentMethod = async (req: CustomRequest, res: Response) => 
   }
 };
 
-// Delete a payment method
 export const deletePaymentMethod = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -241,7 +236,6 @@ export const deletePaymentMethod = async (req: CustomRequest, res: Response) => 
   }
 };
 
-// Create a payment intent (for topup)
 export const createPaymentIntent = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -296,7 +290,6 @@ export const createPaymentIntent = async (req: CustomRequest, res: Response) => 
   }
 };
 
-// Handle Stripe webhook events
 export const handleStripeWebhook = async (req: Request, res: Response) => {
   const sig = req.headers['stripe-signature'];
 
@@ -358,7 +351,6 @@ export const handleStripeWebhook = async (req: Request, res: Response) => {
 };
 
 
-// Handle successful payment intent
 async function handlePaymentIntentSucceeded(paymentIntent) {
   try {
     logger.info(`Payment succeeded: ${paymentIntent.id}`);
@@ -382,7 +374,6 @@ async function handlePaymentIntentSucceeded(paymentIntent) {
   }
 }
 
-// Handle failed payment intent
 async function handlePaymentIntentFailed(paymentIntent) {
   try {
     logger.info(`Payment failed: ${paymentIntent.id}`);
@@ -402,12 +393,9 @@ async function handlePaymentIntentFailed(paymentIntent) {
   }
 }
 
-// Handle successful payout
-// Handle successful payout
 async function handlePayoutSucceeded(payout) {
   try {
     logger.info(`Payout succeeded: ${payout.id}`);
-    // Find transaction by payment_intent_id instead of _id
     const transaction = await Transaction.findOne({
       payment_intent_id: payout.id
     });
@@ -428,7 +416,6 @@ async function handlePayoutSucceeded(payout) {
 }
 
 
-// Handle failed payout
 async function handlePayoutFailed(payout) {
   try {
     logger.info(`Payout failed: ${payout.id}`);
@@ -451,7 +438,6 @@ async function handlePayoutFailed(payout) {
   }
 }
 
-// Handle dispute created
 async function handleDisputeCreated(dispute) {
   try {
     logger.info(`Dispute created: ${dispute.id}`);
@@ -471,7 +457,6 @@ async function handleDisputeCreated(dispute) {
   }
 }
 
-// Get player balance
 async function getPlayerBalance(playerId) {
   try {
     const player = await Player.findById(playerId);
@@ -482,7 +467,6 @@ async function getPlayerBalance(playerId) {
   }
 }
 
-// Update player balance
 async function updatePlayerBalance(playerId, amount) {
   try {
     const player = await Player.findById(playerId);
@@ -498,7 +482,6 @@ async function updatePlayerBalance(playerId, amount) {
   }
 }
 
-// Get transaction history
 export const getTransactionHistory = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -526,7 +509,6 @@ export const getTransactionHistory = async (req: CustomRequest, res: Response) =
   }
 };
 
-// Get transaction detail
 export const getTransactionDetail = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -555,7 +537,6 @@ export const getTransactionDetail = async (req: CustomRequest, res: Response) =>
   }
 };
 
-// Process withdrawal request
 const TEST_CARDS = {
   'pm_card_visa': '4242424242424242',
   'pm_card_visa_debit': '4000056655665556', 
@@ -563,7 +544,6 @@ const TEST_CARDS = {
   'pm_card_amex': '378282246310005'
 };
 
-// Update the processWithdrawal function
 export const processWithdrawal = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
@@ -573,7 +553,6 @@ export const processWithdrawal = async (req: CustomRequest, res: Response) => {
     const playerId = req.user.id;
     const { amount, currency, paymentMethodId } = req.body;
 
-    // Validate amount
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: 'Invalid amount' });
     }
@@ -583,10 +562,9 @@ export const processWithdrawal = async (req: CustomRequest, res: Response) => {
       return res.status(404).json({ message: 'Player not found' });
     }
 
-    // For testing, automatically set balance if using test cards
     if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
       if (TEST_CARDS[paymentMethodId]) {
-        player.balance = 1000; // Give test accounts some balance
+        player.balance = 1000;
         await player.save();
       }
     }
