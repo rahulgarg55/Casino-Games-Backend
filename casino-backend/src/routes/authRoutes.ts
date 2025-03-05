@@ -262,6 +262,8 @@ router.post(
   paymentController.processWithdrawal,
 );
 
+router.get("/player/balance", verifyToken, paymentController.getPlayerBalance);
+
 router.get(
   '/transactions',
   verifyToken,

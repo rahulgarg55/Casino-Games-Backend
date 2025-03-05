@@ -337,6 +337,8 @@ export const createPaymentIntent = async (
     const amountInCents = Math.round(parseFloat(amount) * 100);
     const idempotencyKey = `pi-${playerId}-${Date.now()}`;
 
+    const description = `Top-up for player ${player.fullname} (ID: ${player._id})`;
+
     const paymentIntent = await stripe.paymentIntents.create(
       {
         amount: amountInCents,
@@ -344,6 +346,7 @@ export const createPaymentIntent = async (
         customer: player.stripeCustomerId,
         automatic_payment_methods: { enabled: true },
         metadata: { playerId: player._id.toString(), transactionType: 'topup' },
+        description: description,
       },
       {
         idempotencyKey,
@@ -556,15 +559,15 @@ async function handleDisputeCreated(dispute) {
   }
 }
 
-async function getPlayerBalance(playerId) {
-  try {
-    const player = await Player.findById(playerId);
-    return player?.balance || 0;
-  } catch (error) {
-    logger.error('Error getting player balance:', error);
-    throw error;
-  }
-}
+// async function getPlayerBalance(playerId) {
+//   try {
+//     const player = await Player.findById(playerId);
+//     return player?.balance || 0;
+//   } catch (error) {
+//     logger.error('Error getting player balance:', error);
+//     throw error;
+//   }
+// }
 
 async function updatePlayerBalance(playerId, amount) {
   try {
@@ -818,4 +821,21 @@ export const processWithdrawal = async (req: CustomRequest, res: Response) => {
 // Add this helper function to validate test cards
 export const validateTestCard = (cardNumber: string): boolean => {
   return Object.values(TEST_CARDS).includes(cardNumber);
+};
+
+export const getPlayerBalance = async (req, res) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: "Authentication required" });
+    }
+    const playerId = req.user.id;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({ message: "Player not found" });
+    }
+    res.status(200).json({ balance: player.balance });
+  } catch (error) {
+    logger.error("Error fetching player balance:", error);
+    res.status(500).json({ message: "Failed to fetch balance" });
+  }
 };
