@@ -602,3 +602,28 @@ export const verifyPhone = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const verifyOTP = async (req: Request, res: Response) => {
+  try {
+    const { playerId, otp } = req.body;
+
+    const { token, expiresIn, user } = await authService.verifyOTP(playerId, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'OTP verified successfully',
+      data: {
+        user,
+        token,
+        expiresIn,
+      },
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Invalid OTP or server error';
+    res.status(401).json({
+      success: false,
+      error: errorMessage,
+    });
+  }
+};

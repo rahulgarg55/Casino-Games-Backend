@@ -324,6 +324,18 @@ router.post(
 );
 
 router.post(
+  '/verify-otp',
+  [
+    body('playerId').notEmpty().withMessage('Player ID is required'),
+    body('otp')
+      .isLength({ min: 6, max: 6 })
+      .withMessage('OTP must be 6 digits'),
+  ],
+  validateRequest,
+  authController.verifyOTP,
+);
+
+router.post(
   '/toggle-2fa',
   verifyToken,
   [

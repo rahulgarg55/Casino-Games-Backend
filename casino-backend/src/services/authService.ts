@@ -356,6 +356,7 @@ export const toggle2FA = async (
   return {
     is_2fa_enabled: player.is_2fa_enabled,
     two_factor_method: player.two_factor_method,
+    message: `2FA has been ${enabled ? 'enabled' : 'disabled'} successfully`,
   };
 };
 
@@ -514,4 +515,50 @@ export const generateToken = async (player: any) => {
     { expiresIn: '8h' },
   );
   return { token, expiresIn: 28800 };
+};
+
+export const verifyOTP = async (playerId: string, otp: string) => {
+  const player = await Player.findById(playerId).select(
+    '+two_factor_secret +two_factor_expires',
+  );
+
+  if (!player) {
+    throw new Error('Player not found');
+  }
+
+  if (
+    !player.two_factor_secret ||
+    !player.two_factor_expires ||
+    player.two_factor_secret !== otp ||
+    new Date() > player.two_factor_expires
+  ) {
+    throw new Error('Invalid or expired OTP');
+  }
+
+  player.two_factor_secret = undefined;
+  player.two_factor_expires = undefined;
+  await player.save();
+
+  const tokenData = generateTokenResponse(player);
+
+  return {
+    token: tokenData.token,
+    expiresIn: tokenData.expiresIn,
+    user: {
+      id: player._id,
+      username: player.username,
+      email: player.email,
+      phone_number: player.phone_number,
+      role: player.role_id,
+      status: player.status,
+      gender: player.gender,
+      language: player.language,
+      country: player.country,
+      city: player.city,
+      is_2fa_enabled: player.is_2fa_enabled,
+      profile_picture: player.profile_picture,
+      is_verified: player.is_verified,
+      fullname: player.fullname,
+    },
+  };
 };
