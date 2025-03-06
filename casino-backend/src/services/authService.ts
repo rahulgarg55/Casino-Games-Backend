@@ -343,10 +343,19 @@ export const toggle2FA = async (
   playerId: string,
   enabled: boolean,
   method?: 'email' | 'phone',
+  password?: string,
 ) => {
-  const player = await Player.findById(playerId);
+  const player = await Player.findById(playerId).select('+password_hash');
   if (!player) {
     throw new Error('Player not found');
+  }
+  if(password){
+    const isMatch = await bcrypt.compare(password, player.password_hash);
+    if (!isMatch) {
+      throw new Error('Invalid password');
+    }
+  }else{
+    throw new Error('Password is required to toggle 2FA');
   }
 
   player.is_2fa_enabled = enabled ? TWO_FA.ENABLED : TWO_FA.DISABLED;

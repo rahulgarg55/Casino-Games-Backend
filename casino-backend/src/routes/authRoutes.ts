@@ -344,6 +344,7 @@ router.post(
       .optional()
       .isIn(['email', 'phone'])
       .withMessage('Method must be "email" or "phone"'),
+      body('password').notEmpty().withMessage('Password is required'),
   ],
   validateRequest,
   authController.toggle2FA,

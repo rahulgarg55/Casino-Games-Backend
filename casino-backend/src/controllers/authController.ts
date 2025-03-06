@@ -137,8 +137,8 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
         error: 'Authentication required',
       });
     }
-    const { enabled, method } = req.body;
-    const result = await authService.toggle2FA(req.user.id, enabled, method);
+    const { enabled, method, password } = req.body;
+    const result = await authService.toggle2FA(req.user.id, enabled, method, password);
 
     res.status(200).json({
       success: true,
