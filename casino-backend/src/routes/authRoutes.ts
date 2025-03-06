@@ -262,7 +262,7 @@ router.post(
   paymentController.processWithdrawal,
 );
 
-router.get("/player/balance", verifyToken, paymentController.getPlayerBalance);
+router.get('/player/balance', verifyToken, paymentController.getPlayerBalance);
 
 router.get(
   '/transactions',
@@ -347,6 +347,13 @@ router.post(
   ],
   validateRequest,
   authController.toggle2FA,
+);
+
+router.post(
+  '/resend-verification-email',
+  verifyToken,
+  resendEmailLimiter,
+  authController.resendVerificationEmail,
 );
 
 export default router;

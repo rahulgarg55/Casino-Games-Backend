@@ -607,7 +607,10 @@ export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
 
-    const { token, expiresIn, user } = await authService.verifyOTP(playerId, otp);
+    const { token, expiresIn, user } = await authService.verifyOTP(
+      playerId,
+      otp,
+    );
 
     res.status(200).json({
       success: true,

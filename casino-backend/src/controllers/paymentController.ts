@@ -34,12 +34,10 @@ export const createStripeCustomer = async (player: IPlayer) => {
 export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { method_type, details, is_default } = req.body;
@@ -127,12 +125,10 @@ export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
         .status(400)
         .json({ message: 'Invalid request', error: error.message });
     } else {
-      res
-        .status(500)
-        .json({
-          message: 'Failed to add payment method',
-          error: error.message,
-        });
+      res.status(500).json({
+        message: 'Failed to add payment method',
+        error: error.message,
+      });
     }
   }
 };
@@ -140,12 +136,10 @@ export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
 export const getPaymentMethods = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { limit = 10, starting_after } = req.query;
@@ -162,12 +156,10 @@ export const getPaymentMethods = async (req: CustomRequest, res: Response) => {
     res.status(200).json({ paymentMethods });
   } catch (error) {
     logger.error('Error fetching payment methods:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to fetch payment methods',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to fetch payment methods',
+      error: error.message,
+    });
   }
 };
 
@@ -177,12 +169,10 @@ export const updatePaymentMethod = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { id } = req.params;
@@ -239,12 +229,10 @@ export const updatePaymentMethod = async (
     });
   } catch (error) {
     logger.error('Error updating payment method:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to update payment method',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to update payment method',
+      error: error.message,
+    });
   }
 };
 
@@ -254,12 +242,10 @@ export const deletePaymentMethod = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { id } = req.params;
@@ -298,12 +284,10 @@ export const deletePaymentMethod = async (
     res.status(200).json({ message: 'Payment method deleted successfully' });
   } catch (error) {
     logger.error('Error deleting payment method:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to delete payment method',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to delete payment method',
+      error: error.message,
+    });
   }
 };
 
@@ -313,12 +297,10 @@ export const createPaymentIntent = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { amount, currency } = req.body;
@@ -371,12 +353,10 @@ export const createPaymentIntent = async (
     });
   } catch (error) {
     logger.error('Error creating payment intent:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to create payment intent',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to create payment intent',
+      error: error.message,
+    });
   }
 };
 
@@ -590,12 +570,10 @@ export const getTransactionHistory = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { limit = 50, starting_after } = req.query;
@@ -615,12 +593,10 @@ export const getTransactionHistory = async (
     });
   } catch (error) {
     logger.error('Error fetching transaction history:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to fetch transaction history',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to fetch transaction history',
+      error: error.message,
+    });
   }
 };
 
@@ -630,12 +606,10 @@ export const getTransactionDetail = async (
 ) => {
   try {
     if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({
-          success: false,
-          error: 'Authentication required or invalid token',
-        });
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required or invalid token',
+      });
     }
     const playerId = req.user.id;
     const { id } = req.params;
@@ -662,12 +636,10 @@ export const getTransactionDetail = async (
     });
   } catch (error) {
     logger.error('Error fetching transaction detail:', error);
-    res
-      .status(500)
-      .json({
-        message: 'Failed to fetch transaction detail',
-        error: error.message,
-      });
+    res.status(500).json({
+      message: 'Failed to fetch transaction detail',
+      error: error.message,
+    });
   }
 };
 
@@ -826,16 +798,16 @@ export const validateTestCard = (cardNumber: string): boolean => {
 export const getPlayerBalance = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: "Authentication required" });
+      return res.status(401).json({ error: 'Authentication required' });
     }
     const playerId = req.user.id;
     const player = await Player.findById(playerId);
     if (!player) {
-      return res.status(404).json({ message: "Player not found" });
+      return res.status(404).json({ message: 'Player not found' });
     }
     res.status(200).json({ balance: player.balance });
   } catch (error) {
-    logger.error("Error fetching player balance:", error);
-    res.status(500).json({ message: "Failed to fetch balance" });
+    logger.error('Error fetching player balance:', error);
+    res.status(500).json({ message: 'Failed to fetch balance' });
   }
 };
