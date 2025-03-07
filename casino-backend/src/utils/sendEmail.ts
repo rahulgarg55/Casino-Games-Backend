@@ -18,7 +18,7 @@ export const sendVerificationEmail = async (
       </head>
       <body
         style="
-          background-color: #0b132b;
+          background-color: #fff;
           font-family: Arial, sans-serif;
           color: #ffffff;
           text-align: center;
@@ -64,11 +64,11 @@ export const sendVerificationEmail = async (
             </table>
           </div>
 
-          <div style="font-size: 18px; font-weight: bold; margin-bottom: 20px">
+          <div style="color: #ffffff; font-size: 18px; font-weight: bold; margin-bottom: 20px">
             Verify Your Email Address
           </div>
           <div style="margin: 10px">
-            <p style="font-size: 14px; margin: 0 0 10px 0">
+            <p style="color: #ffffff; font-size: 14px; margin: 0 0 10px 0">
               Thank you for registering! Please verify your email by clicking the link below:
             </p>
             <a
@@ -88,7 +88,7 @@ export const sendVerificationEmail = async (
               Verify Email
             </a>
 
-            <p style="font-size: 12px; margin: 0 0 10px 0">
+            <p style="color: #b0b0b0; font-size: 12px; margin: 0 0 10px 0">
               If you did not register, please ignore this email.
             </p>
           </div>
