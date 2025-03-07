@@ -630,3 +630,41 @@ export const verifyOTP = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const updateCookieConsent = async (req: Request, res: Response) => {
+  try {
+    const { playerId, consent } = req.body;
+
+    if (!playerId || !consent) {
+      return res.status(400).json({
+        success: false,
+        error: 'Player ID and consent are required',
+      });
+    }
+
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        error: 'Player not found',
+      });
+    }
+
+    player.cookieConsent = consent;
+    await player.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cookie consent updated successfully',
+      data: {
+        playerId: player._id,
+        cookieConsent: player.cookieConsent,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'An unexpected error occurred. Please try again later',
+    });
+  }
+};

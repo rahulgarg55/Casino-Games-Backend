@@ -38,6 +38,7 @@ export interface IPlayer extends Document {
   two_factor_secret?: string; // Temporary OTP for 2FA
   two_factor_expires?: Date; // OTP expiration
   two_factor_method?: 'email' | 'phone'; // Preferred 2FA method
+  cookieConsent?: string;
 }
 
 const playerSchema: Schema = new Schema(
@@ -211,6 +212,11 @@ const playerSchema: Schema = new Schema(
       type: String,
       enum: ['email', 'phone'],
       default: 'email',
+    },
+    cookieConsent:{
+      type: String,
+      enum:['accepted','rejected', 'pending'],
+      default: 'pending'
     },
   },
   {

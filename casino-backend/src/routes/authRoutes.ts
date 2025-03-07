@@ -357,4 +357,17 @@ router.post(
   authController.resendVerificationEmail,
 );
 
+router.post(
+  '/update-cookie-consent',
+  verifyToken,
+  [
+    body('playerId').notEmpty().withMessage('Player ID is required'),
+    body('consent')
+      .isIn(['accepted', 'rejected'])
+      .withMessage('Consent must be "accepted" or "rejected"'),
+  ],
+  validateRequest,
+  authController.updateCookieConsent
+);
+
 export default router;
