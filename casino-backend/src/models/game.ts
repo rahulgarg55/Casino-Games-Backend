@@ -5,7 +5,7 @@ export interface IGame extends Document {
   image_url: string;
   provider: string;
   status: number;
-  created_at: Date;  // Fixed typo from create_at to created_at
+  created_at: Date;
   updated_at: Date;
 }
 

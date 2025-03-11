@@ -10,6 +10,7 @@ import PlayerBalance from '../models/playerBalance';
 import { VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail } from '../utils/sendEmail';
+import bcrypt from 'bcryptjs';
 
 interface CustomRequest extends Request {
   user?: {
@@ -666,5 +667,32 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
       success: false,
       error: 'An unexpected error occurred. Please try again later',
     });
+  }
+};
+
+export const changePassword = async (req: CustomRequest, res: Response) => {
+  const { currentPassword, newPassword } = req.body;
+  const playerId = req.user?.id; 
+
+  try {
+    const player = await Player.findById(playerId).select('+password_hash');
+    if (!player) {
+      return res.status(404).json({ success: false, error: 'Player not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, player.password_hash);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, error: 'Current password is incorrect' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
+
+    player.password_hash = hashedPassword;
+    await player.save();
+
+    res.status(200).json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ success: false, error: 'An error occurred while changing the password' });
   }
 };
