@@ -110,11 +110,17 @@ const getEmailContent = (resetUrl: string) => {
             <div style="margin-bottom: 20px">
               <a
                 href="https://facebook.com"
-                style="margin: 0 10px; text-decoration: none"
+                style="
+                  margin: 0 10px;
+                  text-decoration: none;
+                  color: #ff3366;
+                  font-size: 14px;
+                "
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733547.png"
                   alt="Facebook"
+                  title="Follow us on Facebook"
                   style="
                     width: 20px;
                     height: 20px;
@@ -125,11 +131,17 @@ const getEmailContent = (resetUrl: string) => {
               </a>
               <a
                 href="https://twitter.com"
-                style="margin: 0 10px; text-decoration: none"
+                style="
+                  margin: 0 10px;
+                  text-decoration: none;
+                  color: #ff3366;
+                  font-size: 14px;
+                "
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/733/733579.png"
                   alt="Twitter"
+                  title="Follow us on Twitter"
                   style="
                     width: 20px;
                     height: 20px;
@@ -140,11 +152,17 @@ const getEmailContent = (resetUrl: string) => {
               </a>
               <a
                 href="https://instagram.com"
-                style="margin: 0 10px; text-decoration: none"
+                style="
+                  margin: 0 10px;
+                  text-decoration: none;
+                  color: #ff3366;
+                  font-size: 14px;
+                "
               >
                 <img
                   src="https://cdn-icons-png.flaticon.com/512/2111/2111463.png"
                   alt="Instagram"
+                  title="Follow us on Instagram"
                   style="
                     width: 20px;
                     height: 20px;
