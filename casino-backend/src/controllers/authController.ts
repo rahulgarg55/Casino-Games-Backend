@@ -51,12 +51,23 @@ export const register = async (req: Request, res: Response) => {
         expiresIn,
       },
     });
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'Invalid request. Please check your input';
-    res.status(400).json({
+  }  catch (error) {
+    let errorMessage = 'Invalid request. Please check your input';
+    let statusCode = 400;
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+
+      if (
+        errorMessage.includes('Username is already taken') ||
+        errorMessage.includes('Email is already registered') ||
+        errorMessage.includes('Phone number is already registered')
+      ) {
+        statusCode = 409;
+      }
+    }
+
+    res.status(statusCode).json({
       success: false,
       error: errorMessage,
     });

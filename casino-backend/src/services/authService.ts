@@ -84,6 +84,9 @@ export const register = async (data: RegistrationData) => {
 
   const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
+    throw new Error('User already registered');
+  }
+  if (existingUser) {
     if (existingUser.username === username) {
       throw new Error('Username is already taken');
     }
