@@ -111,7 +111,7 @@ const updateProfileValidation = [
     .isDate()
     .withMessage('Date of birth must be a valid date'),
   body('gender').optional().trim().notEmpty().withMessage('Gender is required'),
-  body('city').optional().trim().withMessage('City is required'),
+  // body('city').optional().trim().notEmpty().withMessage('City is required'),
   body('country')
     .optional()
     .trim()
