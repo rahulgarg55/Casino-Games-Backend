@@ -681,29 +681,65 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
   }
 };
 
+
 export const changePassword = async (req: CustomRequest, res: Response) => {
   const { currentPassword, newPassword } = req.body;
-  const playerId = req.user?.id; 
+  const playerId = req.user?.id;
 
   try {
+    // Validate input
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'Both current password and new password are required'
+      });
+    }
+
+    // Password strength validation
+    if (newPassword.length < 8 || !/\d/.test(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Password must be at least 8 characters long and include a number'
+      });
+    }
+
     const player = await Player.findById(playerId).select('+password_hash');
     if (!player) {
       return res.status(404).json({ success: false, error: 'Player not found' });
     }
 
+    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, player.password_hash);
     if (!isMatch) {
-      return res.status(400).json({ success: false, error: 'Current password is incorrect' });
+      return res.status(400).json({
+        success: false,
+        error: 'Current password is incorrect'
+      });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    // Check if new password is same as current password
+    const isSamePassword = await bcrypt.compare(newPassword, player.password_hash);
+    if (isSamePassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'New password must be different from current password'
+      });
+    }
 
+    // Hash and save new password
+    const hashedPassword = await bcrypt.hash(newPassword, 12);
     player.password_hash = hashedPassword;
     await player.save();
 
-    res.status(200).json({ success: true, message: 'Password changed successfully' });
+    res.status(200).json({
+      success: true,
+      message: 'Password changed successfully'
+    });
   } catch (error) {
     console.error('Error changing password:', error);
-    res.status(500).json({ success: false, error: 'An error occurred while changing the password' });
+    res.status(500).json({
+      success: false,
+      error: 'An error occurred while changing the password'
+    });
   }
 };
