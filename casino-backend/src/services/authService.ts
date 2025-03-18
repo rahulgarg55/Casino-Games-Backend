@@ -644,6 +644,12 @@ export const updateProfile = async (
   if (!player) {
     throw new Error('User not found');
   }
+  if(data.phone_number){
+    const existingPlayer = await Player.findOne({ phone_number: data.phone_number });
+    if (existingPlayer && existingPlayer._id.toString() !== playerId) {
+      throw new Error('Phone number is already registered');
+    }
+  }
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     throw new Error('Invalid email format');
   }
