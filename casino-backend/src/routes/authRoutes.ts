@@ -116,7 +116,7 @@ const updateProfileValidation = [
     .optional()
     .trim()
     .notEmpty()
-    .withMessage('Country is required'),
+    .withMessage('Country is required'),  
 ];
 
 router.post(
@@ -175,6 +175,19 @@ router.put(
   authController.updateProfile,
 );
 router.get('/verify-email', validateRequest, authController.verifyEmail);
+
+// router.post(
+//   '/send-verification-email',
+//   verifyToken,
+//   [
+//     body('email')
+//       .isEmail()
+//       .normalizeEmail()
+//       .withMessage('Valid email is required'),
+//   ],
+//   validateRequest,
+//   authController.sendVerificationEmail,
+// );
 
 router.post(
   '/verify-phone',

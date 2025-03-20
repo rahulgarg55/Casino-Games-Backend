@@ -223,12 +223,15 @@ export const login = async (data: LoginData) => {
   const player = await Player.findOne(query).select('+password_hash');
 
   if (!player) {
-    throw new Error('Invalid username or password');
+    if(email) {
+      throw new Error('Email does not exist');
+    }
+    throw new Error('User does not exist');
   }
 
   const isMatch = await bcrypt.compare(password, player.password_hash);
   if (!isMatch) {
-    throw new Error('Invalid username or password');
+    throw new Error('Invalid password');
   }
   if (player.is_verified === VERIFICATION.UNVERIFIED) {
     throw new Error('Please verify your account');
@@ -644,12 +647,19 @@ export const updateProfile = async (
   if (!player) {
     throw new Error('User not found');
   }
-  if(data.phone_number){
+  if(data.phone_number!==undefined){
+    if(data.phone_number===''){
+      player.phone_number=null;
+    } else if (!/^\+?[1-9]\d{1,14}$/.test(data.phone_number)) {
+      throw new Error('Valid phone number is required');
+    }else{
     const existingPlayer = await Player.findOne({ phone_number: data.phone_number });
     if (existingPlayer && existingPlayer._id.toString() !== playerId) {
       throw new Error('Phone number is already registered');
     }
+    player.phone_number=data.phone_number;
   }
+}
   if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
     throw new Error('Invalid email format');
   }
