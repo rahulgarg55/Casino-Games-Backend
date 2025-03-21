@@ -178,6 +178,19 @@ router.put(
 );
 router.get('/verify-email', validateRequest, authController.verifyEmail);
 
+// router.post(
+//   '/send-verification-email',
+//   verifyToken,
+//   [
+//     body('email')
+//       .isEmail()
+//       .normalizeEmail()
+//       .withMessage('Valid email is required'),
+//   ],
+//   validateRequest,
+//   authController.sendVerificationEmail,
+// );
+
 router.post(
   '/verify-phone',
   body('phone_number').matches(/^\+?[1-9]\d{1,14}$/),
@@ -346,7 +359,7 @@ router.post(
       .optional()
       .isIn(['email', 'phone'])
       .withMessage('Method must be "email" or "phone"'),
-      body('password').notEmpty().withMessage('Password is required'),
+    body('password').notEmpty().withMessage('Password is required'),
   ],
   validateRequest,
   authController.toggle2FA,
@@ -369,14 +382,16 @@ router.post(
       .withMessage('Consent must be "accepted" or "rejected"'),
   ],
   validateRequest,
-  authController.updateCookieConsent
+  authController.updateCookieConsent,
 );
 
 router.post(
   '/change-password',
   verifyToken,
   [
-    body('currentPassword').notEmpty().withMessage('Current password is required'),
+    body('currentPassword')
+      .notEmpty()
+      .withMessage('Current password is required'),
     body('newPassword')
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters')

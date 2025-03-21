@@ -1,6 +1,5 @@
 import twilio, { Twilio } from 'twilio';
 
-// Enable debug logging through environment variable
 process.env.TWILIO_LOG_LEVEL = 'debug';
 
 const client = twilio(
@@ -51,7 +50,6 @@ export const sendSmsVerification = async (
       throw new Error('Authentication error - please check Twilio credentials');
     }
 
-    // Log the complete error for debugging
     console.error('Detailed SMS error:', {
       code: error.code,
       message: error.message,

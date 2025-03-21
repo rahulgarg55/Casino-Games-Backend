@@ -1,4 +1,3 @@
-// src/utils/logger.ts
 import winston from 'winston';
 import 'winston-daily-rotate-file';
 
@@ -39,7 +38,6 @@ export const logger = winston.createLogger({
   ],
 });
 
-// If we're not in production, log to the console with colors
 if (process.env.NODE_ENV !== 'production') {
   logger.add(
     new winston.transports.Console({

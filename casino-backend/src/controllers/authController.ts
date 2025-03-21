@@ -54,7 +54,7 @@ export const register = async (req: Request, res: Response) => {
         expiresIn,
       },
     });
-  }  catch (error) {
+  } catch (error) {
     let errorMessage = 'Invalid request. Please check your input';
     let statusCode = 400;
 
@@ -153,7 +153,12 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
       });
     }
     const { enabled, method, password } = req.body;
-    const result = await authService.toggle2FA(req.user.id, enabled, method, password);
+    const result = await authService.toggle2FA(
+      req.user.id,
+      enabled,
+      method,
+      password,
+    );
 
     res.status(200).json({
       success: true,
@@ -177,7 +182,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!email && !phone_number) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide all required fields: username, password, email',
+        error: 'Please provide all required fields, i.e. username, password, email',
       });
     }
     await authService.forgotPassword({ email, phone_number });
@@ -227,9 +232,19 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     }
 
     const playerId = req.user.id;
-    console.log('playerId', playerId);
 
-    const player = await Player.findById(playerId).select('-password_hash');
+    const player = await Player.findById(playerId).select([
+      '-password_hash',
+      '-reset_password_token',
+      '-reset_password_expires',
+      '-verification_token',
+      '-verification_token_expires',
+      '-sms_code',
+      '-sms_code_expires',
+      '-two_factor_secret',
+      '-two_factor_expires',
+      '-refreshToken',
+    ]);
     if (!player) {
       return res.status(404).json({
         success: false,
@@ -824,7 +839,6 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
   }
 };
 
-
 export const changePassword = async (req: CustomRequest, res: Response) => {
   const { currentPassword, newPassword } = req.body;
   const playerId = req.user?.id;
@@ -834,7 +848,7 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
         success: false,
-        error: 'Both current password and new password are required'
+        error: 'Both current password and new password are required',
       });
     }
 
@@ -842,13 +856,16 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
     if (newPassword.length < 8 || !/\d/.test(newPassword)) {
       return res.status(400).json({
         success: false,
-        error: 'Password must be at least 8 characters long and include a number'
+        error:
+          'Password must be at least 8 characters long and include a number',
       });
     }
 
     const player = await Player.findById(playerId).select('+password_hash');
     if (!player) {
-      return res.status(404).json({ success: false, error: 'Player not found' });
+      return res
+        .status(404)
+        .json({ success: false, error: 'Player not found' });
     }
 
     // Verify current password
@@ -856,16 +873,19 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
     if (!isMatch) {
       return res.status(400).json({
         success: false,
-        error: 'Current password is incorrect'
+        error: 'Current password is incorrect',
       });
     }
 
     // Check if new password is same as current password
-    const isSamePassword = await bcrypt.compare(newPassword, player.password_hash);
+    const isSamePassword = await bcrypt.compare(
+      newPassword,
+      player.password_hash,
+    );
     if (isSamePassword) {
       return res.status(400).json({
         success: false,
-        error: 'New password must be different from current password'
+        error: 'New password must be different from current password',
       });
     }
 
@@ -876,13 +896,13 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully'
+      message: 'Password changed successfully',
     });
   } catch (error) {
     console.error('Error changing password:', error);
     res.status(500).json({
       success: false,
-      error: 'An error occurred while changing the password'
+      error: 'An error occurred while changing the password',
     });
   }
 };

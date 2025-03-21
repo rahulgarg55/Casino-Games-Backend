@@ -89,6 +89,7 @@ const playerSchema: Schema = new Schema(
     phone_number: {
       type: String,
       unique: true,
+      default: null,
       sparse: true, // Only index documents that contain the phone_number field
       validate: {
         validator: (v: string) => /^\+?[1-9]\d{1,14}$/.test(v),
@@ -213,10 +214,10 @@ const playerSchema: Schema = new Schema(
       enum: ['email', 'phone'],
       default: 'email',
     },
-    cookieConsent:{
+    cookieConsent: {
       type: String,
-      enum:['accepted','rejected', 'pending'],
-      default: 'pending'
+      enum: ['accepted', 'rejected', 'pending'],
+      default: 'pending',
     },
   },
   {
