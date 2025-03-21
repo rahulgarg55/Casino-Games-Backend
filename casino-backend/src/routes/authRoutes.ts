@@ -158,6 +158,8 @@ router.post(
 router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
+/*Get players statistics*/
+router.get('/players/statistics',authController.getPlayerStats);
 
 router.delete('/players/:userId', authController.deletePlayer);
 router.put(

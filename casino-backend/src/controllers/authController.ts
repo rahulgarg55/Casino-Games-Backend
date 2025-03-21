@@ -11,6 +11,9 @@ import { VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import bcrypt from 'bcryptjs';
+import moment from 'moment'
+import { messages } from '../utils/messages';
+import { months, quarters, daysOfWeek } from '../utils/constant';
 
 interface CustomRequest extends Request {
   user?: {
@@ -298,6 +301,146 @@ export const getAllPlayers = async (req: Request, res: Response) => {
     res.status(400).json({
       success: false,
       error: 'An unexpected error occurred. Please try again later',
+    });
+  }
+};
+export const getPlayerStats = async (req: Request, res: Response) => {
+  try {
+    const { filter } = req.query;
+
+    const now = moment();
+
+    const startOfYear = now.clone().startOf('year');
+    const endOfYear = now.clone().endOf('year');
+    const startOfMonth = now.clone().startOf('month');
+    const endOfMonth = now.clone().endOf('month');
+    const startOfWeek = now.clone().startOf('isoWeek');
+    const endOfWeek = now.clone().endOf('isoWeek');
+    const startOfDay = now.clone().startOf('day');
+    const endOfDay = now.clone().endOf('day');
+
+    let dateFilter = { $gte: startOfYear.toDate(), $lte: endOfYear.toDate() };
+
+    if (filter === 'monthly') {
+      dateFilter = { $gte: startOfMonth.toDate(), $lte: endOfMonth.toDate() };
+    } else if (filter === 'weekly') {
+      dateFilter = { $gte: startOfWeek.toDate(), $lte: endOfWeek.toDate() };
+    } else if (filter === 'daily') {
+      dateFilter = { $gte: startOfDay.toDate(), $lte: endOfDay.toDate() };
+    }
+
+    const players = await Player.find({
+      created_at: dateFilter,
+      role_id: 0,
+      is_verified: 1,
+    }).select('created_at');
+
+    if (filter === 'daily') {
+      // **Daily Stats**
+      return res.status(200).json({
+        success: true,
+        message: `Daily ${messages.stats}`,
+        data: {
+          activePlayersToday: players.length,
+        },
+      });
+    }
+
+    if (filter === 'weekly') {
+      // **Weekly Stats **
+      const weeklyStats = Array(7).fill(0);
+
+      players.forEach((player) => {
+        const dayIndex = moment(player.created_at).isoWeekday() - 1;
+        weeklyStats[dayIndex] += 1;
+      });
+
+      const statsWithDays = daysOfWeek.map((day, index) => ({
+        day,
+        activePlayers: weeklyStats[index],
+      }));
+
+      return res.status(200).json({
+        success: true,
+        message: `Weekly ${messages.stats}`,
+        data: {
+          activePlayersPerDay: statsWithDays,
+        },
+      });
+    }
+
+    if (filter === 'monthly') {
+      // **Monthly Stats **
+      const daysInMonth = moment().daysInMonth();
+      const monthlyStats = Array(daysInMonth).fill(0);
+
+      players.forEach((player) => {
+        const dayIndex = moment(player.created_at).date() - 1;
+        monthlyStats[dayIndex] += 1;
+      });
+
+      const statsWithDays = Array.from({ length: daysInMonth }, (_, index) => ({
+        day: index + 1,
+        activePlayers: monthlyStats[index],
+      }));
+
+      return res.status(200).json({
+        success: true,
+        message: `Monthly ${messages.stats}`,
+        data: {
+          activePlayersPerDayInMonth: statsWithDays,
+        },
+      });
+    }
+
+    if (filter === 'quarterly') {
+      // **Quarterly Stats (Q1, Q2, Q3, Q4)**
+      const quarterlyStats = [0, 0, 0, 0];
+
+      players.forEach((player) => {
+        const month = moment(player.created_at).month();
+        const quarter = Math.floor(month / 3);
+        quarterlyStats[quarter] += 1;
+      });
+
+      const statsWithQuarters = quarters.map((quarter, index) => ({
+        quarter,
+        activePlayers: quarterlyStats[index],
+      }));
+
+      return res.status(200).json({
+        success: true,
+        message: `Quarterly ${messages.stats}`,
+        data: {
+          activePlayersPerQuarter: statsWithQuarters,
+        },
+      });
+    }
+
+    // **Default: Yearly  Stats**
+    const monthlyStats = Array(12).fill(0);
+
+    players.forEach((player) => {
+      const month = moment(player.created_at).month();
+      monthlyStats[month] += 1;
+    });
+
+    const statsWithMonths = months.map((month, index) => ({
+      month,
+      activePlayers: monthlyStats[index],
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Yearly ${messages.stats}`,
+      data: {
+        activePlayersPerMonth: statsWithMonths,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
     });
   }
 };
