@@ -5,7 +5,7 @@ import * as paymentController from '../controllers/paymentController';
 import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
-import { verifyToken } from '../utils/jwt';
+import { verifyToken,verifyAdmin } from '../utils/jwt';
 import bodyParser from 'body-parser';
 import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
@@ -158,6 +158,8 @@ router.post(
 router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
+/*Get players statistics*/
+router.get('/players/statistics',verifyAdmin,authController.getPlayerStats);
 
 router.delete('/players/:userId', authController.deletePlayer);
 router.put(

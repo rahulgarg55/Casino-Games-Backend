@@ -31,6 +31,7 @@ interface LoginData {
   email?: string;
   phone_number?: string;
   password: string;
+  role_id:number
 }
 
 interface ForgotPasswordData {
@@ -208,12 +209,13 @@ const generateOTP = (): string => {
 };
 
 export const login = async (data: LoginData) => {
-  const { email, phone_number, password } = data;
+  const { email, phone_number, password ,role_id=0} = data;
 
   if (!email && !phone_number) {
     throw new Error('Invalid request. Please check your input');
   }
   const query = {
+    role_id,
     $or: [
       { email: { $eq: email, $exists: true } },
       { phone_number: { $eq: phone_number, $exists: true } },
