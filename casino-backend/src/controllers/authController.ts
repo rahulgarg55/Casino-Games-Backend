@@ -179,7 +179,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!email && !phone_number) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide all required fields: username, password, email',
+        error: 'Please provide all required fields, i.e. username, password, email',
       });
     }
     await authService.forgotPassword({ email, phone_number });
