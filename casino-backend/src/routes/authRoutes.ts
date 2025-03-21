@@ -159,7 +159,7 @@ router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
 /*Get players statistics*/
-router.get('/players/statistics',authController.getPlayerStats);
+router.get('/players/statistics',verifyAdmin,authController.getPlayerStats);
 
 router.delete('/players/:userId', authController.deletePlayer);
 router.put(
