@@ -11,7 +11,7 @@ import { VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import bcrypt from 'bcryptjs';
-import moment from 'moment'
+import moment from 'moment';
 import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
 
@@ -182,7 +182,8 @@ export const forgotPassword = async (req: Request, res: Response) => {
     if (!email && !phone_number) {
       return res.status(400).json({
         success: false,
-        error: 'Please provide all required fields, i.e. username, password, email',
+        error:
+          'Please provide all required fields, i.e. username, password, email',
       });
     }
     await authService.forgotPassword({ email, phone_number });
@@ -348,6 +349,7 @@ export const getPlayerStats = async (req: Request, res: Response) => {
       created_at: dateFilter,
       role_id: 0,
       is_verified: 1,
+      status: 1,
     }).select('created_at');
 
     if (filter === 'daily') {
@@ -459,6 +461,82 @@ export const getPlayerStats = async (req: Request, res: Response) => {
     });
   }
 };
+export const getPlayerRegionStats = async (req: Request, res: Response) => {
+  try {
+    const playerStats = await Player.aggregate([
+      {
+        $match: {
+          is_verified: 1,
+          status: 1,
+        },
+      },
+      {
+        $group: {
+          _id: '$country',
+          playerCount: { $sum: 1 },
+        },
+      },
+      {
+        $facet: {
+          totalPlayers: [
+            {
+              $group: {
+                _id: null,
+                total: { $sum: '$playerCount' },
+              },
+            },
+          ],
+          countryStats: [
+            {
+              $project: {
+                country: '$_id',
+                playerCount: 1,
+                _id: 0,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: '$totalPlayers',
+      },
+      {
+        $project: {
+          countryStats: {
+            $map: {
+              input: '$countryStats',
+              as: 'stat',
+              in: {
+                label: { $concat: ['$$stat.country', ' Players'] },
+                value: '$$stat.playerCount',
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    if (!playerStats.length) {
+      return res.status(400).json({
+        success: false,
+        message: messages.dataNotFound,
+        data: [],
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.regionStats,
+      data: playerStats[0].countryStats || [],
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
+    });
+  }
+};
+
 export const updatePlayerStatus = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
