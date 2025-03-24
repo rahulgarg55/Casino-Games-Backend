@@ -161,6 +161,9 @@ router.get('/players', authController.getAllPlayers);
 /*Get players statistics*/
 router.get('/players/statistics',verifyAdmin,authController.getPlayerStats);
 
+/*Get players region statistics*/
+router.get('/players/region/statistics',verifyAdmin,authController.getPlayerRegionStats);
+
 router.delete('/players/:userId', authController.deletePlayer);
 router.put(
   '/players/:userId/status',
