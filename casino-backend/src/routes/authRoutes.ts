@@ -268,6 +268,8 @@ router.post(
   validateRequest,
   paymentController.createPaymentIntent,
 );
+
+router.get('/stripe-config', verifyToken, paymentController.getStripeConfig);
 router.post(
   '/process-withdrawal',
   verifyToken,

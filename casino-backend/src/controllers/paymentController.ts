@@ -5,6 +5,7 @@ import Transaction from '../models/transaction';
 import PaymentMethod from '../models/paymentMethod';
 import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
+import Stripe from 'stripe';
 
 interface CustomRequest extends Request {
   user?: {
@@ -291,54 +292,133 @@ export const deletePaymentMethod = async (
   }
 };
 
-export const createPaymentIntent = async (
-  req: CustomRequest,
-  res: Response,
-) => {
+export const createPaymentIntent = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
+      logger.warn('Unauthorized access attempt to createPaymentIntent', {
+        method: req.method,
+        path: req.path,
+      });
       return res.status(401).json({
         success: false,
         error: 'Authentication required or invalid token',
       });
     }
+
     const playerId = req.user.id;
     const { amount, currency } = req.body;
 
+    if (!amount || !currency) {
+      logger.warn('Missing required fields in createPaymentIntent', {
+        playerId,
+        amount,
+        currency,
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Amount and currency are required',
+      });
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      logger.warn('Invalid amount provided', {
+        playerId,
+        amount,
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be a positive number',
+      });
+    }
+
     const player = await Player.findById(playerId);
     if (!player) {
+      logger.warn('Player not found', { playerId });
       return res.status(404).json({ message: 'Player not found' });
     }
 
-    if (!player.stripeCustomerId) {
+    let customerId = player.stripeCustomerId;
+    if (!customerId) {
+      logger.info('No Stripe customer ID found, creating new customer', { playerId });
       const customer = await createStripeCustomer(player);
-      player.stripeCustomerId = customer.id;
+      customerId = customer.id;
+      player.stripeCustomerId = customerId;
       await player.save();
+      logger.debug('New Stripe customer created', { customerId, playerId });
+    } else {
+      try {
+        await stripe.customers.retrieve(customerId);
+        logger.debug('Verified existing Stripe customer', { customerId, playerId });
+      } catch (error) {
+        if (error.code === 'resource_missing') {
+          logger.warn('Stripe customer not found, recreating', { customerId, playerId });
+          const customer = await createStripeCustomer(player);
+          customerId = customer.id;
+          player.stripeCustomerId = customerId;
+          await player.save();
+          logger.debug('Recreated Stripe customer', { customerId, playerId });
+        } else {
+          logger.error('Unexpected error retrieving Stripe customer', {
+            playerId,
+            customerId,
+            error: error.message,
+            stack: error.stack,
+          });
+          throw error;
+        }
+      }
     }
 
-    const amountInCents = Math.round(parseFloat(amount) * 100);
+    const amountInCents = Math.round(parsedAmount * 100);
     const idempotencyKey = `pi-${playerId}-${Date.now()}`;
+    const description = `Top-up for player ${player.fullname || 'Unnamed'} (ID: ${player._id})`;
 
-    const description = `Top-up for player ${player.fullname} (ID: ${player._id})`;
+    logger.info('Creating PaymentIntent', {
+      playerId,
+      amountInCents,
+      currency: currency.toLowerCase(),
+      customerId,
+      idempotencyKey,
+    });
+
+    const paymentIntentOptions: Stripe.PaymentIntentCreateParams = {
+      amount: amountInCents,
+      currency: currency.toLowerCase(),
+      customer: customerId,
+      automatic_payment_methods: { enabled: true },
+      metadata: { playerId: player._id.toString(), transactionType: 'topup' },
+      description,
+    };
+
+    // Add Stripe Connect support if applicable
+    if (player.stripeConnectedAccountId) {
+      paymentIntentOptions.on_behalf_of = player.stripeConnectedAccountId;
+      // Optionally, if charging directly on the connected account:
+      // paymentIntentOptions.application_fee_amount = Math.round(amountInCents * 0.1); // 10% fee example
+      // paymentIntentOptions.transfer_data = {
+      //   destination: player.stripeConnectedAccountId,
+      // };
+    }
 
     const paymentIntent = await stripe.paymentIntents.create(
-      {
-        amount: amountInCents,
-        currency: currency.toLowerCase(),
-        customer: player.stripeCustomerId,
-        automatic_payment_methods: { enabled: true },
-        metadata: { playerId: player._id.toString(), transactionType: 'topup' },
-        description: description,
-      },
+      paymentIntentOptions,
       {
         idempotencyKey,
-      },
+        ...(player.stripeConnectedAccountId && { stripeAccount: player.stripeConnectedAccountId }), // Direct charge if needed
+      }
     );
+
+    logger.info('PaymentIntent created successfully', {
+      playerId,
+      paymentIntentId: paymentIntent.id,
+      clientSecret: paymentIntent.client_secret,
+    });
 
     const transaction = new Transaction({
       player_id: playerId,
-      amount: amount,
-      currency: currency,
+      amount: parsedAmount,
+      currency: currency.toLowerCase(),
       transaction_type: 'topup',
       payment_method: 'stripe',
       status: 'pending',
@@ -346,17 +426,69 @@ export const createPaymentIntent = async (
     });
     await transaction.save();
 
+    logger.debug('Transaction recorded', {
+      playerId,
+      transactionId: transaction._id,
+      paymentIntentId: paymentIntent.id,
+    });
+
     res.status(200).json({
+      success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       transactionId: transaction._id,
+      stripeAccountId: player.stripeConnectedAccountId || null, // Include for frontend if needed
     });
   } catch (error) {
-    logger.error('Error creating payment intent:', error);
-    res.status(500).json({
-      message: 'Failed to create payment intent',
+    logger.error('Error creating payment intent', {
+      playerId: req.user?.id,
+      requestBody: req.body,
       error: error.message,
+      code: error.code,
+      type: error.type,
+      stack: error.stack,
     });
+
+    if (error.type === 'StripeInvalidRequestError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid request to Stripe',
+        error: error.message,
+      });
+    } else if (error.type === 'StripeCardError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Payment error',
+        error: error.message,
+      });
+    } else {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to create payment intent',
+        error: error.message,
+      });
+    }
+  }
+};
+export const getStripeConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const playerId = req.user.id;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      return res.status(404).json({ message: 'Player not found' });
+    }
+
+    const config = {
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      stripeAccountId: player.stripeConnectedAccountId || null,
+    };
+    res.status(200).json(config);
+  } catch (error) {
+    logger.error('Error fetching Stripe config:', error);
+    res.status(500).json({ error: 'Failed to fetch Stripe config' });
   }
 };
 
