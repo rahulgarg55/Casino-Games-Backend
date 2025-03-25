@@ -14,6 +14,7 @@ import bcrypt from 'bcryptjs';
 import moment from 'moment';
 import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
+import { StripeConfig } from '../models/stripeConfig';
 
 interface CustomRequest extends Request {
   user?: {
@@ -981,6 +982,66 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'An error occurred while changing the password',
+    });
+  }
+};
+
+export const geStripeConfig = async (req: Request, res: Response) => {
+  try {
+    const existingConfig = await StripeConfig.findOne();
+
+    if (!existingConfig) {
+      return res.status(404).json({
+        success: false,
+        message: messages.stripeConfigNotFound,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.stripeConfigFound,
+      data: existingConfig,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
+    });
+  }
+};
+
+export const updateStripeConfig = async (req: Request, res: Response) => {
+  try {
+    const updateData = req.body;
+
+    // Find existing record
+    const existingConfig = await StripeConfig.findOne();
+
+    if (!existingConfig) {
+      return res.status(404).json({
+        success: false,
+        message: messages.stripeConfigNotFound,
+      });
+    }
+
+    // Merge new updates while keeping existing values
+    const updatedData = { ...existingConfig.toObject(), ...updateData };
+
+    const updatedStripeConfig = await StripeConfig.findByIdAndUpdate(
+      existingConfig._id,
+      { $set: updatedData },
+      { new: true },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: messages.stripeConfigUpdated,
+      data: updatedStripeConfig,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
     });
   }
 };
