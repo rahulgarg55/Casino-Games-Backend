@@ -15,37 +15,90 @@ interface CustomRequest extends Request {
   };
 }
 
-export const createStripeCustomer = async (player: IPlayer) => {
+export const createStripeCustomer = async (player: IPlayer): Promise<Stripe.Customer> => {
   try {
-    const customer = await stripe.customers.create({
+    const customerParams: Stripe.CustomerCreateParams = {
       email: player.email,
       name: player.fullname,
       phone: player.phone_number,
       metadata: {
         playerId: player._id.toString(),
+        platform: 'Basta Casino',
       },
-    });
+    };
+
+    const customer = player.stripeConnectedAccountId
+      ? await stripe.customers.create(customerParams, {
+          stripeAccount: player.stripeConnectedAccountId,
+        })
+      : await stripe.customers.create(customerParams);
+
     return customer;
-  } catch (error) {
-    logger.error('Error creating Stripe customer:', error);
+  } catch (error: any) {
+    logger.error('Error creating Stripe customer:', {
+      error: error.message,
+      stack: error.stack,
+      playerId: player._id,
+    });
     throw new Error(`Failed to create Stripe customer: ${error.message}`);
   }
 };
 
-export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
+async function updatePlayerBalance(playerId: string, amount: number): Promise<number> {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required or invalid token',
-      });
+    const player = await Player.findById(playerId);
+    if (!player) {
+      throw new Error('Player not found');
     }
+
+    const newBalance = (player.balance || 0) + amount;
+    if (newBalance < 0) {
+      throw new Error('Insufficient balance');
+    }
+
+    player.balance = newBalance;
+    await player.save();
+
+    logger.info(`Updated balance for player ${playerId}: ${player.balance}`);
+    return player.balance;
+  } catch (error: any) {
+    logger.error('Error updating player balance:', {
+      playerId,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+}
+
+export const addPaymentMethod = async (req: CustomRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
+    }
+
     const playerId = req.user.id;
-    const { method_type, details, is_default } = req.body;
+    const { method_type, details, is_default = false } = req.body;
+
+    if (!method_type || !details) {
+      res.status(400).json({
+        success: false,
+        message: 'method_type and details are required',
+      });
+      return;
+    }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
+      res.status(404).json({ 
+        success: false,
+        message: 'Player not found' 
+      });
+      return;
     }
 
     if (!player.stripeCustomerId) {
@@ -56,44 +109,63 @@ export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
 
     let stripePaymentMethodId: string;
 
-    if (method_type === 'credit_card') {
-      if (!details.payment_method_id) {
-        return res
-          .status(400)
-          .json({ message: 'Payment method ID required for credit_card' });
-      }
-      stripePaymentMethodId = details.payment_method_id;
-      await stripe.paymentMethods.attach(stripePaymentMethodId, {
-        customer: player.stripeCustomerId,
-      });
-    } else if (method_type === 'bank_transfer') {
-      if (!details.payment_method_id) {
-        if (!details.billing_details || !details.billing_details.name) {
-          details.billing_details = { name: player.fullname || 'Unknown' };
+    switch (method_type.toLowerCase()) {
+      case 'credit_card':
+        if (!details.payment_method_id) {
+          res.status(400).json({ 
+            success: false,
+            message: 'Payment method ID required for credit_card' 
+          });
+          return;
         }
-        const paymentMethod = await stripe.paymentMethods.create({
-          type: 'us_bank_account',
-          us_bank_account: {
-            account_number: details.account_number,
-            routing_number: details.routing_number,
-            account_holder_type: details.account_holder_type || 'individual',
-          },
-          billing_details: details.billing_details,
-        });
-        stripePaymentMethodId = paymentMethod.id;
+        
+        const attachedMethod = await stripe.paymentMethods.attach(
+          details.payment_method_id,
+          { customer: player.stripeCustomerId }
+        );
+        stripePaymentMethodId = attachedMethod.id;
+        break;
+
+      case 'bank_transfer':
+        if (!details.payment_method_id) {
+          if (!details.account_number || !details.routing_number) {
+            res.status(400).json({
+              success: false,
+              message: 'Account and routing numbers required',
+            });
+            return;
+          }
+
+          const paymentMethod = await stripe.paymentMethods.create({
+            type: 'us_bank_account',
+            us_bank_account: {
+              account_number: details.account_number,
+              routing_number: details.routing_number,
+              account_holder_type: details.account_holder_type || 'individual',
+            },
+            billing_details: details.billing_details || { name: player.fullname || 'Unknown' },
+          });
+
+          stripePaymentMethodId = paymentMethod.id;
+        } else {
+          stripePaymentMethodId = details.payment_method_id;
+        }
+
         await stripe.paymentMethods.attach(stripePaymentMethodId, {
           customer: player.stripeCustomerId,
         });
-      } else {
-        stripePaymentMethodId = details.payment_method_id;
-        await stripe.paymentMethods.attach(stripePaymentMethodId, {
-          customer: player.stripeCustomerId,
+        break;
+
+      case 'paypal':
+        stripePaymentMethodId = details.paypal_id || `paypal-${Date.now()}`;
+        break;
+
+      default:
+        res.status(400).json({ 
+          success: false,
+          message: 'Unsupported method_type' 
         });
-      }
-    } else if (method_type === 'paypal') {
-      stripePaymentMethodId = details.paypal_id || `paypal-${Date.now()}`;
-    } else {
-      return res.status(400).json({ message: 'Unsupported method_type' });
+        return;
     }
 
     const paymentMethod = new PaymentMethod({
@@ -109,72 +181,102 @@ export const addPaymentMethod = async (req: CustomRequest, res: Response) => {
     if (is_default) {
       await PaymentMethod.updateMany(
         { player_id: playerId, _id: { $ne: paymentMethod._id } },
-        { is_default: false },
+        { $set: { is_default: false } }
       );
     }
 
     res.status(201).json({
+      success: true,
       message: 'Payment method added successfully',
-      paymentMethod,
+      paymentMethod: {
+        id: paymentMethod._id,
+        method_type: paymentMethod.method_type,
+        is_default: paymentMethod.is_default,
+        last4: method_type === 'credit_card' ? details.card?.last4 : undefined,
+        brand: method_type === 'credit_card' ? details.card?.brand : undefined,
+      },
     });
-  } catch (error) {
-    logger.error('Error adding payment method:', error);
-    if (error.type === 'StripeCardError') {
-      res.status(400).json({ message: 'Card error', error: error.message });
-    } else if (error.type === 'StripeInvalidRequestError') {
-      res
-        .status(400)
-        .json({ message: 'Invalid request', error: error.message });
-    } else {
-      res.status(500).json({
-        message: 'Failed to add payment method',
-        error: error.message,
-      });
-    }
+  } catch (error: any) {
+    logger.error('Error adding payment method:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+
+    res.status(error.type === 'StripeCardError' ? 400 : 500).json({
+      success: false,
+      message: error.type === 'StripeCardError' ? 'Card error' : 'Failed to add payment method',
+      error: error.message,
+    });
   }
 };
 
-export const getPaymentMethods = async (req: CustomRequest, res: Response) => {
+export const getPaymentMethods = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
-    const playerId = req.user.id;
-    const { limit = 10, starting_after } = req.query;
 
-    const query = { player_id: playerId };
+    const playerId = req.user.id;
+    const { limit = '10', starting_after } = req.query;
+
+    const parsedLimit = parseInt(limit as string);
+    if (isNaN(parsedLimit) || parsedLimit <= 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid limit parameter',
+      });
+      return;
+    }
+
+    const query: any = { player_id: playerId };
     if (starting_after) {
-      query['_id'] = { $gt: starting_after };
+      query._id = { $gt: starting_after };
     }
 
     const paymentMethods = await PaymentMethod.find(query)
-      .limit(parseInt(limit as string))
+      .limit(parsedLimit)
       .sort({ _id: 1 });
 
-    res.status(200).json({ paymentMethods });
-  } catch (error) {
-    logger.error('Error fetching payment methods:', error);
+    res.status(200).json({
+      success: true,
+      paymentMethods: paymentMethods.map(method => ({
+        id: method._id,
+        method_type: method.method_type,
+        is_default: method.is_default,
+        created_at: method.created_at,
+        last4: method.method_type === 'credit_card' ? method.details?.card?.last4 : undefined,
+        brand: method.method_type === 'credit_card' ? method.details?.card?.brand : undefined,
+      })),
+    });
+  } catch (error: any) {
+    logger.error('Error fetching payment methods:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to fetch payment methods',
       error: error.message,
     });
   }
 };
 
-export const updatePaymentMethod = async (
-  req: CustomRequest,
-  res: Response,
-) => {
+export const updatePaymentMethod = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
+
     const playerId = req.user.id;
     const { id } = req.params;
     const { method_type, details, is_default } = req.body;
@@ -184,31 +286,32 @@ export const updatePaymentMethod = async (
       player_id: playerId,
     });
     if (!paymentMethod) {
-      return res.status(404).json({ message: 'Payment method not found' });
+      res.status(404).json({
+        success: false,
+        message: 'Payment method not found'
+      });
+      return;
     }
 
     const player = await Player.findById(playerId);
     if (!player || !player.stripeCustomerId) {
-      return res
-        .status(400)
-        .json({ message: 'Player or Stripe customer not found' });
+      res.status(400).json({
+        success: false,
+        message: 'Player or Stripe customer not found'
+      });
+      return;
     }
 
-    if (paymentMethod.stripe_payment_method_id && details) {
-      if (
-        method_type === 'credit_card' &&
-        paymentMethod.method_type === 'credit_card'
-      ) {
-        await stripe.paymentMethods.update(
-          paymentMethod.stripe_payment_method_id,
-          {
-            card: {
-              exp_month: details.exp_month || paymentMethod.details.exp_month,
-              exp_year: details.exp_year || paymentMethod.details.exp_year,
-            },
+    if (paymentMethod.stripe_payment_method_id && details && method_type === 'credit_card') {
+      await stripe.paymentMethods.update(
+        paymentMethod.stripe_payment_method_id,
+        {
+          card: {
+            exp_month: details.exp_month || paymentMethod.details.exp_month,
+            exp_year: details.exp_year || paymentMethod.details.exp_year,
           },
-        );
-      }
+        }
+      );
     }
 
     if (method_type) paymentMethod.method_type = method_type;
@@ -220,34 +323,44 @@ export const updatePaymentMethod = async (
     if (is_default) {
       await PaymentMethod.updateMany(
         { player_id: playerId, _id: { $ne: paymentMethod._id } },
-        { is_default: false },
+        { $set: { is_default: false } }
       );
     }
 
     res.status(200).json({
+      success: true,
       message: 'Payment method updated successfully',
-      paymentMethod,
+      paymentMethod: {
+        id: paymentMethod._id,
+        method_type: paymentMethod.method_type,
+        is_default: paymentMethod.is_default,
+      },
     });
-  } catch (error) {
-    logger.error('Error updating payment method:', error);
+  } catch (error: any) {
+    logger.error('Error updating payment method:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      paymentMethodId: req.params.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to update payment method',
       error: error.message,
     });
   }
 };
 
-export const deletePaymentMethod = async (
-  req: CustomRequest,
-  res: Response,
-) => {
+export const deletePaymentMethod = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
+
     const playerId = req.user.id;
     const { id } = req.params;
 
@@ -256,19 +369,21 @@ export const deletePaymentMethod = async (
       player_id: playerId,
     });
     if (!paymentMethod) {
-      return res.status(404).json({ message: 'Payment method not found' });
+      res.status(404).json({
+        success: false,
+        message: 'Payment method not found'
+      });
+      return;
     }
 
     if (paymentMethod.stripe_payment_method_id) {
       try {
-        await stripe.paymentMethods.detach(
-          paymentMethod.stripe_payment_method_id,
-        );
-      } catch (detachError) {
-        logger.warn(
-          `Failed to detach Stripe payment method ${paymentMethod.stripe_payment_method_id}:`,
-          detachError,
-        );
+        await stripe.paymentMethods.detach(paymentMethod.stripe_payment_method_id);
+      } catch (detachError: any) {
+        logger.warn('Failed to detach Stripe payment method:', {
+          error: detachError.message,
+          paymentMethodId: paymentMethod._id,
+        });
       }
     }
 
@@ -282,138 +397,125 @@ export const deletePaymentMethod = async (
       }
     }
 
-    res.status(200).json({ message: 'Payment method deleted successfully' });
-  } catch (error) {
-    logger.error('Error deleting payment method:', error);
+    res.status(200).json({
+      success: true,
+      message: 'Payment method deleted successfully',
+    });
+  } catch (error: any) {
+    logger.error('Error deleting payment method:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      paymentMethodId: req.params.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to delete payment method',
       error: error.message,
     });
   }
 };
 
-export const createPaymentIntent = async (req: CustomRequest, res: Response) => {
+export const createPaymentIntent = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      logger.warn('Unauthorized access attempt to createPaymentIntent', {
-        method: req.method,
-        path: req.path,
-      });
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
 
     const playerId = req.user.id;
-    const { amount, currency } = req.body;
+    const { amount, currency, payment_method_id, description } = req.body;
 
     if (!amount || !currency) {
-      logger.warn('Missing required fields in createPaymentIntent', {
-        playerId,
-        amount,
-        currency,
-      });
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Amount and currency are required',
       });
+      return;
     }
 
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      logger.warn('Invalid amount provided', {
-        playerId,
-        amount,
-      });
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Amount must be a positive number',
       });
+      return;
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      logger.warn('Player not found', { playerId });
-      return res.status(404).json({ message: 'Player not found' });
+      res.status(404).json({ 
+        success: false,
+        message: 'Player not found' 
+      });
+      return;
     }
 
     let customerId = player.stripeCustomerId;
     if (!customerId) {
-      logger.info('No Stripe customer ID found, creating new customer', { playerId });
       const customer = await createStripeCustomer(player);
       customerId = customer.id;
       player.stripeCustomerId = customerId;
       await player.save();
-      logger.debug('New Stripe customer created', { customerId, playerId });
-    } else {
-      try {
-        await stripe.customers.retrieve(customerId);
-        logger.debug('Verified existing Stripe customer', { customerId, playerId });
-      } catch (error) {
-        if (error.code === 'resource_missing') {
-          logger.warn('Stripe customer not found, recreating', { customerId, playerId });
-          const customer = await createStripeCustomer(player);
-          customerId = customer.id;
-          player.stripeCustomerId = customerId;
-          await player.save();
-          logger.debug('Recreated Stripe customer', { customerId, playerId });
-        } else {
-          logger.error('Unexpected error retrieving Stripe customer', {
-            playerId,
-            customerId,
-            error: error.message,
-            stack: error.stack,
-          });
-          throw error;
-        }
-      }
     }
 
     const amountInCents = Math.round(parsedAmount * 100);
     const idempotencyKey = `pi-${playerId}-${Date.now()}`;
-    const description = `Top-up for player ${player.fullname || 'Unnamed'} (ID: ${player._id})`;
+    const paymentDescription = description || `Topup from ${player.fullname || 'customer'}`;
 
-    logger.info('Creating PaymentIntent', {
-      playerId,
-      amountInCents,
-      currency: currency.toLowerCase(),
-      customerId,
-      idempotencyKey,
-    });
-
-    const paymentIntentOptions: Stripe.PaymentIntentCreateParams = {
+    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
       amount: amountInCents,
       currency: currency.toLowerCase(),
       customer: customerId,
-      automatic_payment_methods: { enabled: true },
-      metadata: { playerId: player._id.toString(), transactionType: 'topup' },
-      description,
+      description: paymentDescription,
+      metadata: {
+        playerId: player._id.toString(),
+        transactionType: 'topup',
+        platform: 'Basta Casino',
+      },
+      automatic_payment_methods: {
+        enabled: !payment_method_id,
+      },
     };
 
-    // Add Stripe Connect support if applicable
+    if (payment_method_id) {
+      paymentIntentParams.payment_method = payment_method_id;
+    }
+
+    let stripeAccount = null;
     if (player.stripeConnectedAccountId) {
-      paymentIntentOptions.on_behalf_of = player.stripeConnectedAccountId;
-      // Optionally, if charging directly on the connected account:
-      // paymentIntentOptions.application_fee_amount = Math.round(amountInCents * 0.1); // 10% fee example
-      // paymentIntentOptions.transfer_data = {
-      //   destination: player.stripeConnectedAccountId,
-      // };
+      stripeAccount = player.stripeConnectedAccountId;
+      paymentIntentParams.on_behalf_of = stripeAccount;
+      paymentIntentParams.application_fee_amount = Math.round(amountInCents * 0.1);
     }
 
     const paymentIntent = await stripe.paymentIntents.create(
-      paymentIntentOptions,
+      paymentIntentParams,
       {
         idempotencyKey,
-        ...(player.stripeConnectedAccountId && { stripeAccount: player.stripeConnectedAccountId }), // Direct charge if needed
+        ...(stripeAccount && { stripeAccount }),
       }
     );
 
-    logger.info('PaymentIntent created successfully', {
-      playerId,
-      paymentIntentId: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret,
-    });
+    const mapStripeStatusToTransactionStatus = (stripeStatus: string): 'pending' | 'completed' | 'failed' | 'cancelled' | 'disputed' => {
+      switch (stripeStatus) {
+        case 'requires_payment_method':
+        case 'requires_confirmation':
+        case 'requires_action':
+        case 'requires_capture':
+          return 'pending';
+        case 'succeeded':
+          return 'completed';
+        case 'canceled':
+          return 'cancelled';
+        default:
+          return 'pending';
+      }
+    };
 
     const transaction = new Transaction({
       player_id: playerId,
@@ -421,190 +523,247 @@ export const createPaymentIntent = async (req: CustomRequest, res: Response) => 
       currency: currency.toLowerCase(),
       transaction_type: 'topup',
       payment_method: 'stripe',
-      status: 'pending',
+      status: mapStripeStatusToTransactionStatus(paymentIntent.status),
       payment_intent_id: paymentIntent.id,
     });
     await transaction.save();
-
-    logger.debug('Transaction recorded', {
-      playerId,
-      transactionId: transaction._id,
-      paymentIntentId: paymentIntent.id,
-    });
 
     res.status(200).json({
       success: true,
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
       transactionId: transaction._id,
-      stripeAccountId: player.stripeConnectedAccountId || null, // Include for frontend if needed
+      stripeAccountId: stripeAccount,
+      amount: parsedAmount,
+      currency: currency.toLowerCase(),
+      status: paymentIntent.status,
+      requiresAction: paymentIntent.status === 'requires_action',
+      nextAction: paymentIntent.next_action
+        ? {
+            type: paymentIntent.next_action.type,
+            ...paymentIntent.next_action,
+          }
+        : null,
     });
-  } catch (error) {
-    logger.error('Error creating payment intent', {
-      playerId: req.user?.id,
-      requestBody: req.body,
+  } catch (error: any) {
+    logger.error('Error creating payment intent:', {
       error: error.message,
-      code: error.code,
-      type: error.type,
       stack: error.stack,
+      userId: req.user?.id,
+      requestBody: req.body,
     });
 
-    if (error.type === 'StripeInvalidRequestError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid request to Stripe',
-        error: error.message,
-      });
-    } else if (error.type === 'StripeCardError') {
-      return res.status(400).json({
-        success: false,
-        message: 'Payment error',
-        error: error.message,
-      });
-    } else {
-      return res.status(500).json({
-        success: false,
-        message: 'Failed to create payment intent',
-        error: error.message,
-      });
-    }
-  }
-};
-export const getStripeConfig = async (req: CustomRequest, res: Response) => {
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    const playerId = req.user.id;
-    const player = await Player.findById(playerId);
-    if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
-    }
+    const statusCode = 
+      error.type === 'StripeInvalidRequestError' ? 400 :
+      error.type === 'StripeCardError' ? 402 : 500;
 
-    const config = {
-      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
-      stripeAccountId: player.stripeConnectedAccountId || null,
-    };
-    res.status(200).json(config);
-  } catch (error) {
-    logger.error('Error fetching Stripe config:', error);
-    res.status(500).json({ error: 'Failed to fetch Stripe config' });
+    res.status(statusCode).json({
+      success: false,
+      message: 'Failed to create payment intent',
+      error: error.message,
+      ...(error.code && { code: error.code }),
+      ...(error.type && { type: error.type }),
+    });
   }
 };
 
-export const handleStripeWebhook = async (req: Request, res: Response) => {
-  const sig = req.headers['stripe-signature'];
+export const handleStripeWebhook = async (req: Request, res: Response): Promise<void> => {
+  const sig = req.headers['stripe-signature'] as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    logger.error('Stripe webhook secret not configured');
+    res.status(500).json({ error: 'Webhook secret not configured' });
+    return;
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err: any) {
+    logger.error('Webhook signature verification failed:', err.message);
+    res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    return;
+  }
+
+  logger.info(`Processing Stripe event: ${event.type}`);
 
   try {
-    logger.info('Webhook received:', {
-      signature: sig,
-      rawBody: req.body.toString(),
-    });
-
-    const event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET,
-    );
-
-    logger.info(`Processing webhook event: ${event.type}`);
-
     switch (event.type) {
       case 'payment_intent.succeeded':
-        await handlePaymentIntentSucceeded(event.data.object);
+        await handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
         break;
-
       case 'payment_intent.payment_failed':
-        await handlePaymentIntentFailed(event.data.object);
+        await handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
         break;
-
+      case 'payment_intent.requires_action':
+        await handlePaymentIntentRequiresAction(event.data.object as Stripe.PaymentIntent);
+        break;
+      case 'charge.succeeded':
+        await handleChargeSucceeded(event.data.object as Stripe.Charge);
+        break;
+      case 'charge.failed':
+        await handleChargeFailed(event.data.object as Stripe.Charge);
+        break;
       case 'payment_method.attached':
-        logger.info(`PaymentMethod attached: ${event.data.object.id}`);
+        logger.info(`Payment method attached: ${(event.data.object as Stripe.PaymentMethod).id}`);
         break;
-
       case 'payout.paid':
-        await handlePayoutSucceeded(event.data.object);
+        await handlePayoutSucceeded(event.data.object as Stripe.Payout);
         break;
-
       case 'payout.failed':
-        await handlePayoutFailed(event.data.object);
+        await handlePayoutFailed(event.data.object as Stripe.Payout);
         break;
-
       case 'charge.dispute.created':
-        await handleDisputeCreated(event.data.object);
+        await handleDisputeCreated(event.data.object as Stripe.Dispute);
         break;
-
       default:
         logger.info(`Unhandled event type: ${event.type}`);
     }
 
     res.json({ received: true });
-  } catch (error) {
-    logger.error('Webhook Error:', {
+  } catch (error: any) {
+    logger.error('Error processing webhook event:', {
+      eventType: event.type,
       error: error.message,
       stack: error.stack,
     });
-
-    return res.status(400).json({
-      error: `Webhook Error: ${error.message}`,
-    });
+    res.status(500).json({ error: 'Failed to process webhook event' });
   }
 };
 
-async function handlePaymentIntentSucceeded(paymentIntent) {
+async function handlePaymentIntentSucceeded(paymentIntent: Stripe.PaymentIntent): Promise<void> {
   try {
-    logger.info(`Payment succeeded: ${paymentIntent.id}`);
+    logger.info(`PaymentIntent succeeded: ${paymentIntent.id}`);
+
     const transaction = await Transaction.findOne({
       payment_intent_id: paymentIntent.id,
     });
+
     if (!transaction) {
-      logger.error(
-        `Transaction not found for payment intent: ${paymentIntent.id}`,
-      );
+      logger.error(`Transaction not found for PaymentIntent: ${paymentIntent.id}`);
       return;
     }
 
+    const retrievedIntent = await stripe.paymentIntents.retrieve(paymentIntent.id, {
+      expand: ['charges'],
+    });
+
     transaction.status = 'completed';
     transaction.completed_at = new Date();
+    transaction.stripe_charge_id = retrievedIntent.latest_charge as string;
     await transaction.save();
 
     if (transaction.transaction_type === 'topup') {
-      await updatePlayerBalance(transaction.player_id, transaction.amount);
+      await updatePlayerBalance(transaction.player_id.toString(), transaction.amount);
     }
 
     logger.info(`Transaction ${transaction._id} completed successfully`);
-  } catch (error) {
-    logger.error('Error handling payment intent succeeded:', error);
+  } catch (error: any) {
+    logger.error('Error handling payment intent succeeded:', {
+      paymentIntentId: paymentIntent.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
   }
 }
 
-async function handlePaymentIntentFailed(paymentIntent) {
+async function handlePaymentIntentFailed(paymentIntent: Stripe.PaymentIntent): Promise<void> {
   try {
-    logger.info(`Payment failed: ${paymentIntent.id}`);
+    logger.info(`PaymentIntent failed: ${paymentIntent.id}`);
+
     const transaction = await Transaction.findOne({
       payment_intent_id: paymentIntent.id,
     });
+
     if (!transaction) {
-      logger.error(
-        `Transaction not found for payment intent: ${paymentIntent.id}`,
-      );
+      logger.error(`Transaction not found for PaymentIntent: ${paymentIntent.id}`);
       return;
     }
 
     transaction.status = 'failed';
-    transaction.error =
-      paymentIntent.last_payment_error?.message || 'Payment failed';
+    transaction.error = paymentIntent.last_payment_error?.message || 'Payment failed';
     await transaction.save();
 
     logger.info(`Transaction ${transaction._id} marked as failed`);
-  } catch (error) {
-    logger.error('Error handling payment intent failed:', error);
+  } catch (error: any) {
+    logger.error('Error handling payment intent failed:', {
+      paymentIntentId: paymentIntent.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
   }
 }
 
-async function handlePayoutSucceeded(payout) {
+async function handlePaymentIntentRequiresAction(paymentIntent: Stripe.PaymentIntent): Promise<void> {
+  try {
+    logger.info(`PaymentIntent requires action: ${paymentIntent.id}`);
+
+    const transaction = await Transaction.findOne({
+      payment_intent_id: paymentIntent.id,
+    });
+
+    if (!transaction) {
+      logger.error(`Transaction not found for PaymentIntent: ${paymentIntent.id}`);
+      return;
+    }
+
+    transaction.status = 'pending';
+    await transaction.save();
+
+    logger.info(`Transaction ${transaction._id} requires customer action`);
+  } catch (error: any) {
+    logger.error('Error handling payment intent requires action:', {
+      paymentIntentId: paymentIntent.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+}
+
+async function handleChargeSucceeded(charge: Stripe.Charge): Promise<void> {
+  try {
+    logger.info(`Charge succeeded: ${charge.id}`);
+  } catch (error: any) {
+    logger.error('Error handling charge succeeded:', {
+      chargeId: charge.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+}
+
+async function handleChargeFailed(charge: Stripe.Charge): Promise<void> {
+  try {
+    logger.info(`Charge failed: ${charge.id}`);
+
+    const transaction = await Transaction.findOne({
+      stripe_charge_id: charge.id,
+    });
+
+    if (transaction) {
+      transaction.status = 'failed';
+      transaction.error = charge.failure_message || 'Charge failed';
+      await transaction.save();
+    }
+  } catch (error: any) {
+    logger.error('Error handling charge failed:', {
+      chargeId: charge.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
+  }
+}
+
+async function handlePayoutSucceeded(payout: Stripe.Payout): Promise<void> {
   try {
     logger.info(`Payout succeeded: ${payout.id}`);
+
     const transaction = await Transaction.findOne({
       payment_intent_id: payout.id,
     });
@@ -618,20 +777,25 @@ async function handlePayoutSucceeded(payout) {
     transaction.completed_at = new Date();
     await transaction.save();
 
-    logger.info(
-      `Withdrawal transaction ${transaction._id} completed successfully`,
-    );
-  } catch (error) {
-    logger.error('Error handling payout succeeded:', error);
+    logger.info(`Withdrawal transaction ${transaction._id} completed successfully`);
+  } catch (error: any) {
+    logger.error('Error handling payout succeeded:', {
+      payoutId: payout.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
   }
 }
 
-async function handlePayoutFailed(payout) {
+async function handlePayoutFailed(payout: Stripe.Payout): Promise<void> {
   try {
     logger.info(`Payout failed: ${payout.id}`);
+
     const transaction = await Transaction.findOne({
       _id: payout.metadata.transactionId,
     });
+
     if (!transaction) {
       logger.error(`Transaction not found for payout: ${payout.id}`);
       return;
@@ -641,21 +805,32 @@ async function handlePayoutFailed(payout) {
     transaction.error = payout.failure_message || 'Payout failed';
     await transaction.save();
 
-    await updatePlayerBalance(transaction.player_id, transaction.amount);
-    logger.info(
-      `Transaction ${transaction._id} marked as failed, balance refunded`,
-    );
-  } catch (error) {
-    logger.error('Error handling payout failed:', error);
+    await updatePlayerBalance(transaction.player_id.toString(), Math.abs(transaction.amount));
+
+    logger.info(`Transaction ${transaction._id} failed, balance refunded`);
+  } catch (error: any) {
+    logger.error('Error handling payout failed:', {
+      payoutId: payout.id,
+      error: error.message,
+      stack: error.stack,
+    });
+    throw error;
   }
 }
 
-async function handleDisputeCreated(dispute) {
+async function handleDisputeCreated(dispute: Stripe.Dispute): Promise<void> {
   try {
     logger.info(`Dispute created: ${dispute.id}`);
+
+    if (typeof dispute.payment_intent !== 'string') {
+      logger.error(`Invalid payment_intent type for dispute: ${dispute.id}`);
+      return;
+    }
+
     const transaction = await Transaction.findOne({
       payment_intent_id: dispute.payment_intent,
     });
+
     if (!transaction) {
       logger.error(`Transaction not found for dispute: ${dispute.id}`);
       return;
@@ -666,83 +841,84 @@ async function handleDisputeCreated(dispute) {
     await transaction.save();
 
     logger.info(`Transaction ${transaction._id} marked as disputed`);
-  } catch (error) {
-    logger.error('Error handling dispute created:', error);
-  }
-}
-
-// async function getPlayerBalance(playerId) {
-//   try {
-//     const player = await Player.findById(playerId);
-//     return player?.balance || 0;
-//   } catch (error) {
-//     logger.error('Error getting player balance:', error);
-//     throw error;
-//   }
-// }
-
-async function updatePlayerBalance(playerId, amount) {
-  try {
-    const player = await Player.findById(playerId);
-    if (!player) {
-      throw new Error('Player not found');
-    }
-    player.balance = (player.balance || 0) + parseFloat(amount);
-    await player.save();
-    return player.balance;
-  } catch (error) {
-    logger.error('Error updating player balance:', error);
+  } catch (error: any) {
+    logger.error('Error handling dispute created:', {
+      disputeId: dispute.id,
+      error: error.message,
+      stack: error.stack,
+    });
     throw error;
   }
 }
 
-export const getTransactionHistory = async (
-  req: CustomRequest,
-  res: Response,
-) => {
+export const getTransactionHistory = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
-    const playerId = req.user.id;
-    const { limit = 50, starting_after } = req.query;
 
-    const query = { player_id: playerId };
+    const playerId = req.user.id;
+    const { limit = '50', starting_after } = req.query;
+
+    const parsedLimit = parseInt(limit as string);
+    if (isNaN(parsedLimit) || parsedLimit <= 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid limit parameter',
+      });
+      return;
+    }
+
+    const query: any = { player_id: playerId };
     if (starting_after) {
-      query['_id'] = { $gt: starting_after };
+      query._id = { $gt: starting_after };
     }
 
     const transactions = await Transaction.find(query)
       .sort({ created_at: -1 })
-      .limit(parseInt(limit as string));
+      .limit(parsedLimit);
 
     res.status(200).json({
+      success: true,
       message: 'Transaction history retrieved successfully',
-      transactions,
+      transactions: transactions.map(tx => ({
+        id: tx._id,
+        amount: tx.amount,
+        currency: tx.currency,
+        status: tx.status,
+        transaction_type: tx.transaction_type,
+        created_at: tx.created_at,
+        completed_at: tx.completed_at,
+      })),
     });
-  } catch (error) {
-    logger.error('Error fetching transaction history:', error);
+  } catch (error: any) {
+    logger.error('Error fetching transaction history:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to fetch transaction history',
       error: error.message,
     });
   }
 };
 
-export const getTransactionDetail = async (
-  req: CustomRequest,
-  res: Response,
-) => {
+export const getTransactionDetail = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
+    if (!req.user?.id) {
+      res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: 'Authentication required',
       });
+      return;
     }
+
     const playerId = req.user.id;
     const { id } = req.params;
 
@@ -751,102 +927,234 @@ export const getTransactionDetail = async (
       player_id: playerId,
     });
     if (!transaction) {
-      return res.status(404).json({ message: 'Transaction not found' });
+      res.status(404).json({
+        success: false,
+        message: 'Transaction not found'
+      });
+      return;
     }
 
-    const paymentIntent = await stripe.paymentIntents.retrieve(
-      transaction.payment_intent_id,
-      {
-        expand: ['customer'],
-      },
-    );
+    let paymentIntent: Stripe.Response<Stripe.PaymentIntent> | undefined;
+    if (transaction.payment_intent_id) {
+      try {
+        paymentIntent = await stripe.paymentIntents.retrieve(
+          transaction.payment_intent_id,
+          { expand: ['customer'] }
+        );
+      } catch (error: any) {
+        logger.warn('Failed to retrieve payment intent:', {
+          paymentIntentId: transaction.payment_intent_id,
+          error: error.message,
+        });
+      }
+    }
 
     res.status(200).json({
+      success: true,
       message: 'Transaction retrieved successfully',
-      transaction,
-      paymentIntent,
+      transaction: {
+        id: transaction._id,
+        amount: transaction.amount,
+        currency: transaction.currency,
+        status: transaction.status,
+        transaction_type: transaction.transaction_type,
+        created_at: transaction.created_at,
+        completed_at: transaction.completed_at,
+        error: transaction.error,
+      },
+      paymentIntent: paymentIntent ? {
+        id: paymentIntent.id,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status,
+        payment_method: paymentIntent.payment_method,
+        customer: paymentIntent.customer,
+      } : null,
     });
-  } catch (error) {
-    logger.error('Error fetching transaction detail:', error);
+  } catch (error: any) {
+    logger.error('Error fetching transaction detail:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      transactionId: req.params.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to fetch transaction detail',
       error: error.message,
     });
   }
 };
 
-const TEST_CARDS = {
-  pm_card_visa: '4242424242424242',
-  pm_card_visa_debit: '4000056655665556',
-  pm_card_mastercard: '5555555555554444',
-  pm_card_amex: '378282246310005',
+export const getPlayerBalance = async (req: CustomRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
+    }
+
+    const playerId = req.user.id;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      res.status(404).json({
+        success: false,
+        message: 'Player not found'
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      balance: player.balance || 0,
+    });
+  } catch (error: any) {
+    logger.error('Error fetching player balance:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch balance',
+      error: error.message,
+    });
+  }
 };
 
-export const processWithdrawal = async (req: CustomRequest, res: Response) => {
+export const getStripeConfig = async (req: CustomRequest, res: Response): Promise<void> => {
   try {
-    if (!req.user || !req.user.id) {
-      return res
-        .status(401)
-        .json({ success: false, error: 'Authentication required' });
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
+    }
+
+    const playerId = req.user.id;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      res.status(404).json({
+        success: false,
+        message: 'Player not found'
+      });
+      return;
+    }
+
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      throw new Error('Stripe configuration missing');
+    }
+
+    res.status(200).json({
+      success: true,
+      publishableKey: process.env.STRIPE_PUBLISHABLE_KEY,
+      stripeAccountId: player.stripeConnectedAccountId || null,
+    });
+  } catch (error: any) {
+    logger.error('Error fetching Stripe config:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch Stripe config',
+      details: error.message,
+    });
+  }
+};
+
+export const processWithdrawal = async (req: CustomRequest, res: Response): Promise<void> => {
+  try {
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+      return;
     }
 
     const playerId = req.user.id;
     const { amount, currency, paymentMethodId } = req.body;
 
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ message: 'Invalid amount' });
+    if (!amount || !currency || !paymentMethodId) {
+      res.status(400).json({
+        success: false,
+        message: 'Amount, currency, and paymentMethodId are required'
+      });
+      return;
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      res.status(400).json({
+        success: false,
+        message: 'Invalid amount'
+      });
+      return;
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
+      res.status(404).json({
+        success: false,
+        message: 'Player not found'
+      });
+      return;
     }
 
-    if (
-      process.env.NODE_ENV === 'development' ||
-      process.env.NODE_ENV === 'test'
-    ) {
-      if (TEST_CARDS[paymentMethodId]) {
-        player.balance = 1000;
+    if ((player.balance || 0) < parsedAmount) {
+      res.status(400).json({
+        success: false,
+        message: 'Insufficient balance',
+        currentBalance: player.balance,
+        requestedAmount: parsedAmount,
+      });
+      return;
+    }
+
+    let paymentMethod;
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      const TEST_CARDS = {
+        pm_card_visa: '4242424242424242',
+        pm_card_visa_debit: '4000056655665556',
+        pm_card_mastercard: '5555555555554444',
+        pm_card_amex: '378282246310005',
+      };
+
+      if (TEST_CARDS[paymentMethodId as keyof typeof TEST_CARDS]) {
+        paymentMethod = {
+          _id: paymentMethodId,
+          method_type: 'credit_card',
+          stripe_payment_method_id: paymentMethodId,
+          player_id: playerId,
+        };
+        player.balance = 1000; 
         await player.save();
       }
     }
 
-    // Check balance
-    if ((player.balance || 0) < parseFloat(amount)) {
-      return res.status(400).json({
-        message: 'Insufficient balance',
-        currentBalance: player.balance,
-        requestedAmount: amount,
-      });
-    }
-
-    // Handle test payment methods
-    let paymentMethod;
-    if (TEST_CARDS[paymentMethodId]) {
-      // Create a temporary payment method object for test cards
-      paymentMethod = {
-        _id: paymentMethodId,
-        method_type: 'credit_card',
-        stripe_payment_method_id: paymentMethodId,
-        player_id: playerId,
-      };
-    } else {
-      // Find existing payment method
+    if (!paymentMethod) {
       paymentMethod = await PaymentMethod.findOne({
         _id: paymentMethodId,
         player_id: playerId,
       });
 
       if (!paymentMethod) {
-        return res.status(404).json({ message: 'Payment method not found' });
+        res.status(404).json({
+          success: false,
+          message: 'Payment method not found'
+        });
+        return;
       }
     }
 
-    // Create transaction record
     const transaction = new Transaction({
       player_id: playerId,
-      amount: -Math.abs(parseFloat(amount)),
+      amount: -parsedAmount,
       currency: currency.toLowerCase(),
       transaction_type: 'withdrawal',
       payment_method: paymentMethod.method_type,
@@ -855,30 +1163,20 @@ export const processWithdrawal = async (req: CustomRequest, res: Response) => {
     });
     await transaction.save();
 
-    // Reduce player's balance
-    player.balance = (player.balance || 0) - parseFloat(amount);
-    await player.save();
+    await updatePlayerBalance(playerId, -parsedAmount);
 
-    const amountInCents = Math.round(parseFloat(amount) * 100);
-
+    const amountInCents = Math.round(parsedAmount * 100);
     let payoutResponse;
 
     try {
-      if (
-        process.env.NODE_ENV === 'development' ||
-        process.env.NODE_ENV === 'test'
-      ) {
-        // Simulate successful payout for test cards
-        if (TEST_CARDS[paymentMethodId]) {
-          payoutResponse = {
-            id: `test_po_${Date.now()}`,
-            amount: amountInCents,
-            currency: currency.toLowerCase(),
-            status: 'pending',
-          };
-        }
+      if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+        payoutResponse = {
+          id: `test_po_${Date.now()}`,
+          amount: amountInCents,
+          currency: currency.toLowerCase(),
+          status: 'pending',
+        };
       } else {
-        // Real payout processing
         payoutResponse = await stripe.payouts.create({
           amount: amountInCents,
           currency: currency.toLowerCase(),
@@ -891,55 +1189,45 @@ export const processWithdrawal = async (req: CustomRequest, res: Response) => {
         });
       }
 
-      // Update transaction with payout details
       transaction.payment_intent_id = payoutResponse.id;
-      transaction.status = payoutResponse.status;
+      transaction.status = payoutResponse.status === 'paid' ? 'completed' : 'pending';
       await transaction.save();
 
       res.status(200).json({
+        success: true,
         message: 'Withdrawal processed successfully',
-        transaction: transaction,
-        status: payoutResponse.status,
+        transaction: {
+          id: transaction._id,
+          amount: transaction.amount,
+          status: transaction.status,
+        },
         payoutId: payoutResponse.id,
       });
-    } catch (payoutError) {
-      // Rollback the transaction and balance if payout fails
+    } catch (payoutError: any) {
       transaction.status = 'failed';
       transaction.error = payoutError.message;
       await transaction.save();
 
-      player.balance = (player.balance || 0) + Math.abs(parseFloat(amount));
-      await player.save();
+      await updatePlayerBalance(playerId, parsedAmount);
+
+      logger.error('Payout failed:', {
+        error: payoutError.message,
+        stack: payoutError.stack,
+        transactionId: transaction._id,
+      });
 
       throw payoutError;
     }
-  } catch (error) {
-    logger.error('Error processing withdrawal:', error);
+  } catch (error: any) {
+    logger.error('Error processing withdrawal:', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
     res.status(500).json({
+      success: false,
       message: 'Failed to process withdrawal',
       error: error.message,
     });
-  }
-};
-
-// Add this helper function to validate test cards
-export const validateTestCard = (cardNumber: string): boolean => {
-  return Object.values(TEST_CARDS).includes(cardNumber);
-};
-
-export const getPlayerBalance = async (req, res) => {
-  try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    const playerId = req.user.id;
-    const player = await Player.findById(playerId);
-    if (!player) {
-      return res.status(404).json({ message: 'Player not found' });
-    }
-    res.status(200).json({ balance: player.balance });
-  } catch (error) {
-    logger.error('Error fetching player balance:', error);
-    res.status(500).json({ message: 'Failed to fetch balance' });
   }
 };
