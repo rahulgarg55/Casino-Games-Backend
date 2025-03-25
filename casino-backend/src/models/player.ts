@@ -32,6 +32,7 @@ export interface IPlayer extends Document {
   refreshToken?: string;
   profile_picture?: string;
   stripeCustomerId?: string;
+  stripeConnectedAccountId?: string;
   balance?: number;
   balance_updated_at?: Date;
   is_2fa_enabled: number;
@@ -89,25 +90,27 @@ const playerSchema: Schema = new Schema(
     phone_number: {
       type: String,
       unique: true,
-      default: null,
+      // default: null,
       sparse: true, // Only index documents that contain the phone_number field
       validate: {
-        validator: (v: string) => /^\+?[1-9]\d{1,14}$/.test(v),
-        message: 'Invalid phone number format',
+        validator: function(v: string | null | undefined): boolean {
+          return v === null || v === undefined || /^\+?[1-9]\d{1,14}$/.test(v);
+        },
+        message: 'Invalid phone number format'
       },
-    },
-    password_hash: {
+        },
+        password_hash: {
       type: String,
       required: true,
-    },
-    registration_date: {
+        },
+        registration_date: {
       type: Date,
       default: Date.now,
-    },
-    last_login: {
+        },
+        last_login: {
       type: Date,
-    },
-    status: {
+        },
+        status: {
       type: Number,
       enum: [0, 1], // 0 = inactive, 1 = active
       default: 1,
@@ -185,6 +188,10 @@ const playerSchema: Schema = new Schema(
     stripeCustomerId: {
       type: String,
       unique: true,
+      sparse: true,
+    },
+    stripeConnectedAccountId: {
+      type: String,
       sparse: true,
     },
     balance: {
