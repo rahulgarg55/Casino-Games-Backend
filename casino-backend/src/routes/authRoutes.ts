@@ -11,6 +11,7 @@ import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
 import { generateTokenResponse } from '../utils/auth';
 import { IPlayer } from '../models/player';
+import {validateStripeConfig,handleValidationErrors}from "../validation/authValidation"
 
 const router = Router();
 const authLimiter = rateLimit({
@@ -410,4 +411,9 @@ router.post(
   validateRequest,
   authController.changePassword,
 );
+
+/*Stripe config apis*/
+router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
+router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
+
 export default router;
