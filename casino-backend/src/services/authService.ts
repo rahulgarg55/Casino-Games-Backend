@@ -31,7 +31,7 @@ interface LoginData {
   email?: string;
   phone_number?: string;
   password: string;
-  role_id:number
+  role_id: number;
 }
 
 interface ForgotPasswordData {
@@ -209,7 +209,7 @@ const generateOTP = (): string => {
 };
 
 export const login = async (data: LoginData) => {
-  const { email, phone_number, password ,role_id=0} = data;
+  const { email, phone_number, password, role_id = 0 } = data;
 
   if (!email && !phone_number) {
     throw new Error('Invalid request. Please check your input');
@@ -674,8 +674,13 @@ export const updateProfile = async (
   if (data.username) player.username = data.username;
   if (data.language !== undefined) player.language = data.language;
   if (data.patronymic) player.patronymic = data.patronymic;
-  if (data.dob) player.dob = data.dob;
-  if (data.gender !== undefined) player.gender = data.gender;
+  if (data.dob) {
+    const parsedDate = new Date(data.dob);
+    if (isNaN(parsedDate.getTime())) {
+      throw new Error('Invalid date format for date of birth');
+    }
+    player.dob = parsedDate;
+  }  if (data.gender !== undefined) player.gender = data.gender;
   if (data.city !== undefined) player.city = data.city;
   if (data.country !== undefined) player.country = data.country;
 

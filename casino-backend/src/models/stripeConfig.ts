@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from "mongoose";
+import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IStripeConfig extends Document {
   stripeWebhookSecret: string;
@@ -7,11 +7,17 @@ export interface IStripeConfig extends Document {
   stripeTestMode: boolean;
 }
 
-const StripeConfigSchema: Schema = new Schema({
-  stripeWebhookSecret: { type: String, required: true },
-  stripeSecretKey: { type: String, required: true },
-  stripePublishableKey: { type: String, required: true },
-  stripeTestMode: { type: Boolean, required: true },
-}, { timestamps: true });
+const StripeConfigSchema: Schema = new Schema(
+  {
+    stripeWebhookSecret: { type: String, required: true },
+    stripeSecretKey: { type: String, required: true },
+    stripePublishableKey: { type: String, required: true },
+    stripeTestMode: { type: Boolean, required: true },
+  },
+  { timestamps: true },
+);
 
-export const StripeConfig = mongoose.model<IStripeConfig>("StripeConfig", StripeConfigSchema);
+export const StripeConfig = mongoose.model<IStripeConfig>(
+  'StripeConfig',
+  StripeConfigSchema,
+);

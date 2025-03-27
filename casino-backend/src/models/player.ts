@@ -47,7 +47,7 @@ const playerSchema: Schema = new Schema(
     username: {
       type: String,
       unique: true,
-      sparse: true, // Only index documents that contain the username field
+      sparse: true,
       minlength: [3, 'Username must be at least 3 characters'],
       maxlength: [30, 'Username cannot exceed 30 characters'],
     },
@@ -93,24 +93,24 @@ const playerSchema: Schema = new Schema(
       // default: null,
       sparse: true, // Only index documents that contain the phone_number field
       validate: {
-        validator: function(v: string | null | undefined): boolean {
+        validator: function (v: string | null | undefined): boolean {
           return v === null || v === undefined || /^\+?[1-9]\d{1,14}$/.test(v);
         },
-        message: 'Invalid phone number format'
+        message: 'Invalid phone number format',
       },
-        },
-        password_hash: {
+    },
+    password_hash: {
       type: String,
       required: true,
-        },
-        registration_date: {
+    },
+    registration_date: {
       type: Date,
       default: Date.now,
-        },
-        last_login: {
+    },
+    last_login: {
       type: Date,
-        },
-        status: {
+    },
+    status: {
       type: Number,
       enum: [0, 1], // 0 = inactive, 1 = active
       default: 1,

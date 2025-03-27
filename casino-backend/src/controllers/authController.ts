@@ -23,6 +23,18 @@ interface CustomRequest extends Request {
   };
 }
 
+const sendErrorResponse = (
+  res: Response,
+  statusCode: number,
+  message: string | Array<{ param?: string; message: string }>,
+) => {
+  const response = {
+    success: false,
+    ...(typeof message === 'string' ? { error: message } : { errors: message }),
+  };
+  res.status(statusCode).json(response);
+};
+
 export const register = async (req: Request, res: Response) => {
   try {
     const { player, balance, token, expiresIn } = await authService.register(
@@ -55,25 +67,28 @@ export const register = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    let errorMessage = 'Invalid request. Please check your input';
-    let statusCode = 400;
-
     if (error instanceof Error) {
-      errorMessage = error.message;
-
-      if (
-        errorMessage.includes('Username is already taken') ||
-        errorMessage.includes('Email is already registered') ||
-        errorMessage.includes('Phone number is already registered')
-      ) {
-        statusCode = 409;
+      if (error.message.includes('Username is already taken')) {
+        sendErrorResponse(res, 409, [
+          { param: 'username', message: 'Username is already taken' },
+        ]);
+      } else if (error.message.includes('Email is already registered')) {
+        sendErrorResponse(res, 409, [
+          { param: 'email', message: 'Email is already registered' },
+        ]);
+      } else if (error.message.includes('Phone number is already registered')) {
+        sendErrorResponse(res, 409, [
+          {
+            param: 'phone_number',
+            message: 'Phone number is already registered',
+          },
+        ]);
+      } else {
+        sendErrorResponse(res, 400, error.message);
       }
+    } else {
+      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
     }
-
-    res.status(statusCode).json({
-      success: false,
-      error: errorMessage,
-    });
   }
 };
 
@@ -86,10 +101,7 @@ export const login = async (req: Request, res: Response) => {
       return res.status(200).json({
         success: true,
         message: 'OTP sent for 2FA verification',
-        data: {
-          requires2FA: true,
-          playerId: user.id,
-        },
+        data: { requires2FA: true, playerId: user.id },
       });
     }
     res.status(200).json({
@@ -108,18 +120,20 @@ export const login = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Invalid username or password';
-    res.status(401).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      401,
+      error instanceof Error ? error.message : 'Invalid username or password',
+    );
   }
 };
 
 export const verify2FA = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
+    if (!playerId || !otp) {
+      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+    }
     const { token, expiresIn, user } = await authService.verify2FA(
       playerId,
       otp,
@@ -128,31 +142,30 @@ export const verify2FA = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: '2FA verification successful',
-      data: {
-        user,
-        token,
-        expiresIn,
-      },
+      data: { user, token, expiresIn },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Invalid OTP or server error';
-    res.status(401).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      401,
+      error instanceof Error ? error.message : 'Invalid OTP',
+    );
   }
 };
 
 export const toggle2FA = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
+      return sendErrorResponse(res, 401, 'Authentication required');
     }
     const { enabled, method, password } = req.body;
+    if (typeof enabled !== 'boolean' || !method || !password) {
+      return sendErrorResponse(
+        res,
+        400,
+        'Enabled, method, and password are required',
+      );
+    }
     const result = await authService.toggle2FA(
       req.user.id,
       enabled,
@@ -166,25 +179,23 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
       data: result,
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Server error toggling 2FA';
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to toggle 2FA',
+    );
   }
 };
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
     const { email, phone_number } = req.body;
-
     if (!email && !phone_number) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Please provide all required fields, i.e. username, password, email',
-      });
+      return sendErrorResponse(
+        res,
+        400,
+        'Please provide either email or phone number',
+      );
     }
     await authService.forgotPassword({ email, phone_number });
 
@@ -193,20 +204,22 @@ export const forgotPassword = async (req: Request, res: Response) => {
       message: 'Password reset link has been sent to your email',
     });
   } catch (error) {
-    const errorMessage =
+    sendErrorResponse(
+      res,
+      400,
       error instanceof Error
         ? error.message
-        : 'Invalid request. Please check your input';
-    res.status(400).json({
-      success: false,
-      error: errorMessage,
-    });
+        : 'Failed to process password reset',
+    );
   }
 };
+
 export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
-
+    if (!token || !password) {
+      return sendErrorResponse(res, 400, 'Token and password are required');
+    }
     await resetPasswordService({ token, password });
 
     res.status(200).json({
@@ -214,26 +227,21 @@ export const resetPassword = async (req: Request, res: Response) => {
       message: 'Password updated successfully',
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Invalid or expired reset token';
-    res.status(400).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Invalid or expired reset token',
+    );
   }
 };
 
 export const viewProfile = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required or invalid token',
-      });
+      return sendErrorResponse(res, 401, 'Authentication required');
     }
 
     const playerId = req.user.id;
-
     const player = await Player.findById(playerId).select([
       '-password_hash',
       '-reset_password_token',
@@ -246,11 +254,9 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
       '-two_factor_expires',
       '-refreshToken',
     ]);
+
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
+      return sendErrorResponse(res, 404, 'User not found');
     }
 
     const balance = await PlayerBalance.findOne({ player_id: playerId });
@@ -269,13 +275,14 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error in viewProfile:', error);
-    res.status(400).json({
-      success: false,
-      error:
-        error.message || 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to retrieve profile',
+    );
   }
 };
+
 export const getAllPlayers = async (req: Request, res: Response) => {
   try {
     const players = await Player.find()
@@ -309,23 +316,22 @@ export const getAllPlayers = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'Players retrieved successfully',
-      data: {
-        players: playersWithBalance,
-      },
+      data: { players: playersWithBalance },
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to retrieve players',
+    );
   }
 };
+
 export const getPlayerStats = async (req: Request, res: Response) => {
   try {
     const { filter } = req.query;
 
     const now = moment();
-
     const startOfYear = now.clone().startOf('year');
     const endOfYear = now.clone().endOf('year');
     const startOfMonth = now.clone().startOf('month');
@@ -353,95 +359,71 @@ export const getPlayerStats = async (req: Request, res: Response) => {
     }).select('created_at');
 
     if (filter === 'daily') {
-      // **Daily Stats**
       return res.status(200).json({
         success: true,
         message: `Daily ${messages.stats}`,
-        data: {
-          activePlayersToday: players.length,
-        },
+        data: { activePlayersToday: players.length },
       });
     }
 
     if (filter === 'weekly') {
-      // **Weekly Stats **
       const weeklyStats = Array(7).fill(0);
-
       players.forEach((player) => {
         const dayIndex = moment(player.created_at).isoWeekday() - 1;
         weeklyStats[dayIndex] += 1;
       });
-
       const statsWithDays = daysOfWeek.map((day, index) => ({
         day,
         activePlayers: weeklyStats[index],
       }));
-
       return res.status(200).json({
         success: true,
         message: `Weekly ${messages.stats}`,
-        data: {
-          activePlayersPerDay: statsWithDays,
-        },
+        data: { activePlayersPerDay: statsWithDays },
       });
     }
 
     if (filter === 'monthly') {
-      // **Monthly Stats **
       const daysInMonth = moment().daysInMonth();
       const monthlyStats = Array(daysInMonth).fill(0);
-
       players.forEach((player) => {
         const dayIndex = moment(player.created_at).date() - 1;
         monthlyStats[dayIndex] += 1;
       });
-
       const statsWithDays = Array.from({ length: daysInMonth }, (_, index) => ({
         day: index + 1,
         activePlayers: monthlyStats[index],
       }));
-
       return res.status(200).json({
         success: true,
         message: `Monthly ${messages.stats}`,
-        data: {
-          activePlayersPerDayInMonth: statsWithDays,
-        },
+        data: { activePlayersPerDayInMonth: statsWithDays },
       });
     }
 
     if (filter === 'quarterly') {
-      // **Quarterly Stats (Q1, Q2, Q3, Q4)**
       const quarterlyStats = [0, 0, 0, 0];
-
       players.forEach((player) => {
         const month = moment(player.created_at).month();
         const quarter = Math.floor(month / 3);
         quarterlyStats[quarter] += 1;
       });
-
       const statsWithQuarters = quarters.map((quarter, index) => ({
         quarter,
         activePlayers: quarterlyStats[index],
       }));
-
       return res.status(200).json({
         success: true,
         message: `Quarterly ${messages.stats}`,
-        data: {
-          activePlayersPerQuarter: statsWithQuarters,
-        },
+        data: { activePlayersPerQuarter: statsWithQuarters },
       });
     }
 
-    // **Default: Yearly  Stats**
     const monthlyStats = Array(12).fill(0);
-
     players.forEach((player) => {
       const month = moment(player.created_at).month();
       monthlyStats[month] += 1;
     });
-
     const statsWithMonths = months.map((month, index) => ({
       month,
       activePlayers: monthlyStats[index],
@@ -450,56 +432,33 @@ export const getPlayerStats = async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: `Yearly ${messages.stats}`,
-      data: {
-        activePlayersPerMonth: statsWithMonths,
-      },
+      data: { activePlayersPerMonth: statsWithMonths },
     });
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      error: messages.error,
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : messages.error,
+    );
   }
 };
+
 export const getPlayerRegionStats = async (req: Request, res: Response) => {
   try {
     const playerStats = await Player.aggregate([
-      {
-        $match: {
-          is_verified: 1,
-          status: 1,
-        },
-      },
-      {
-        $group: {
-          _id: '$country',
-          playerCount: { $sum: 1 },
-        },
-      },
+      { $match: { is_verified: 1, status: 1 } },
+      { $group: { _id: '$country', playerCount: { $sum: 1 } } },
       {
         $facet: {
           totalPlayers: [
-            {
-              $group: {
-                _id: null,
-                total: { $sum: '$playerCount' },
-              },
-            },
+            { $group: { _id: null, total: { $sum: '$playerCount' } } },
           ],
           countryStats: [
-            {
-              $project: {
-                country: '$_id',
-                playerCount: 1,
-                _id: 0,
-              },
-            },
+            { $project: { country: '$_id', playerCount: 1, _id: 0 } },
           ],
         },
       },
-      {
-        $unwind: '$totalPlayers',
-      },
+      { $unwind: '$totalPlayers' },
       {
         $project: {
           countryStats: {
@@ -517,8 +476,8 @@ export const getPlayerRegionStats = async (req: Request, res: Response) => {
     ]);
 
     if (!playerStats.length) {
-      return res.status(400).json({
-        success: false,
+      return res.status(200).json({
+        success: true,
         message: messages.dataNotFound,
         data: [],
       });
@@ -530,10 +489,11 @@ export const getPlayerRegionStats = async (req: Request, res: Response) => {
       data: playerStats[0].countryStats || [],
     });
   } catch (error) {
-    return res.status(400).json({
-      success: false,
-      error: messages.error,
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : messages.error,
+    );
   }
 };
 
@@ -543,11 +503,11 @@ export const updatePlayerStatus = async (req: Request, res: Response) => {
     const { status } = req.body;
 
     if (status !== 0 && status !== 1) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Invalid status value. Status must be 0 (inactive) or 1 (active).',
-      });
+      return sendErrorResponse(
+        res,
+        400,
+        'Invalid status value. Status must be 0 (inactive) or 1 (active)',
+      );
     }
 
     const player = await Player.findByIdAndUpdate(
@@ -555,31 +515,21 @@ export const updatePlayerStatus = async (req: Request, res: Response) => {
       { status },
       { new: true },
     );
-
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'Player not found',
-      });
+      return sendErrorResponse(res, 404, 'Player not found');
     }
 
     res.status(200).json({
       success: true,
       message: 'Player status updated successfully',
-      data: {
-        id: player._id,
-        status: player.status,
-      },
+      data: { id: player._id, status: player.status },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred. Please try again later';
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to update player status',
+    );
   }
 };
 
@@ -588,116 +538,171 @@ export const deletePlayer = async (req: Request, res: Response) => {
     const { userId } = req.params;
 
     const player = await Player.findByIdAndDelete(userId);
-
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'Player not found',
-      });
+      return sendErrorResponse(res, 404, 'Player not found');
     }
 
     res.status(200).json({
       success: true,
       message: 'Player deleted successfully',
-      data: {
-        id: player._id,
-      },
+      data: { id: player._id },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error
-        ? error.message
-        : 'An unexpected error occurred. Please try again later';
-    res.status(500).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to delete player',
+    );
   }
 };
+
 export const getAdminNotifications = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
     const result = await getNotifications(page, limit);
-    // console.log('result', result);
-    res.json({
+    res.status(200).json({
       success: true,
+      message: 'Notifications retrieved successfully',
       data: result,
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch notifications',
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to fetch notifications',
+    );
   }
 };
+
 export const updateProfile = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user || !req.user.id) {
-      return res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
+    if (!req.user?.id) {
+      return sendErrorResponse(res, 401, 'Authentication required');
     }
-    const playerId = req.user!.id;
-    const player = await authService.updateProfile(playerId, req.body);
+
+    const playerId = req.user.id;
+    const updateData = req.body;
+
+    const currentPlayer = await Player.findById(playerId);
+    if (!currentPlayer) {
+      return sendErrorResponse(res, 404, 'Player not found');
+    }
+
+    const errors: Array<{ param: string; message: string }> = [];
+
+    if (updateData.email && updateData.email !== currentPlayer.email) {
+      const emailExists = await Player.exists({
+        email: updateData.email,
+        _id: { $ne: playerId },
+      });
+      if (emailExists) {
+        errors.push({ param: 'email', message: 'Email already in use' });
+      } else {
+        updateData.email_verified = false;
+        updateData.verification_token = crypto.randomBytes(32).toString('hex');
+        updateData.verification_token_expires = new Date(
+          Date.now() + 24 * 60 * 60 * 1000,
+        );
+        await sendVerificationEmail(
+          updateData.email,
+          updateData.verification_token,
+        );
+      }
+    }
+
+    if (
+      updateData.phone_number &&
+      updateData.phone_number !== currentPlayer.phone_number
+    ) {
+      const phoneExists = await Player.exists({
+        phone_number: updateData.phone_number,
+        _id: { $ne: playerId },
+      });
+      if (phoneExists) {
+        errors.push({
+          param: 'phone_number',
+          message: 'Phone number already in use',
+        });
+      } else {
+        updateData.phone_verified = false;
+      }
+    }
+
+    if (updateData.username && updateData.username !== currentPlayer.username) {
+      const usernameExists = await Player.exists({
+        username: updateData.username,
+        _id: { $ne: playerId },
+      });
+      if (usernameExists) {
+        errors.push({ param: 'username', message: 'Username already in use' });
+      }
+    }
+
+    if (errors.length > 0) {
+      return sendErrorResponse(res, 409, errors);
+    }
+
+    const updatedPlayer = await authService.updateProfile(playerId, updateData);
     const balance = await PlayerBalance.findOne({ player_id: playerId });
 
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
+      message: updateData.email
+        ? 'Profile updated. Please verify your new email.'
+        : 'Profile updated successfully',
       data: {
         user: {
-          ...player.toObject(),
+          ...updatedPlayer.toObject(),
           balance: balance?.balance || 0,
-          is_2fa_enabled: player.is_2fa_enabled,
+          is_2fa_enabled: updatedPlayer.is_2fa_enabled,
         },
       },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'An unexpected error occurred';
-    res.status(400).json({
-      success: false,
-      error: errorMessage,
-    });
+    console.error('Profile update error:', error);
+    const statusCode = error.name === 'ValidationError' ? 400 : 500;
+    sendErrorResponse(
+      res,
+      statusCode,
+      error instanceof Error ? error.message : 'Failed to update profile',
+    );
   }
 };
 
 export const uploadPhoto = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid request. Please check your input',
-      });
+      return sendErrorResponse(res, 400, 'No photo provided');
     }
-    const playerId = req.user!.id;
+    if (!req.user?.id) {
+      return sendErrorResponse(res, 401, 'Authentication required');
+    }
+
+    const playerId = req.user.id;
     const player = await Player.findById(playerId);
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'User not found',
-      });
+      return sendErrorResponse(res, 404, 'User not found');
     }
+
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'player_photos',
     });
     player.photo = result.secure_url;
     await player.save();
+
     res.status(200).json({
       success: true,
       message: 'Photo uploaded successfully',
-      data: {
-        photo: player.photo,
-      },
+      data: { photo: player.photo },
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to upload photo',
+    );
   }
 };
 
@@ -707,8 +712,6 @@ export const googleLogin = passport.authenticate('google', {
 
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', { session: false }, (err: any, user: any) => {
-    console.log('Google Callback - User:', user);
-    console.log('Google Callback - Error:', err);
 
     if (err || !user) {
       let errorMessage = err?.message || 'Authentication failed';
@@ -738,16 +741,12 @@ export const facebookCallback = (req: Request, res: Response) => {
     (err: any, user: any) => {
       if (err) {
         return res.redirect(
-          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
-            'An unexpected error occurred. Please try again later',
-          )}`,
+          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent('An unexpected error occurred')}`,
         );
       }
       if (!user) {
         return res.redirect(
-          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(
-            'Invalid credentials',
-          )}`,
+          `${process.env.CLIENT_URL}/login?error=${encodeURIComponent('Invalid credentials')}`,
         );
       }
       res.redirect(
@@ -756,43 +755,40 @@ export const facebookCallback = (req: Request, res: Response) => {
     },
   )(req, res);
 };
+
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
-  console.log('token', token);
+
   if (!token || typeof token !== 'string') {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid or expired token. Please login again',
-    });
+    return sendErrorResponse(res, 400, 'Invalid or missing token');
   }
+
   try {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
     });
-    console.log('player', player);
+
     if (!player) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid or expired token. Please login again',
-      });
+      return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
 
     player.is_verified = VERIFICATION.VERIFIED;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
-    console.log('player', player);
     await player.save();
+
     res.status(200).json({
       success: true,
-      message: 'User registered successfully',
+      message: 'Email verified successfully',
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to verify email',
+    );
   }
 };
 
@@ -800,20 +796,21 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
   const { email } = req.body;
 
   try {
-    const player = await Player.findOne({ email });
+    if (!email) {
+      return sendErrorResponse(res, 400, 'Email is required');
+    }
 
+    const player = await Player.findOne({ email });
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'No account found with this email address',
-      });
+      return sendErrorResponse(
+        res,
+        404,
+        'No account found with this email address',
+      );
     }
 
     if (player.is_verified === VERIFICATION.VERIFIED) {
-      return res.status(400).json({
-        success: false,
-        error: 'Email is already registered',
-      });
+      return sendErrorResponse(res, 400, 'Email is already verified');
     }
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
@@ -826,34 +823,46 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'Verification email has been sent',
+      data: { verification_token: verificationToken },
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error
+        ? error.message
+        : 'Failed to resend verification email',
+    );
   }
 };
 
 export const verifyPhone = async (req: Request, res: Response) => {
   try {
     const { phone_number, code } = req.body;
+    if (!phone_number || !code) {
+      return sendErrorResponse(res, 400, 'Phone number and code are required');
+    }
+
     await authService.verifyPhoneNumber(phone_number, code);
     res.status(200).json({
       success: true,
       message: 'Phone number verified successfully',
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Verification failed',
-    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Phone verification failed',
+    );
   }
 };
 
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
+    if (!playerId || !otp) {
+      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+    }
 
     const { token, expiresIn, user } = await authService.verifyOTP(
       playerId,
@@ -863,39 +872,27 @@ export const verifyOTP = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'OTP verified successfully',
-      data: {
-        user,
-        token,
-        expiresIn,
-      },
+      data: { user, token, expiresIn },
     });
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : 'Invalid OTP or server error';
-    res.status(401).json({
-      success: false,
-      error: errorMessage,
-    });
+    sendErrorResponse(
+      res,
+      401,
+      error instanceof Error ? error.message : 'Invalid OTP',
+    );
   }
 };
 
 export const updateCookieConsent = async (req: Request, res: Response) => {
   try {
     const { playerId, consent } = req.body;
-
-    if (!playerId || !consent) {
-      return res.status(400).json({
-        success: false,
-        error: 'Player ID and consent are required',
-      });
+    if (!playerId || consent === undefined) {
+      return sendErrorResponse(res, 400, 'Player ID and consent are required');
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      return res.status(404).json({
-        success: false,
-        error: 'Player not found',
-      });
+      return sendErrorResponse(res, 404, 'Player not found');
     }
 
     player.cookieConsent = consent;
@@ -904,16 +901,16 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'Cookie consent updated successfully',
-      data: {
-        playerId: player._id,
-        cookieConsent: player.cookieConsent,
-      },
+      data: { playerId: player._id, cookieConsent: player.cookieConsent },
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: 'An unexpected error occurred. Please try again later',
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error
+        ? error.message
+        : 'Failed to update cookie consent',
+    );
   }
 };
 
@@ -922,52 +919,48 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
   const playerId = req.user?.id;
 
   try {
-    // Validate input
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'Both current password and new password are required',
-      });
+    if (!playerId) {
+      return sendErrorResponse(res, 401, 'Authentication required');
     }
 
-    // Password strength validation
+    if (!currentPassword || !newPassword) {
+      return sendErrorResponse(
+        res,
+        400,
+        'Both current and new passwords are required',
+      );
+    }
+
     if (newPassword.length < 8 || !/\d/.test(newPassword)) {
-      return res.status(400).json({
-        success: false,
-        error:
-          'Password must be at least 8 characters long and include a number',
-      });
+      return sendErrorResponse(
+        res,
+        400,
+        'Password must be at least 8 characters long and include a number',
+      );
     }
 
     const player = await Player.findById(playerId).select('+password_hash');
     if (!player) {
-      return res
-        .status(404)
-        .json({ success: false, error: 'Player not found' });
+      return sendErrorResponse(res, 404, 'Player not found');
     }
 
-    // Verify current password
     const isMatch = await bcrypt.compare(currentPassword, player.password_hash);
     if (!isMatch) {
-      return res.status(400).json({
-        success: false,
-        error: 'Current password is incorrect',
-      });
+      return sendErrorResponse(res, 400, 'Current password is incorrect');
     }
 
-    // Check if new password is same as current password
     const isSamePassword = await bcrypt.compare(
       newPassword,
       player.password_hash,
     );
     if (isSamePassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'New password must be different from current password',
-      });
+      return sendErrorResponse(
+        res,
+        400,
+        'New password must be different from current password',
+      );
     }
 
-    // Hash and save new password
     const hashedPassword = await bcrypt.hash(newPassword, 12);
     player.password_hash = hashedPassword;
     await player.save();
@@ -978,9 +971,10 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
     });
   } catch (error) {
     console.error('Error changing password:', error);
-    res.status(500).json({
-      success: false,
-      error: 'An error occurred while changing the password',
-    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to change password',
+    );
   }
 };
