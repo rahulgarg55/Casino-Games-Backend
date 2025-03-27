@@ -1,17 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 
-/**
- * Middleware to handle errors in the application.
- *
- * Logs the error message with a timestamp and sends a JSON response with the error details.
- *
- * @param err - The error object.
- * @param req - The request object.
- * @param res - The response object.
- * @param next - The next middleware function.
- *
- * @returns A JSON response with the error message and stack trace (if not in production).
- */
 const errorHandler = (
   err: Error,
   req: Request,

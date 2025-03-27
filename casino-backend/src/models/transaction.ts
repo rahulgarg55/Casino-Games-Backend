@@ -1,8 +1,18 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export type TransactionType = 'topup' | 'withdrawal' | 'wager' | 'win';
-export type PaymentMethodType = 'stripe' | 'basta_pay' | 'credit_card' | 'paypal' | 'bank_transfer';
-export type TransactionStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'disputed';
+export type PaymentMethodType =
+  | 'stripe'
+  | 'basta_pay'
+  | 'credit_card'
+  | 'paypal'
+  | 'bank_transfer';
+export type TransactionStatus =
+  | 'pending'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'disputed';
 
 export interface ITransaction extends Document {
   player_id: mongoose.Types.ObjectId;
@@ -104,16 +114,19 @@ const transactionSchema: Schema = new Schema(
     toObject: {
       virtuals: true,
     },
-  }
+  },
 );
 
 transactionSchema.index({ player_id: 1, created_at: -1 });
-transactionSchema.index({ payment_intent_id: 1 }, { unique: true, sparse: true });
+transactionSchema.index(
+  { payment_intent_id: 1 },
+  { unique: true, sparse: true },
+);
 transactionSchema.index({ dispute_id: 1 }, { sparse: true });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ transaction_type: 1 });
 
-transactionSchema.pre<ITransaction>('save', function(next) {
+transactionSchema.pre<ITransaction>('save', function (next) {
   if (this.completed_at && this.status === 'pending') {
     this.status = 'completed';
   }

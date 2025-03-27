@@ -5,7 +5,7 @@ import * as paymentController from '../controllers/paymentController';
 import { body, oneOf } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
-import { verifyToken,verifyAdmin } from '../utils/jwt';
+import { verifyToken, verifyAdmin } from '../utils/jwt';
 import bodyParser from 'body-parser';
 import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
@@ -20,8 +20,8 @@ const authLimiter = rateLimit({
   message: 'Too many attempts from this IP, please try again later',
 });
 const resendEmailLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 3,
+  windowMs: 60 * 60 * 1000,
+  max: 10,
   message: 'Too many attempts. Please try again later.',
 });
 
@@ -107,10 +107,10 @@ const updateProfileValidation = [
     .trim()
     .notEmpty()
     .withMessage('Patronymic is required'),
-  body('dob')
-    .optional()
-    .isDate()
-    .withMessage('Date of birth must be a valid date'),
+  // body('dob')
+  //   .optional()
+  //   .isDate()
+  //   .withMessage('Date of birth must be a valid date'),
   body('gender').optional().trim().notEmpty().withMessage('Gender is required'),
   // body('city').optional().trim().notEmpty().withMessage('City is required'),
   body('country')
@@ -160,10 +160,14 @@ router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
 /*Get players statistics*/
-router.get('/players/statistics',verifyAdmin,authController.getPlayerStats);
+router.get('/players/statistics', verifyAdmin, authController.getPlayerStats);
 
 /*Get players region statistics*/
-router.get('/players/region/statistics',verifyAdmin,authController.getPlayerRegionStats);
+router.get(
+  '/players/region/statistics',
+  verifyAdmin,
+  authController.getPlayerRegionStats,
+);
 
 router.delete('/players/:userId', authController.deletePlayer);
 router.put(
