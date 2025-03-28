@@ -417,7 +417,7 @@ router.post(
 );
 
 /*Stripe config apis*/
-router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
-router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
+router.get('/stripe-config-details',authController.geStripeConfig);
+router.patch('/stripe-config-details',authController.updateStripeConfig);
 
 export default router;
