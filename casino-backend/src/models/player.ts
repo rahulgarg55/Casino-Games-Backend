@@ -45,6 +45,9 @@ export interface IPlayer extends Document {
   email_verified?: boolean;
   phone_verified?: boolean;
   referredBy?: mongoose.Types.ObjectId;
+  sumsub_id?:string;
+  sumsub_status?: 'pending' | 'approved' | 'rejected' | null;
+  sumsub_verification_date?: Date;
 }
 
 const playerSchema: Schema = new Schema(
@@ -235,7 +238,20 @@ const playerSchema: Schema = new Schema(
       enum: ['accepted', 'rejected', 'pending'],
       default: 'pending',
     },
-    referredBy: { type: Schema.Types.ObjectId, ref: 'Affiliate', default: null }
+    referredBy: { type: Schema.Types.ObjectId, ref: 'Affiliate', default: null },
+    sumsub_id: {
+      type: String,
+      default: null,
+    },
+    sumsub_status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected', null],
+      default: null,
+    },
+    sumsub_verification_date: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: {

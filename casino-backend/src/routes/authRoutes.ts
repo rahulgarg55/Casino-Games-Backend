@@ -11,7 +11,8 @@ import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
 import { generateTokenResponse } from '../utils/auth';
 import { IPlayer } from '../models/player';
-import {validateStripeConfig,handleValidationErrors}from "../validation/authValidation"
+import {validateStripeConfig,handleValidationErrors}from "../validation/authValidation";
+import { startSumsubVerification, sumsubWebhook } from '../controllers/authController';
 
 const router = Router();
 const authLimiter = rateLimit({
@@ -423,5 +424,14 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 
 /*Get Affiliate users*/
 router.get('/affiliate-users',authController.geAffliateUsers);
+
+/* SumSub Apis */
+
+router.post(
+  '/sumsub/start',
+  passport.authenticate('jwt', { session: false }),
+  startSumsubVerification
+);
+router.post('/sumsub/webhook', sumsubWebhook);
 
 export default router;

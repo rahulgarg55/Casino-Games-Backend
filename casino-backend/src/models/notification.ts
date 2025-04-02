@@ -6,6 +6,7 @@ export enum NotificationType {
   WITHDRAWAL_REQUESTED = 'WITHDRAWAL_REQUESTED',
   EMAIL_VERIFIED = 'EMAIL_VERIFIED',
   PHONE_VERIFIED = 'PHONE_VERIFIED',
+  KYC_UPDATE = 'KYC_UPDATE',
 }
 
 export interface INotification extends Document {

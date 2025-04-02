@@ -16,6 +16,8 @@ import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
 import { StripeConfig } from '../models/stripeConfig';
 import { Affiliate } from '../models/affiliate';
+import { initiateSumsubVerification, updateSumsubStatus } from '../services/authService';
+import { validateWebhookSignature } from '../utils/sumsub';
 
 interface CustomRequest extends Request {
   user?: {
@@ -594,30 +596,8 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 
     const errors: Array<{ param: string; message: string }> = [];
 
-    if (updateData.email && updateData.email !== currentPlayer.email) {
-      const emailExists = await Player.exists({
-        email: updateData.email,
-        _id: { $ne: playerId },
-      });
-      if (emailExists) {
-        errors.push({ param: 'email', message: 'Email already in use' });
-      } else {
-        updateData.email_verified = false;
-        updateData.verification_token = crypto.randomBytes(32).toString('hex');
-        updateData.verification_token_expires = new Date(
-          Date.now() + 24 * 60 * 60 * 1000,
-        );
-        await sendVerificationEmail(
-          updateData.email,
-          updateData.verification_token,
-        );
-      }
-    }
-
-    if (
-      updateData.phone_number &&
-      updateData.phone_number !== currentPlayer.phone_number
-    ) {
+    // Only check for username and phone conflicts
+    if (updateData.phone_number && updateData.phone_number !== currentPlayer.phone_number) {
       const phoneExists = await Player.exists({
         phone_number: updateData.phone_number,
         _id: { $ne: playerId },
@@ -627,8 +607,6 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
           param: 'phone_number',
           message: 'Phone number already in use',
         });
-      } else {
-        updateData.phone_verified = false;
       }
     }
 
@@ -651,14 +629,15 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: updateData.email
-        ? 'Profile updated. Please verify your new email.'
+      message: updateData.email && updateData.email !== currentPlayer.email
+        ? 'Verification email sent to your new email address. Please verify to complete the update.'
         : 'Profile updated successfully',
       data: {
         user: {
-          ...updatedPlayer.toObject(),
+          ...updatedPlayer,
           balance: balance?.balance || 0,
           is_2fa_enabled: updatedPlayer.is_2fa_enabled,
+          logoutRequired: updatedPlayer.logoutRequired || false,
         },
       },
     });
@@ -774,14 +753,19 @@ export const verifyEmail = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
 
+    // Verify the email and clear verification fields
     player.is_verified = VERIFICATION.VERIFIED;
+    player.email_verified = true;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
+    
+    // Invalidate all sessions
+    player.refreshToken = undefined;
     await player.save();
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully',
+      message: 'Email verified successfully. Please login with your new email.',
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
@@ -810,9 +794,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       );
     }
 
-    if (player.is_verified === VERIFICATION.VERIFIED) {
-      return sendErrorResponse(res, 400, 'Email is already verified');
-    }
+    if (player.email_verified) return sendErrorResponse(res, 400, 'Email is already verified');
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     player.verification_token = verificationToken;
@@ -1078,3 +1060,70 @@ export const geAffliateUsers = async (req: Request, res: Response) => {
     });
   }
 };
+export const startSumsubVerification = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return sendErrorResponse(res, 401, 'Authentication required');
+    }
+
+    const tokenResponse = await initiateSumsubVerification(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Sumsub verification initiated successfully',
+      data: {
+        accessToken: tokenResponse.token,
+        externalUserId: tokenResponse.userId,
+      },
+    });
+  } catch (error) {
+    console.error('Sumsub verification error:', error);
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to initiate Sumsub verification'
+    );
+  }
+};
+
+export const sumsubWebhook = async (req: Request, res: Response) => {
+  try {
+    const signature = req.headers['x-payload-signature'] as string;
+    if (!signature) {
+      return sendErrorResponse(res, 400, 'Missing webhook signature');
+    }
+
+    if (!validateWebhookSignature(req.body, signature)) {
+      return sendErrorResponse(res, 401, 'Invalid webhook signature');
+    }
+
+    const { applicantId, reviewStatus, reviewResult } = req.body;
+    if (!applicantId || !reviewStatus) {
+      return sendErrorResponse(res, 400, 'Invalid webhook payload');
+    }
+
+    const player = await Player.findOne({ sumsub_id: applicantId });
+    if (!player) {
+      return sendErrorResponse(res, 404, 'Player not found');
+    }
+
+    const status = reviewStatus === 'completed' && reviewResult?.reviewAnswer === 'GREEN'
+      ? 'approved'
+      : 'rejected';
+    await updateSumsubStatus(player._id.toString(), status);
+
+    res.status(200).json({
+      success: true,
+      message: 'Webhook processed successfully',
+    });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to process Sumsub webhook'
+    );
+  }
+};
+
+
