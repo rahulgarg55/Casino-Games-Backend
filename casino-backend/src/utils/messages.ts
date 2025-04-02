@@ -8,4 +8,5 @@ export const messages = {
     stripeConfigAdded:"Stripe configuration added successfully.",
     stripeConfigNotAdded:"Stripe configuration not added successfully.",
     stripeConfigUpdated:"Stripe details  updated successfully.",
+    affiliateUserList:"Affliate users list found successfully"
 }

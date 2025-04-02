@@ -28,3 +28,14 @@ export const generateTokenResponse = (user: IPlayer) => {
     expiresIn: 28800,
   };
 };
+
+
+/*Function for generate Referral code */
+export const generateReferralCode = (userId: any) => {
+  const userIdStr = userId.toString();
+
+  // Generate 4-digit random number
+  const randomPart = Math.floor(1000 + Math.random() * 9000);
+
+  return `AFF-${userIdStr.substring(0, 6)}-${randomPart}`;
+};

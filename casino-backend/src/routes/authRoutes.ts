@@ -421,4 +421,7 @@ router.post(
 router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
 router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
 
+/*Get Affiliate users*/
+router.get('/affiliate-users',authController.geAffliateUsers);
+
 export default router;

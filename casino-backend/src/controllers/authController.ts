@@ -15,6 +15,7 @@ import moment from 'moment';
 import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
 import { StripeConfig } from '../models/stripeConfig';
+import { Affiliate } from '../models/affiliate';
 
 interface CustomRequest extends Request {
   user?: {
@@ -713,7 +714,6 @@ export const googleLogin = passport.authenticate('google', {
 
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', { session: false }, (err: any, user: any) => {
-
     if (err || !user) {
       let errorMessage = err?.message || 'Authentication failed';
       console.error('Google Callback Authentication Error:', err);
@@ -1031,6 +1031,45 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
       success: true,
       message: messages.stripeConfigUpdated,
       data: updatedStripeConfig,
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
+    });
+  }
+};
+
+export const geAffliateUsers = async (req: Request, res: Response) => {
+  try {
+    let page = parseInt(req.query.page as string) || 1; 
+    let limit = parseInt(req.query.limit as string) || 10;
+
+    const affiliateUserList = await Affiliate.find()
+      .sort({ createdAt: -1 })
+      .populate('user_id')
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalAffiliates = await Affiliate.countDocuments();
+
+    if (!affiliateUserList) {
+      return res.status(404).json({
+        success: false,
+        message: messages.dataNotFound,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.affiliateUserList,
+      data: {
+        total: totalAffiliates,
+        page,
+        limit,
+        totalPages: Math.ceil(totalAffiliates / limit),
+        data: affiliateUserList,
+      },
     });
   } catch (error) {
     return res.status(400).json({

@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
 import { sendResetEmail } from '../utils/sendResetEmail';
-import { generateTokenResponse } from '../utils/auth';
+import { generateTokenResponse, generateReferralCode } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
@@ -13,6 +13,7 @@ import Notification, { NotificationType } from '../models/notification';
 import language from '../models/language';
 import mongoose from 'mongoose';
 import { session } from 'passport';
+import { Affiliate } from '../models/affiliate';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -25,6 +26,7 @@ interface RegistrationData {
   gender?: string;
   city?: string;
   country?: string;
+  is_affiliate: boolean;
 }
 
 interface LoginData {
@@ -70,6 +72,7 @@ export const register = async (data: RegistrationData) => {
     gender,
     city,
     country,
+    is_affiliate,
   } = data;
 
   if (!email && !phone_number) {
@@ -127,6 +130,7 @@ export const register = async (data: RegistrationData) => {
     city,
     country,
     gender,
+    is_affiliate,
   };
 
   if (username) {
@@ -144,6 +148,17 @@ export const register = async (data: RegistrationData) => {
   try {
     const player = new Player(playerData);
     await player.save();
+
+    /*If affiliate user*/
+    if (playerData.is_affiliate) {
+      const referral_code = await generateReferralCode(player._id);
+
+      /*Save Affliate details*/
+      await Affiliate.create({
+        user_id: player._id,
+        referral_code,
+      });
+    }
 
     const playerBalance = new PlayerBalance({
       player_id: player._id,
@@ -680,7 +695,8 @@ export const updateProfile = async (
       throw new Error('Invalid date format for date of birth');
     }
     player.dob = parsedDate;
-  }  if (data.gender !== undefined) player.gender = data.gender;
+  }
+  if (data.gender !== undefined) player.gender = data.gender;
   if (data.city !== undefined) player.city = data.city;
   if (data.country !== undefined) player.country = data.country;
 

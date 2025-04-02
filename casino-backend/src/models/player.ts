@@ -44,6 +44,7 @@ export interface IPlayer extends Document {
   country_code?: string;
   email_verified?: boolean;
   phone_verified?: boolean;
+  referredBy?: mongoose.Types.ObjectId;
 }
 
 const playerSchema: Schema = new Schema(
@@ -234,6 +235,7 @@ const playerSchema: Schema = new Schema(
       enum: ['accepted', 'rejected', 'pending'],
       default: 'pending',
     },
+    referredBy: { type: Schema.Types.ObjectId, ref: 'Affiliate', default: null }
   },
   {
     timestamps: {
