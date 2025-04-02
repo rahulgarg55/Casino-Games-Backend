@@ -747,19 +747,20 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
+      new_email: { $exists: true, $ne: null }
     });
 
     if (!player) {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
 
-    // Verify the email and clear verification fields
+    player.email = player.new_email;
+    player.new_email = undefined;
     player.is_verified = VERIFICATION.VERIFIED;
     player.email_verified = true;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
     
-    // Invalidate all sessions
     player.refreshToken = undefined;
     await player.save();
 
