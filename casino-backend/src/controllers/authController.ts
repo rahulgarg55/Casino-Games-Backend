@@ -1030,7 +1030,7 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
   }
 };
 
-export const geAffliateUsers = async (req: Request, res: Response) => {
+export const getAffliateUsers = async (req: Request, res: Response) => {
   try {
     let page = parseInt(req.query.page as string) || 1;
     let limit = parseInt(req.query.limit as string) || 10;

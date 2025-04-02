@@ -423,7 +423,7 @@ router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
 router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
 
 /*Get Affiliate users*/
-router.get('/affiliate-users',authController.geAffliateUsers);
+router.get('/affiliate-users',authController.getAffliateUsers);
 router.patch('/affiliate-users/:id',authController.updateAffliateUsersStatus);
 
 /* SumSub Apis */
