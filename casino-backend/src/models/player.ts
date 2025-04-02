@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { TWO_FA, STATUS, VERIFICATION } from '../constants';
+
 export interface IPlayer extends Document {
   username?: string;
   fullname?: string;
@@ -40,6 +41,9 @@ export interface IPlayer extends Document {
   two_factor_expires?: Date; // OTP expiration
   two_factor_method?: 'email' | 'phone'; // Preferred 2FA method
   cookieConsent?: string;
+  country_code?: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
 }
 
 const playerSchema: Schema = new Schema(
@@ -62,8 +66,7 @@ const playerSchema: Schema = new Schema(
     photo: {
       type: String,
       validate: {
-        validator: (v: string) =>
-          /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v),
+        validator: (v: string) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v),
         message: 'Invalid URL format for photo',
       },
     },
@@ -76,12 +79,12 @@ const playerSchema: Schema = new Schema(
     },
     gender: {
       type: String,
-      ref: 'Gender',
+      enum: ['male', 'female', 'other'],
     },
     email: {
       type: String,
       unique: true,
-      sparse: true, // Only index documents that contain the email field
+      sparse: true,
       validate: {
         validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
         message: 'Invalid email format',
@@ -90,14 +93,17 @@ const playerSchema: Schema = new Schema(
     phone_number: {
       type: String,
       unique: true,
-      // default: null,
-      sparse: true, // Only index documents that contain the phone_number field
+      sparse: true,
       validate: {
         validator: function (v: string | null | undefined): boolean {
           return v === null || v === undefined || /^\+?[1-9]\d{1,14}$/.test(v);
         },
         message: 'Invalid phone number format',
       },
+    },
+    country_code: {
+      type: String,
+      default: '+1',
     },
     password_hash: {
       type: String,
@@ -112,27 +118,35 @@ const playerSchema: Schema = new Schema(
     },
     status: {
       type: Number,
-      enum: [0, 1], // 0 = inactive, 1 = active
-      default: 1,
+      enum: [STATUS.INACTIVE, STATUS.ACTIVE],
+      default: STATUS.ACTIVE,
     },
     is_verified: {
       type: Number,
-      enum: [0, 1], // 0 = unverified, 1 = verified
-      default: 0,
+      enum: [VERIFICATION.UNVERIFIED, VERIFICATION.VERIFIED],
+      default: VERIFICATION.UNVERIFIED,
+    },
+    email_verified: {
+      type: Boolean,
+      default: false,
+    },
+    phone_verified: {
+      type: Boolean,
+      default: false,
     },
     is_2fa: {
       type: Number,
-      enum: [0, 1], // 0 = disabled, 1 = enabled
-      default: 0,
+      enum: [TWO_FA.DISABLED, TWO_FA.ENABLED],
+      default: TWO_FA.DISABLED,
     },
     currency: {
       type: Number,
       required: true,
-      enum: [0, 1, 2], // 0 = USD, 1 = INR, 2 = Pound
+      enum: [0, 1, 2],
     },
     language: {
       type: String,
-      ref: 'Language',
+      default: 'en',
     },
     country: {
       type: String,
@@ -149,19 +163,15 @@ const playerSchema: Schema = new Schema(
     },
     reset_password_token: {
       type: String,
-      default: null,
     },
     reset_password_expires: {
       type: Date,
-      default: null,
     },
     verification_token: {
       type: String,
-      default: null,
     },
     verification_token_expires: {
       type: Date,
-      default: null,
     },
     sms_code: {
       type: String,
@@ -179,11 +189,9 @@ const playerSchema: Schema = new Schema(
     ],
     refreshToken: {
       type: String,
-      default: null,
     },
     profile_picture: {
       type: String,
-      default: null,
     },
     stripeCustomerId: {
       type: String,
@@ -240,7 +248,13 @@ const playerSchema: Schema = new Schema(
         return ret;
       },
     },
-  },
+  }
 );
+
+playerSchema.virtual('full_phone_number').get(function () {
+  return this.country_code && this.phone_number 
+    ? `${this.country_code}${this.phone_number}`
+    : null;
+});
 
 export default mongoose.model<IPlayer>('Player', playerSchema);
