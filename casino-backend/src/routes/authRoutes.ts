@@ -424,6 +424,7 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 
 /*Get Affiliate users*/
 router.get('/affiliate-users',authController.geAffliateUsers);
+router.patch('/affiliate-users/:id',authController.updateAffliateUsersStatus);
 
 /* SumSub Apis */
 
