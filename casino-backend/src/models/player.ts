@@ -44,6 +44,9 @@ export interface IPlayer extends Document {
   country_code?: string;
   email_verified?: boolean;
   phone_verified?: boolean;
+  sumsub_id?:string;
+  sumsub_status?: 'pending' | 'approved' | 'rejected' | null;
+  sumsub_verification_date?: Date;
 }
 
 const playerSchema: Schema = new Schema(
@@ -233,6 +236,19 @@ const playerSchema: Schema = new Schema(
       type: String,
       enum: ['accepted', 'rejected', 'pending'],
       default: 'pending',
+    },
+    sumsub_id: {
+      type: String,
+      default: null,
+    },
+    sumsub_status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected', null],
+      default: null,
+    },
+    sumsub_verification_date: {
+      type: Date,
+      default: null,
     },
   },
   {

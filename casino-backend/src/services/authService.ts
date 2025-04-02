@@ -10,6 +10,7 @@ import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
 import Notification, { NotificationType } from '../models/notification';
+import { generateSumsubAccessToken, createSumsubApplicant, SumsubTokenResponse } from '../utils/sumsub';
 import language from '../models/language';
 import mongoose from 'mongoose';
 import { session } from 'passport';
@@ -641,63 +642,60 @@ export const generateResetToken = async (email: string) => {
   return resetToken;
 };
 
-export const updateProfile = async (
-  playerId: string,
-  data: UpdateProfileData,
-) => {
+export const updateProfile = async (playerId: string, data: UpdateProfileData) => {
   const player = await Player.findById(playerId);
-  if (!player) {
-    throw new Error('User not found');
+  if (!player) throw new Error('User not found');
+
+  const updates: any = {};
+  let logoutRequired = false;
+
+  if (data.email && data.email !== player.email) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+      throw new Error('Invalid email format');
+    }
+    
+    updates.email = data.email;
+    updates.email_verified = false;
+    updates.verification_token = crypto.randomBytes(32).toString('hex');
+    updates.verification_token_expires = new Date(Date.now() + 3600000); // 1 hour
+    logoutRequired = true;
   }
+
   if (data.phone_number !== undefined) {
-    if (data.phone_number === '') {
-      player.phone_number = null;
-    } else if (!/^\+?[1-9]\d{1,14}$/.test(data.phone_number)) {
-      throw new Error('Valid phone number is required');
-    } else {
-      const existingPlayer = await Player.findOne({
-        phone_number: data.phone_number,
-      });
+    if (data.phone_number && !/^\+?[1-9]\d{1,14}$/.test(data.phone_number)) {
+      throw new Error('Invalid phone number format');
+    }
+    if (data.phone_number !== player.phone_number) {
+      const existingPlayer = await Player.findOne({ phone_number: data.phone_number });
       if (existingPlayer && existingPlayer._id.toString() !== playerId) {
         throw new Error('Phone number is already registered');
       }
-      player.phone_number = data.phone_number;
+      updates.phone_number = data.phone_number || null;
+      updates.phone_verified = data.phone_number ? false : player.phone_verified;
     }
-  }
-  if (data.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    throw new Error('Invalid email format');
   }
 
-  if (data.fullname) player.fullname = data.fullname;
-  if (data.email) player.email = data.email;
-  if (data.phone_number) player.phone_number = data.phone_number;
-  if (data.username) player.username = data.username;
-  if (data.language !== undefined) player.language = data.language;
-  if (data.patronymic) player.patronymic = data.patronymic;
-  if (data.dob) {
-    const parsedDate = new Date(data.dob);
-    if (isNaN(parsedDate.getTime())) {
-      throw new Error('Invalid date format for date of birth');
-    }
-    player.dob = parsedDate;
-  }  if (data.gender !== undefined) player.gender = data.gender;
-  if (data.city !== undefined) player.city = data.city;
-  if (data.country !== undefined) player.country = data.country;
+  // Handle other fields
+  if (data.fullname) updates.fullname = data.fullname;
+  if (data.username) updates.username = data.username;
+  if (data.language) updates.language = data.language;
+  if (data.patronymic) updates.patronymic = data.patronymic;
+  if (data.dob) updates.dob = new Date(data.dob);
+  if (data.gender) updates.gender = data.gender;
+  if (data.city) updates.city = data.city;
+  if (data.country) updates.country = data.country;
 
-  try {
-    await player.save();
-    return player;
-  } catch (error) {
-    if (error.code === 11000) {
-      if (error.keyPattern.username) {
-        throw new Error('Username is already taken');
-      }
-      if (error.keyPattern.email) {
-        throw new Error('Email is already registered');
-      }
-    }
-    throw error;
+  Object.assign(player, updates);
+  await player.save();
+
+  if (updates.email) {
+    await sendVerificationEmail(updates.email, updates.verification_token);
   }
+
+  return {
+    ...player.toObject(),
+    logoutRequired
+  };
 };
 
 export const getNotifications = async (
@@ -775,4 +773,67 @@ export const verifyOTP = async (playerId: string, otp: string) => {
       fullname: player.fullname,
     },
   };
+};
+
+/**
+ * Initiates Sumsub KYC verification for a player.
+ * @param playerId - Internal player ID
+ * @returns Sumsub access token and user ID
+ * @throws {Error} If player not found or Sumsub API fails
+ */
+export const initiateSumsubVerification = async (playerId: string): Promise<SumsubTokenResponse> => {
+  const player = await Player.findById(playerId);
+  if (!player) {
+    throw new Error('Player not found');
+  }
+
+  if (!player.email) {
+    throw new Error('Player email is required for Sumsub verification');
+  }
+
+  if (!player.sumsub_id) {
+    const applicantId = await createSumsubApplicant(
+      playerId,
+      player.email,
+      player.phone_number
+    );
+    player.sumsub_id = applicantId;
+    player.sumsub_status = 'pending';
+    await player.save();
+  }
+
+  return generateSumsubAccessToken(playerId, playerId, 'basic-kyc');
+};
+
+/**
+ * Updates player Sumsub verification status based on webhook data.
+ * @param playerId - Internal player ID
+ * @param status - New status ('approved' or 'rejected')
+ * @returns Updated player object
+ * @throws {Error} If player not found or update fails
+ */
+export const updateSumsubStatus = async (playerId: string, status: 'approved' | 'rejected') => {
+  const player = await Player.findById(playerId);
+  if (!player) {
+    throw new Error('Player not found');
+  }
+
+  player.sumsub_status = status;
+  player.sumsub_verification_date = new Date();
+  if (status === 'approved') {
+    player.is_verified = VERIFICATION.VERIFIED;
+  } else if (status === 'rejected') {
+    player.is_verified = VERIFICATION.UNVERIFIED;
+  }
+  await player.save();
+
+  const notification = new Notification({
+    type: NotificationType.KYC_UPDATE,
+    message: `KYC status updated to ${status} for user ${player.username || player.email}`,
+    user_id: player._id,
+    metadata: { sumsub_id: player.sumsub_id, status },
+  });
+  await notification.save();
+
+  return player;
 };
