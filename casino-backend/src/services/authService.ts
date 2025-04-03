@@ -875,6 +875,7 @@ export const registerAffiliate = async (data: IAffiliate) => {
     promotionMethod,
     hearAboutUs,
     status,
+    marketingEmailsOptIn,
     
   } = data;
 
