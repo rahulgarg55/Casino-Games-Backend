@@ -663,15 +663,23 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
 
   const updates: any = {};
   let logoutRequired = false;
+  let verificationToken: string | undefined;
 
   if (data.email && data.email !== player.email) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       throw new Error('Invalid email format');
     }
-    
-    updates.email = data.email;
-    updates.email_verified = false;
-    updates.verification_token = crypto.randomBytes(32).toString('hex');
+    const emailExists = await Player.findOne({ 
+      email: data.email,
+      _id: { $ne: playerId }
+    });
+    if (emailExists) {
+      throw new Error('Email is already registered');
+    }
+
+     verificationToken = crypto.randomBytes(32).toString('hex');
+    updates.new_email = data.email;
+    updates.verification_token = verificationToken;
     updates.verification_token_expires = new Date(Date.now() + 3600000); // 1 hour
     logoutRequired = true;
   }
@@ -681,14 +689,18 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
       throw new Error('Invalid phone number format');
     }
     if (data.phone_number !== player.phone_number) {
-      const existingPlayer = await Player.findOne({ phone_number: data.phone_number });
-      if (existingPlayer && existingPlayer._id.toString() !== playerId) {
+      const existingPlayer = await Player.findOne({ 
+        phone_number: data.phone_number,
+        _id: { $ne: playerId }
+      });
+      if (existingPlayer) {
         throw new Error('Phone number is already registered');
       }
       updates.phone_number = data.phone_number || null;
       updates.phone_verified = data.phone_number ? false : player.phone_verified;
     }
   }
+
 
   // Handle other fields
   if (data.fullname) updates.fullname = data.fullname;
@@ -703,10 +715,9 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
   Object.assign(player, updates);
   await player.save();
 
-  if (updates.email) {
-    await sendVerificationEmail(updates.email, updates.verification_token);
+  if (verificationToken && updates.new_email) {
+    await sendVerificationEmail(updates.new_email, verificationToken);
   }
-
   return {
     ...player.toObject(),
     logoutRequired

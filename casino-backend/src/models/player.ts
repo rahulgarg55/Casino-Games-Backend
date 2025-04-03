@@ -48,6 +48,7 @@ export interface IPlayer extends Document {
   sumsub_id?:string;
   sumsub_status?: 'pending' | 'approved' | 'rejected' | null;
   sumsub_verification_date?: Date;
+  new_email?: string;
 }
 
 const playerSchema: Schema = new Schema(
@@ -251,6 +252,13 @@ const playerSchema: Schema = new Schema(
     sumsub_verification_date: {
       type: Date,
       default: null,
+    },
+    new_email: {
+      type: String,
+      validate: {
+        validator: (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: 'Invalid email format',
+      },
     },
   },
   {
