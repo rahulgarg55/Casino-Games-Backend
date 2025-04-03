@@ -3,10 +3,11 @@ import stripe from '../utils/stripeConfig';
 import Player from '../models/player';
 import Transaction from '../models/transaction';
 import PaymentMethod from '../models/paymentMethod';
+import PaymentConfig from '../models/paymentConfig';
+import {sendErrorResponse} from './authController';
 import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
-
 interface CustomRequest extends Request {
   user?: {
     sub: string;
@@ -1328,5 +1329,174 @@ export const processWithdrawal = async (
       message: 'Failed to process withdrawal',
       error: error.message,
     });
+  }
+};
+
+export const seedPaymentConfigs = async () => {
+  const initialConfigs = [
+    {
+      paymentMethodId: 1,
+      name: 'stripe',
+      config: {
+        STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
+        STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
+        STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+        STRIPE_TEST_SECRET_KEY: process.env.STRIPE_TEST_SECRET_KEY || '',
+        STRIPE_TEST_PUBLISHABLE_KEY: process.env.STRIPE_TEST_PUBLISHABLE_KEY || '',
+        STRIPE_TEST_WEBHOOK_SECRET: process.env.STRIPE_TEST_WEBHOOK_SECRET || '',
+      },
+      mode: 'test',
+      isActive: true,
+    },
+    {
+      paymentMethodId: 2,
+      name: 'bastapay',
+      config: {
+        BASTAPAY_API_KEY: process.env.BASTAPAY_API_KEY || '',
+        BASTAPAY_SECRET: process.env.BASTAPAY_SECRET || '',
+        BASTAPAY_TEST_API_KEY: process.env.BASTAPAY_TEST_API_KEY || '',
+        BASTAPAY_TEST_SECRET: process.env.BASTAPAY_TEST_SECRET || '',
+      },
+      mode: 'test',
+      isActive: false,
+    },
+  ];
+
+  for (const config of initialConfigs) {
+    await PaymentConfig.findOneAndUpdate(
+      { paymentMethodId: config.paymentMethodId },
+      { $set: config },
+      { upsert: true, new: true }
+    );
+  }
+};
+export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 1) {
+      return sendErrorResponse(res, 403, 'Admin access required');
+    }
+
+    const paymentConfigs = await PaymentConfig.find().select('-__v');
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment configurations retrieved successfully',
+      data: paymentConfigs.map(config => ({
+        id: config._id,
+        paymentMethodId: config.paymentMethodId,
+        name: config.name,
+        config: config.config,
+        mode: config.mode,
+        isActive: config.isActive,
+      })),
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to retrieve payment configurations'
+    );
+  }
+};
+
+export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 1) {
+      return sendErrorResponse(res, 403, 'Admin access required');
+    }
+
+    const { id } = req.params;
+    const paymentConfig = await PaymentConfig.findById(id).select('-__v');
+
+    if (!paymentConfig) {
+      return sendErrorResponse(res, 404, 'Payment configuration not found');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment configuration retrieved successfully',
+      data: {
+        id: paymentConfig._id,
+        paymentMethodId: paymentConfig.paymentMethodId,
+        name: paymentConfig.name,
+        config: paymentConfig.config,
+        mode: paymentConfig.mode,
+        isActive: paymentConfig.isActive,
+      },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to retrieve payment configuration'
+    );
+  }
+};
+
+export const updatePaymentConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 1) {
+      return sendErrorResponse(res, 403, 'Admin access required');
+    }
+
+    const { id } = req.params;
+    const { config, mode, isActive } = req.body;
+
+    const paymentConfig = await PaymentConfig.findById(id);
+    if (!paymentConfig) {
+      return sendErrorResponse(res, 404, 'Payment configuration not found');
+    }
+
+    if (config) paymentConfig.config = config;
+    if (mode && ['test', 'live'].includes(mode)) paymentConfig.mode = mode;
+    if (typeof isActive === 'boolean') paymentConfig.isActive = isActive;
+
+    await paymentConfig.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment configuration updated successfully',
+      data: {
+        id: paymentConfig._id,
+        paymentMethodId: paymentConfig.paymentMethodId,
+        name: paymentConfig.name,
+        config: paymentConfig.config,
+        mode: paymentConfig.mode,
+        isActive: paymentConfig.isActive,
+      },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to update payment configuration'
+    );
+  }
+};
+
+export const deletePaymentConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user || req.user.role !== 1) {
+      return sendErrorResponse(res, 403, 'Admin access required');
+    }
+
+    const { id } = req.params;
+    const paymentConfig = await PaymentConfig.findByIdAndDelete(id);
+
+    if (!paymentConfig) {
+      return sendErrorResponse(res, 404, 'Payment configuration not found');
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment configuration deleted successfully',
+      data: { id },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? error.message : 'Failed to delete payment configuration'
+    );
   }
 };

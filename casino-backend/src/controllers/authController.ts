@@ -31,7 +31,7 @@ interface CustomRequest extends Request {
   };
 }
 
-const sendErrorResponse = (
+export const sendErrorResponse = (
   res: Response,
   statusCode: number,
   message: string | Array<{ param?: string; message: string }>,
