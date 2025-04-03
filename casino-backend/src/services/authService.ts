@@ -10,11 +10,15 @@ import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
 import Notification, { NotificationType } from '../models/notification';
-import { generateSumsubAccessToken, createSumsubApplicant, SumsubTokenResponse } from '../utils/sumsub';
+import {
+  generateSumsubAccessToken,
+  createSumsubApplicant,
+  SumsubTokenResponse,
+} from '../utils/sumsub';
 import language from '../models/language';
 import mongoose from 'mongoose';
 import { session } from 'passport';
-import { Affiliate } from '../models/affiliate';
+import { Affiliate, IAffiliate } from '../models/affiliate';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -27,8 +31,11 @@ interface RegistrationData {
   gender?: string;
   city?: string;
   country?: string;
+<<<<<<< HEAD
+=======
   is_affiliate: boolean;
   role_id: number;
+>>>>>>> 462d27048787c93c289e067bca41a92961b1e1ed
 }
 
 interface LoginData {
@@ -74,8 +81,11 @@ export const register = async (data: RegistrationData) => {
     gender,
     city,
     country,
+<<<<<<< HEAD
+=======
     is_affiliate,
     role_id,
+>>>>>>> 462d27048787c93c289e067bca41a92961b1e1ed
   } = data;
 
   if (!email && !phone_number) {
@@ -133,7 +143,6 @@ export const register = async (data: RegistrationData) => {
     city,
     country,
     gender,
-    is_affiliate,
   };
 
   if (username) {
@@ -151,17 +160,6 @@ export const register = async (data: RegistrationData) => {
   try {
     const player = new Player(playerData);
     await player.save();
-
-    /*If affiliate user*/
-    if (playerData.is_affiliate) {
-      const referral_code = await generateReferralCode(player._id);
-
-      /*Save Affliate details*/
-      await Affiliate.create({
-        user_id: player._id,
-        referral_code,
-      });
-    }
 
     const playerBalance = new PlayerBalance({
       player_id: player._id,
@@ -659,7 +657,10 @@ export const generateResetToken = async (email: string) => {
   return resetToken;
 };
 
-export const updateProfile = async (playerId: string, data: UpdateProfileData) => {
+export const updateProfile = async (
+  playerId: string,
+  data: UpdateProfileData,
+) => {
   const player = await Player.findById(playerId);
   if (!player) throw new Error('User not found');
 
@@ -671,15 +672,15 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
       throw new Error('Invalid email format');
     }
-    const emailExists = await Player.findOne({ 
+    const emailExists = await Player.findOne({
       email: data.email,
-      _id: { $ne: playerId }
+      _id: { $ne: playerId },
     });
     if (emailExists) {
       throw new Error('Email is already registered');
     }
 
-     verificationToken = crypto.randomBytes(32).toString('hex');
+    verificationToken = crypto.randomBytes(32).toString('hex');
     updates.new_email = data.email;
     updates.verification_token = verificationToken;
     updates.verification_token_expires = new Date(Date.now() + 3600000); // 1 hour
@@ -691,18 +692,19 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
       throw new Error('Invalid phone number format');
     }
     if (data.phone_number !== player.phone_number) {
-      const existingPlayer = await Player.findOne({ 
+      const existingPlayer = await Player.findOne({
         phone_number: data.phone_number,
-        _id: { $ne: playerId }
+        _id: { $ne: playerId },
       });
       if (existingPlayer) {
         throw new Error('Phone number is already registered');
       }
       updates.phone_number = data.phone_number || null;
-      updates.phone_verified = data.phone_number ? false : player.phone_verified;
+      updates.phone_verified = data.phone_number
+        ? false
+        : player.phone_verified;
     }
   }
-
 
   // Handle other fields
   if (data.fullname) updates.fullname = data.fullname;
@@ -722,7 +724,7 @@ export const updateProfile = async (playerId: string, data: UpdateProfileData) =
   }
   return {
     ...player.toObject(),
-    logoutRequired
+    logoutRequired,
   };
 };
 
@@ -809,7 +811,9 @@ export const verifyOTP = async (playerId: string, otp: string) => {
  * @returns Sumsub access token and user ID
  * @throws {Error} If player not found or Sumsub API fails
  */
-export const initiateSumsubVerification = async (playerId: string): Promise<SumsubTokenResponse> => {
+export const initiateSumsubVerification = async (
+  playerId: string,
+): Promise<SumsubTokenResponse> => {
   const player = await Player.findById(playerId);
   if (!player) {
     throw new Error('Player not found');
@@ -823,7 +827,7 @@ export const initiateSumsubVerification = async (playerId: string): Promise<Sums
     const applicantId = await createSumsubApplicant(
       playerId,
       player.email,
-      player.phone_number
+      player.phone_number,
     );
     player.sumsub_id = applicantId;
     player.sumsub_status = 'pending';
@@ -840,7 +844,10 @@ export const initiateSumsubVerification = async (playerId: string): Promise<Sums
  * @returns Updated player object
  * @throws {Error} If player not found or update fails
  */
-export const updateSumsubStatus = async (playerId: string, status: 'approved' | 'rejected') => {
+export const updateSumsubStatus = async (
+  playerId: string,
+  status: 'approved' | 'rejected',
+) => {
   const player = await Player.findById(playerId);
   if (!player) {
     throw new Error('Player not found');
@@ -864,4 +871,63 @@ export const updateSumsubStatus = async (playerId: string, status: 'approved' | 
   await notification.save();
 
   return player;
+};
+
+export const registerAffiliate = async (data: IAffiliate) => {
+  const {
+    firstname,
+    lastname,
+    email,
+    phonenumber,
+    country,
+    password,
+    referralCode,
+    promotionMethod,
+    hearAboutUs,
+    status,
+    marketingEmailsOptIn,
+    
+  } = data;
+
+  /*Check if user exists*/
+  const existingUser = await Affiliate.findOne({ email });
+  if (existingUser) {
+    if (existingUser.email === email) {
+      throw new Error('Email is already registered');
+    }
+    if (existingUser.phonenumber === phonenumber) {
+      throw new Error('Phone number is already registered');
+    }
+  }
+
+  if (password.length < 8 || !/\d/.test(password)) {
+    throw new Error(
+      'Password must be at least 8 characters long and include a number',
+    );
+  }
+  
+
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationTokenExpires = new Date(Date.now() + 3600000);
+
+  try {
+    const hashedPassword = password
+      ? await bcrypt.hash(password, 12)
+      : undefined;
+    const newAffiliate = new Affiliate({
+      ...data,
+      password: hashedPassword,
+      referralCode:
+        referralCode || generateReferralCode(new mongoose.Types.ObjectId()),
+        verification_token: verificationToken,
+        verification_token_expires: verificationTokenExpires,
+    });
+    newAffiliate.save();
+    const affiliateObject = newAffiliate.toObject();
+    delete affiliateObject.password;
+
+    return affiliateObject;
+  } catch (error) {
+    throw error;
+  }
 };

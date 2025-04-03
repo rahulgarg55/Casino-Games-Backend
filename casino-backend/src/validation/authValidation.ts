@@ -22,6 +22,20 @@ export const validateStripeConfig = [
 ];
 
 
+// Express validation middleware for affiliate registration
+export const validateAffiliate =  [
+  body('firstname').notEmpty().withMessage('First name is required'),
+  body('lastname').notEmpty().withMessage('Last name is required'),
+  body('email')
+        .isEmail()
+        .normalizeEmail()
+        .withMessage('Valid email is required'),
+  body('country').notEmpty().withMessage('Country is required'),
+  body('hearAboutUs').notEmpty().withMessage('Please specify how you heard about us')
+];
+
+
+
 
 
 /**
