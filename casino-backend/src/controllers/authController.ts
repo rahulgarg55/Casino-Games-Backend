@@ -21,6 +21,7 @@ import {
   updateSumsubStatus,
 } from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
+const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
 
 interface CustomRequest extends Request {
   user?: {
@@ -754,7 +755,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
-      new_email: { $exists: true, $ne: null }
+      new_email: { $exists: true, $ne: null },
     });
 
     if (!player) {
@@ -767,7 +768,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     player.email_verified = true;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
-    
+
     player.refreshToken = undefined;
     await player.save();
 
@@ -1038,9 +1039,9 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
 
     const affiliateUserList = await Affiliate.find()
       .sort({ createdAt: -1 })
-      .populate('user_id')
       .skip((page - 1) * limit)
-      .limit(limit);
+      .limit(limit)
+      .select('-password');
 
     const totalAffiliates = await Affiliate.countDocuments();
 
@@ -1076,15 +1077,38 @@ export const updateAffliateUsersStatus = async (
 ) => {
   try {
     const id = req.params.id;
-    const { status } = req.query;
+    const status = req.query.status;
 
-    /*Find Affiliate user */
+    // Check if status is provided
+    if (!status) {
+      return res.status(400).json({
+        success: false,
+        message: messages.statusRequired,
+      });
+    }
+
+    const statusString = String(status) as 'Active' | 'Inactive' | 'Banned';
+
+    // Find Affiliate user
     const affiliateUser = await Affiliate.findById(id);
-
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.dataNotFound,
+        message: messages.invalidAffiliateId,
+      });
+    }
+
+    // Update status
+    const updatedAffiliate = await Affiliate.findByIdAndUpdate(
+      id,
+      { status: statusString },
+      { new: true },
+    );
+
+    if (!updatedAffiliate) {
+      return res.status(400).json({
+        success: false,
+        message: messages.failedToUpdateAffiliateStatus,
       });
     }
 
@@ -1094,13 +1118,39 @@ export const updateAffliateUsersStatus = async (
       data: {},
     });
   } catch (error) {
-    return res.status(400).json({
+    console.error('Error updating affiliate status:', error);
+    return res.status(500).json({
       success: false,
-      error: messages.error,
+      message: messages.error,
     });
   }
 };
+export const getAffliateUsersDetails = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id;
 
+    // Find Affiliate user
+    const affiliateUser = await Affiliate.findById(id).select('-password');
+    if (!affiliateUser) {
+      return res.status(404).json({
+        success: false,
+        message: messages.invalidAffiliateId,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.affiliateFound,
+      data: affiliateUser,
+    });
+  } catch (error) {
+    console.error('Error get affiliate user details:', error);
+    return res.status(500).json({
+      success: false,
+      message: messages.error,
+    });
+  }
+};
 
 export const startSumsubVerification = async (
   req: CustomRequest,
@@ -1173,5 +1223,39 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
         ? error.message
         : 'Failed to process Sumsub webhook',
     );
+  }
+};
+
+export const addAffliateUsers = async (req: Request, res: Response) => {
+  try {
+    const AffiliateUserData = await authService.registerAffiliate(req.body);
+    res.status(200).json({
+      success: true,
+      message: messages.registerAffiliate,
+      data: AffiliateUserData || {},
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.includes('Username is already taken')) {
+        sendErrorResponse(res, 409, [
+          { param: 'username', message: 'Username is already taken' },
+        ]);
+      } else if (error.message.includes('Email is already registered')) {
+        sendErrorResponse(res, 409, [
+          { param: 'email', message: 'Email is already registered' },
+        ]);
+      } else if (error.message.includes('Phone number is already registered')) {
+        sendErrorResponse(res, 409, [
+          {
+            param: 'phone_number',
+            message: 'Phone number is already registered',
+          },
+        ]);
+      } else {
+        sendErrorResponse(res, 400, error.message);
+      }
+    } else {
+      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
+    }
   }
 };

@@ -10,4 +10,9 @@ export const messages = {
     stripeConfigUpdated:"Stripe details  updated successfully.",
     affiliateUserList:"Affliate users list found successfully",
     updateAffiliateUserStatus:"Affliate users status updated successfully",
+    failedToUpdateAffiliateStatus:"Failed to update affiliate status.",
+    registerAffiliate:' Affiliate User registered successfully.',
+    statusRequired:"Status is required",
+    invalidAffiliateId:"Invalid Affiliate Id.",
+    affiliateFound:"Affiliate user details found successfully "
 }
