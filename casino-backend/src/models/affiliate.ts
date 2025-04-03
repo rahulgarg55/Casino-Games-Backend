@@ -12,6 +12,8 @@ export interface IAffiliate extends Document {
   promotionMethod?: { type: string[] }; 
   hearAboutUs: string;
   status: 'Active' | 'Inactive' | 'Banned';
+  verification_token?: string;
+  verification_token_expires?: Date;
 }
 
 // Define the Mongoose schema
@@ -25,7 +27,13 @@ const AffiliateSchema: Schema = new Schema({
   referralCode: { type: String },
   promotionMethod: { type: [String] }, 
   hearAboutUs: { type: String, required: true },
-  status: { type: String, enum: ['Active', 'Inactive', 'Banned'], default: 'Inactive' }
+  status: { type: String, enum: ['Active', 'Inactive', 'Banned'], default: 'Inactive' },
+  verification_token: {
+    type: String,
+  },
+  verification_token_expires: {
+    type: Date,
+  },
 }, { timestamps: true });
 
 // Export the model

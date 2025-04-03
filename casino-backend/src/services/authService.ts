@@ -875,6 +875,7 @@ export const registerAffiliate = async (data: IAffiliate) => {
     promotionMethod,
     hearAboutUs,
     status,
+    
   } = data;
 
   /*Check if user exists*/
@@ -893,6 +894,10 @@ export const registerAffiliate = async (data: IAffiliate) => {
       'Password must be at least 8 characters long and include a number',
     );
   }
+  
+
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationTokenExpires = new Date(Date.now() + 3600000);
 
   try {
     const hashedPassword = password
@@ -903,10 +908,13 @@ export const registerAffiliate = async (data: IAffiliate) => {
       password: hashedPassword,
       referralCode:
         referralCode || generateReferralCode(new mongoose.Types.ObjectId()),
+        verification_token: verificationToken,
+        verification_token_expires: verificationTokenExpires,
     });
     newAffiliate.save();
     const affiliateObject = newAffiliate.toObject();
     delete affiliateObject.password;
+
     return affiliateObject;
   } catch (error) {
     throw error;
