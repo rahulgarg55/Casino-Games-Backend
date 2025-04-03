@@ -170,11 +170,12 @@ router.get(
   authController.getPlayerRegionStats,
 );
 
-router.delete('/players/:userId', authController.deletePlayer);
+router.delete('/players/:userId', verifyAdmin,authController.deletePlayer);
 router.put(
   '/players/:userId/status',
   body('status').isInt({ min: 0, max: 1 }).withMessage('Status must be 0 or 1'),
   validateRequest,
+  verifyAdmin,
   authController.updatePlayerStatus,
 );
 
@@ -418,8 +419,12 @@ router.post(
 );
 
 /*Stripe config apis*/
-router.get('/stripe-config-details',authController.geStripeConfig);
-router.patch('/stripe-config-details',authController.updateStripeConfig);
+router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
+router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
+
+/*Get Affiliate users*/
+router.get('/affiliate-users',authController.getAffliateUsers);
+router.patch('/affiliate-users/:id',authController.updateAffliateUsersStatus);
 
 /* SumSub Apis */
 

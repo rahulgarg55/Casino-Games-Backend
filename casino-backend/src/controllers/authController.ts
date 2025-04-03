@@ -15,7 +15,11 @@ import moment from 'moment';
 import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
 import { StripeConfig } from '../models/stripeConfig';
-import { initiateSumsubVerification, updateSumsubStatus } from '../services/authService';
+import { Affiliate } from '../models/affiliate';
+import {
+  initiateSumsubVerification,
+  updateSumsubStatus,
+} from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
 
 interface CustomRequest extends Request {
@@ -596,7 +600,10 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
     const errors: Array<{ param: string; message: string }> = [];
 
     // Only check for username and phone conflicts
-    if (updateData.phone_number && updateData.phone_number !== currentPlayer.phone_number) {
+    if (
+      updateData.phone_number &&
+      updateData.phone_number !== currentPlayer.phone_number
+    ) {
       const phoneExists = await Player.exists({
         phone_number: updateData.phone_number,
         _id: { $ne: playerId },
@@ -628,9 +635,10 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: updateData.email && updateData.email !== currentPlayer.email
-        ? 'Verification email sent to your new email address. Please verify to complete the update.'
-        : 'Profile updated successfully',
+      message:
+        updateData.email && updateData.email !== currentPlayer.email
+          ? 'Verification email sent to your new email address. Please verify to complete the update.'
+          : 'Profile updated successfully',
       data: {
         user: {
           ...updatedPlayer,
@@ -692,7 +700,6 @@ export const googleLogin = passport.authenticate('google', {
 
 export const googleCallback = (req: Request, res: Response) => {
   passport.authenticate('google', { session: false }, (err: any, user: any) => {
-
     if (err || !user) {
       let errorMessage = err?.message || 'Authentication failed';
       console.error('Google Callback Authentication Error:', err);
@@ -795,7 +802,8 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       );
     }
 
-    if (player.email_verified) return sendErrorResponse(res, 400, 'Email is already verified');
+    if (player.email_verified)
+      return sendErrorResponse(res, 400, 'Email is already verified');
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     player.verification_token = verificationToken;
@@ -1023,7 +1031,81 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
   }
 };
 
-export const startSumsubVerification = async (req: CustomRequest, res: Response) => {
+export const getAffliateUsers = async (req: Request, res: Response) => {
+  try {
+    let page = parseInt(req.query.page as string) || 1;
+    let limit = parseInt(req.query.limit as string) || 10;
+
+    const affiliateUserList = await Affiliate.find()
+      .sort({ createdAt: -1 })
+      .populate('user_id')
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    const totalAffiliates = await Affiliate.countDocuments();
+
+    if (!affiliateUserList.length) {
+      return res.status(404).json({
+        success: false,
+        message: messages.dataNotFound,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.affiliateUserList,
+      data: {
+        total: totalAffiliates,
+        page,
+        limit,
+        totalPages: Math.ceil(totalAffiliates / limit),
+        data: affiliateUserList,
+      },
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
+    });
+  }
+};
+
+export const updateAffliateUsersStatus = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const id = req.params.id;
+    const { status } = req.query;
+
+    /*Find Affiliate user */
+    const affiliateUser = await Affiliate.findById(id);
+
+    if (!affiliateUser) {
+      return res.status(404).json({
+        success: false,
+        message: messages.dataNotFound,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.updateAffiliateUserStatus,
+      data: {},
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      error: messages.error,
+    });
+  }
+};
+
+
+export const startSumsubVerification = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id) {
       return sendErrorResponse(res, 401, 'Authentication required');
@@ -1044,7 +1126,9 @@ export const startSumsubVerification = async (req: CustomRequest, res: Response)
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to initiate Sumsub verification'
+      error instanceof Error
+        ? error.message
+        : 'Failed to initiate Sumsub verification',
     );
   }
 };
@@ -1070,9 +1154,10 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 404, 'Player not found');
     }
 
-    const status = reviewStatus === 'completed' && reviewResult?.reviewAnswer === 'GREEN'
-      ? 'approved'
-      : 'rejected';
+    const status =
+      reviewStatus === 'completed' && reviewResult?.reviewAnswer === 'GREEN'
+        ? 'approved'
+        : 'rejected';
     await updateSumsubStatus(player._id.toString(), status);
 
     res.status(200).json({
@@ -1084,9 +1169,9 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to process Sumsub webhook'
+      error instanceof Error
+        ? error.message
+        : 'Failed to process Sumsub webhook',
     );
   }
 };
-
-
