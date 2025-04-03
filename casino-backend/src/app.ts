@@ -5,11 +5,15 @@ import router from './routes';
 import { connectDB } from './utils/db';
 import session from 'express-session';
 import * as paymentController from './controllers/paymentController';
+import { seedPaymentConfigs } from './controllers/paymentController';
 import passport from 'passport';
 import './utils/passportConfig';
 import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
+import dotenv from  'dotenv';
+
+dotenv.config();
 
 const app = express();
 
@@ -98,8 +102,21 @@ app.use(express.urlencoded({ extended: true }));
 app.use(passport.initialize());
 app.use(passport.session());
 
-connectDB();
 
+const initializeApp = async () => {
+  try {
+    await connectDB();
+    logger.info('Database connected successfully');
+
+    await paymentController.seedPaymentConfigs();
+    logger.info('Payment configurations seeded successfully');
+  } catch (error) {
+    logger.error('Failed to initialize application', { error });
+    process.exit(1);
+  }
+};
+
+initializeApp();
 app.use('/', router);
 
 app.use(

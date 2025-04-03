@@ -28,6 +28,7 @@ interface RegistrationData {
   city?: string;
   country?: string;
   is_affiliate: boolean;
+  role_id: number;
 }
 
 interface LoginData {
@@ -74,6 +75,7 @@ export const register = async (data: RegistrationData) => {
     city,
     country,
     is_affiliate,
+    role_id,
   } = data;
 
   if (!email && !phone_number) {
@@ -117,7 +119,7 @@ export const register = async (data: RegistrationData) => {
     phone_number,
     fullname,
     password_hash: hashedPassword,
-    role_id: 0, // Default to User
+    role_id: role_id || 0, // Default to User
     currency,
     language,
     status: STATUS.ACTIVE,

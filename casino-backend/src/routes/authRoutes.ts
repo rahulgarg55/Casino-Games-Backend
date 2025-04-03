@@ -435,4 +435,41 @@ router.post(
 );
 router.post('/sumsub/webhook', sumsubWebhook);
 
+
+//Payment Configuration Routes
+
+router.get(
+  '/payment-configs/all',
+  verifyToken,
+  verifyAdmin,
+  paymentController.getPaymentConfigs
+);
+
+router.get(
+  '/payment-configs/:id',
+  verifyToken,
+  verifyAdmin,
+  paymentController.getPaymentConfig
+);
+
+router.put(
+  '/payment-configs/:id',
+  verifyToken,
+  verifyAdmin,
+  [
+    body('config').optional().isObject().withMessage('Config must be an object'),
+    body('mode').optional().isIn(['test', 'live']).withMessage('Mode must be either "test" or "live"'),
+    body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+  ],
+  validateRequest,
+  paymentController.updatePaymentConfig
+);
+
+router.delete(
+  '/payment-configs/:id',
+  verifyToken,
+  verifyAdmin,
+  paymentController.deletePaymentConfig
+);
+
 export default router;
