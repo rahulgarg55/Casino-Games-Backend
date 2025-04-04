@@ -5,7 +5,11 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
 import { sendResetEmail } from '../utils/sendResetEmail';
-import { generateTokenResponse, generateReferralCode } from '../utils/auth';
+import {
+  generateTokenResponse,
+  generateReferralCode,
+  generateTokenForAffialite,
+} from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
 import { sendSmsVerification } from '../utils/sendSms';
@@ -33,7 +37,7 @@ interface RegistrationData {
   country?: string;
   is_affiliate: boolean;
   role_id: number;
-  referralCode?:string;
+  referralCode?: string;
 }
 
 interface LoginData {
@@ -41,6 +45,11 @@ interface LoginData {
   phone_number?: string;
   password: string;
   role_id: number;
+}
+
+interface AffiliateLoginData {
+  email: string;
+  password: string;
 }
 
 interface ForgotPasswordData {
@@ -151,15 +160,20 @@ export const register = async (data: RegistrationData) => {
     playerData.patronymic = patronymic;
   }
 
-    /** Handle Referral Code **/
-    if (referralCode) {
-      const referringAffiliate = await Affiliate.findOne({ referralCode,status:'Active' });
-      if (!referringAffiliate) {
-        throw new Error('Invalid referral code, Please enter valid referral code');
-      }
-
-      playerData.referredBy = referringAffiliate._id;
+  /** Handle Referral Code **/
+  if (referralCode) {
+    const referringAffiliate = await Affiliate.findOne({
+      referralCode,
+      status: 'Active',
+    });
+    if (!referringAffiliate) {
+      throw new Error(
+        'Invalid referral code, Please enter valid referral code',
+      );
     }
+
+    playerData.referredBy = referringAffiliate._id;
+  }
 
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -892,7 +906,6 @@ export const registerAffiliate = async (data: IAffiliate) => {
     hearAboutUs,
     status,
     marketingEmailsOptIn,
-    
   } = data;
 
   /*Check if user exists*/
@@ -906,20 +919,19 @@ export const registerAffiliate = async (data: IAffiliate) => {
     }
   }
 
-    /* Check if referral code already exists */
-    if (referralCode) {
-      const existingReferral = await Affiliate.findOne({ referralCode });
-      if (existingReferral) {
-        throw new Error('Referral code is already in use');
-      }
+  /* Check if referral code already exists */
+  if (referralCode) {
+    const existingReferral = await Affiliate.findOne({ referralCode });
+    if (existingReferral) {
+      throw new Error('Referral code is already in use');
     }
+  }
 
   if (password.length < 8 || !/\d/.test(password)) {
     throw new Error(
       'Password must be at least 8 characters long and include a number',
     );
   }
-  
 
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const verificationTokenExpires = new Date(Date.now() + 3600000);
@@ -933,8 +945,8 @@ export const registerAffiliate = async (data: IAffiliate) => {
       password: hashedPassword,
       referralCode:
         referralCode || generateReferralCode(new mongoose.Types.ObjectId()),
-        verification_token: verificationToken,
-        verification_token_expires: verificationTokenExpires,
+      verification_token: verificationToken,
+      verification_token_expires: verificationTokenExpires,
     });
     newAffiliate.save();
     const affiliateObject = newAffiliate.toObject();
@@ -947,4 +959,47 @@ export const registerAffiliate = async (data: IAffiliate) => {
   } catch (error) {
     throw error;
   }
+};
+
+export const loginAffiliate = async (data: AffiliateLoginData) => {
+  const { email, password } = data;
+
+  if (!email) {
+    throw new Error('Invalid request. Please check your input');
+  }
+
+  const affiliate = await Affiliate.findOne({ email }).select('+password');
+
+  if (!affiliate) {
+    throw new Error('Invalid email address! ');
+  }
+
+  if (affiliate.status === 'Inactive') {
+    throw new Error('Your account is Inactive , please verify your account');
+  }
+
+  if (affiliate.status === 'Banned') {
+    throw new Error('Your account is Banned! ');
+  }
+
+  const isMatch = await bcrypt.compare(password, affiliate.password);
+
+  if (!isMatch) {
+    throw new Error('Invalid password');
+  }
+
+  if (!process.env.JWT_SECRET) {
+    throw new Error('An unexpected error occurred. Please try again later');
+  }
+
+  const tokenData = generateTokenForAffialite(affiliate);
+  console.log('tokenData', tokenData.token);
+
+  const user = affiliate.toObject();
+  delete user.password;
+
+  return {
+    token: tokenData.token,
+    user,
+  };
 };

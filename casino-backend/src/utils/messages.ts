@@ -1,4 +1,5 @@
 export const messages = {
+    login:'User Login successfully',
     stats:'player statistics retrieved successfully',
     regionStats:'player region statistics retrieved successfully',
     error:'An unexpected error occurred. Please try again later',
@@ -10,7 +11,9 @@ export const messages = {
     stripeConfigUpdated:"Stripe details  updated successfully.",
     affiliateUserList:"Affliate users list found successfully",
     updateAffiliateUserStatus:"Affliate users status updated successfully",
+    updateAffiliateUser:"Affliate users updated successfully",
     failedToUpdateAffiliateStatus:"Failed to update affiliate status.",
+    failedToUpdateAffiliate:"Failed to update affiliate.",
     registerAffiliate:' Affiliate User registered successfully.',
     statusRequired:"Status is required",
     invalidAffiliateId:"Invalid Affiliate Id.",
