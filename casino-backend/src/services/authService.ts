@@ -31,11 +31,9 @@ interface RegistrationData {
   gender?: string;
   city?: string;
   country?: string;
-<<<<<<< HEAD
-=======
   is_affiliate: boolean;
   role_id: number;
->>>>>>> 462d27048787c93c289e067bca41a92961b1e1ed
+  referralCode?:string;
 }
 
 interface LoginData {
@@ -81,11 +79,9 @@ export const register = async (data: RegistrationData) => {
     gender,
     city,
     country,
-<<<<<<< HEAD
-=======
     is_affiliate,
     role_id,
->>>>>>> 462d27048787c93c289e067bca41a92961b1e1ed
+    referralCode,
   } = data;
 
   if (!email && !phone_number) {
@@ -154,6 +150,16 @@ export const register = async (data: RegistrationData) => {
   if (patronymic) {
     playerData.patronymic = patronymic;
   }
+
+    /** Handle Referral Code **/
+    if (referralCode) {
+      const referringAffiliate = await Affiliate.findOne({ referralCode,status:'Active' });
+      if (!referringAffiliate) {
+        throw new Error('Invalid referral code, Please enter valid referral code');
+      }
+
+      playerData.referredBy = referringAffiliate._id;
+    }
 
   // const session = await mongoose.startSession();
   // session.startTransaction();
@@ -900,6 +906,14 @@ export const registerAffiliate = async (data: IAffiliate) => {
     }
   }
 
+    /* Check if referral code already exists */
+    if (referralCode) {
+      const existingReferral = await Affiliate.findOne({ referralCode });
+      if (existingReferral) {
+        throw new Error('Referral code is already in use');
+      }
+    }
+
   if (password.length < 8 || !/\d/.test(password)) {
     throw new Error(
       'Password must be at least 8 characters long and include a number',
@@ -925,6 +939,9 @@ export const registerAffiliate = async (data: IAffiliate) => {
     newAffiliate.save();
     const affiliateObject = newAffiliate.toObject();
     delete affiliateObject.password;
+
+    /*Send verification email*/
+    await sendVerificationEmail(email, verificationToken, true);
 
     return affiliateObject;
   } catch (error) {

@@ -69,6 +69,7 @@ export const register = async (req: Request, res: Response) => {
           is_2fa_enabled: player.is_2fa_enabled,
           balance: balance.balance,
           currency: player.currency,
+          referredBy:player.referredBy
         },
         token,
         expiresIn,
@@ -745,38 +746,62 @@ export const facebookCallback = (req: Request, res: Response) => {
 };
 
 export const verifyEmail = async (req: Request, res: Response) => {
-  const { token } = req.query;
-
+  const { token, isAffiliate } = req.query;
   if (!token || typeof token !== 'string') {
     return sendErrorResponse(res, 400, 'Invalid or missing token');
   }
 
   try {
-    const player = await Player.findOne({
-      verification_token: token,
-      verification_token_expires: { $gt: new Date() },
-      new_email: { $exists: true, $ne: null },
-    });
+    if (isAffiliate) {
+      const affiliate = await Affiliate.findOne({
+        verification_token: token,
+        verification_token_expires: { $gt: new Date() },
+      });
 
-    if (!player) {
-      return sendErrorResponse(res, 400, 'Invalid or expired token');
+      if (!affiliate) {
+        return sendErrorResponse(res, 400, 'Invalid or expired token');
+      }
+
+      affiliate.status = 'Active';
+      affiliate.verification_token = undefined;
+      affiliate.verification_token_expires = undefined;
+
+      await affiliate.save();
+
+      res.status(200).json({
+        success: true,
+        message:
+          'Email verified successfully. Please login with your new email.',
+        redirectUrl: `${process.env.CLIENT_URL}/login`,
+      });
+    } else {
+      const player = await Player.findOne({
+        verification_token: token,
+        verification_token_expires: { $gt: new Date() },
+        new_email: { $exists: true, $ne: null },
+      });
+
+      if (!player) {
+        return sendErrorResponse(res, 400, 'Invalid or expired token');
+      }
+
+      player.email = player.new_email;
+      player.new_email = undefined;
+      player.is_verified = VERIFICATION.VERIFIED;
+      player.email_verified = true;
+      player.verification_token = undefined;
+      player.verification_token_expires = undefined;
+
+      player.refreshToken = undefined;
+      await player.save();
+
+      res.status(200).json({
+        success: true,
+        message:
+          'Email verified successfully. Please login with your new email.',
+        redirectUrl: `${process.env.CLIENT_URL}/login`,
+      });
     }
-
-    player.email = player.new_email;
-    player.new_email = undefined;
-    player.is_verified = VERIFICATION.VERIFIED;
-    player.email_verified = true;
-    player.verification_token = undefined;
-    player.verification_token_expires = undefined;
-
-    player.refreshToken = undefined;
-    await player.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully. Please login with your new email.',
-      redirectUrl: `${process.env.CLIENT_URL}/login`,
-    });
   } catch (error) {
     sendErrorResponse(
       res,
