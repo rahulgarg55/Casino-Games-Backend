@@ -424,6 +424,7 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 
 /*Affiliate users apis */
 router.post('/register-affiliate-users',validateAffiliate,handleValidationErrors,authController.addAffliateUsers);
+router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
 router.get('/affiliate-users',authController.getAffliateUsers);
 router.patch('/affiliate-users/status/:id',authController.updateAffliateUsersStatus);
 router.get('/affiliate-users/:id',authController.getAffliateUsersDetails);

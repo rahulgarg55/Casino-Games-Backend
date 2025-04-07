@@ -746,62 +746,37 @@ export const facebookCallback = (req: Request, res: Response) => {
 };
 
 export const verifyEmail = async (req: Request, res: Response) => {
-  const { token, isAffiliate } = req.query;
+  const { token } = req.query;
   if (!token || typeof token !== 'string') {
     return sendErrorResponse(res, 400, 'Invalid or missing token');
   }
 
   try {
-    if (isAffiliate) {
-      const affiliate = await Affiliate.findOne({
-        verification_token: token,
-        verification_token_expires: { $gt: new Date() },
-      });
+    const player = await Player.findOne({
+      verification_token: token,
+      verification_token_expires: { $gt: new Date() },
+      new_email: { $exists: true, $ne: null },
+    });
 
-      if (!affiliate) {
-        return sendErrorResponse(res, 400, 'Invalid or expired token');
-      }
-
-      affiliate.status = 'Active';
-      affiliate.verification_token = undefined;
-      affiliate.verification_token_expires = undefined;
-
-      await affiliate.save();
-
-      res.status(200).json({
-        success: true,
-        message:
-          'Email verified successfully. Please login with your new email.',
-        redirectUrl: `${process.env.CLIENT_URL}/login`,
-      });
-    } else {
-      const player = await Player.findOne({
-        verification_token: token,
-        verification_token_expires: { $gt: new Date() },
-        new_email: { $exists: true, $ne: null },
-      });
-
-      if (!player) {
-        return sendErrorResponse(res, 400, 'Invalid or expired token');
-      }
-
-      player.email = player.new_email;
-      player.new_email = undefined;
-      player.is_verified = VERIFICATION.VERIFIED;
-      player.email_verified = true;
-      player.verification_token = undefined;
-      player.verification_token_expires = undefined;
-
-      player.refreshToken = undefined;
-      await player.save();
-
-      res.status(200).json({
-        success: true,
-        message:
-          'Email verified successfully. Please login with your new email.',
-        redirectUrl: `${process.env.CLIENT_URL}/login`,
-      });
+    if (!player) {
+      return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
+
+    player.email = player.new_email;
+    player.new_email = undefined;
+    player.is_verified = VERIFICATION.VERIFIED;
+    player.email_verified = true;
+    player.verification_token = undefined;
+    player.verification_token_expires = undefined;
+
+    player.refreshToken = undefined;
+    await player.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. Please login with your new email.',
+      redirectUrl: `${process.env.CLIENT_URL}/login`,
+    });
   } catch (error) {
     sendErrorResponse(
       res,
@@ -1181,10 +1156,9 @@ export const updateAffliateUsersDetails = async (
   res: Response,
 ) => {
   try {
-    
     const user = req.user as { id: string };
     const id = user.id;
-  
+
     // Find Affiliate user
     const affiliateUser = await Affiliate.findById(id);
     if (!affiliateUser) {
@@ -1370,5 +1344,41 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
     } else {
       sendErrorResponse(res, 400, 'Invalid request. Please check your input');
     }
+  }
+};
+
+export const verifyAffiliateEmail = async (req: Request, res: Response) => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    return sendErrorResponse(res, 400, 'Invalid or missing token');
+  }
+
+  try {
+    const affiliate = await Affiliate.findOne({
+      verification_token: token,
+      verification_token_expires: { $gt: new Date() },
+    });
+
+    if (!affiliate) {
+      return sendErrorResponse(res, 400, 'Invalid or expired token');
+    }
+
+    affiliate.status = 'Active';
+    affiliate.verification_token = undefined;
+    affiliate.verification_token_expires = undefined;
+
+    await affiliate.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. Please login with your new email.',
+      redirectUrl: `${process.env.CLIENT_URL}/login`,
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to verify email',
+    );
   }
 };

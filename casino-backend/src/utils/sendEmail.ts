@@ -7,10 +7,11 @@ export const sendVerificationEmail = async (
   verificationToken: string,
   isAffiliate?: boolean
 ) => {
-  let verificationLink = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+  let verificationLink ;
+  verificationLink= `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
 
   if (isAffiliate) {
-    verificationLink += `&isAffiliate=true`;
+    verificationLink= `${process.env.CLIENT_URL}/verify-affiliate-email?token=${verificationToken}`;
   }
 
   const htmlContent = `

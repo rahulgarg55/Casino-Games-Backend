@@ -979,7 +979,7 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
   }
 
   if (affiliate.status === 'Banned') {
-    throw new Error('Your account is Banned! ');
+    throw new Error('Ohh! Your account is suspended due to some reason! PLease contact Adminstator ');
   }
 
   const isMatch = await bcrypt.compare(password, affiliate.password);
