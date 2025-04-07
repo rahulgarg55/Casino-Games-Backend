@@ -1034,13 +1034,8 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
 
 export const getAffliateUsers = async (req: Request, res: Response) => {
   try {
-    let page = parseInt(req.query.page as string) || 1;
-    let limit = parseInt(req.query.limit as string) || 10;
-
     const affiliateUserList = await Affiliate.find()
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit)
       .select('-password');
 
     const totalAffiliates = await Affiliate.countDocuments();
@@ -1057,9 +1052,6 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
       message: messages.affiliateUserList,
       data: {
         total: totalAffiliates,
-        page,
-        limit,
-        totalPages: Math.ceil(totalAffiliates / limit),
         data: affiliateUserList,
       },
     });
