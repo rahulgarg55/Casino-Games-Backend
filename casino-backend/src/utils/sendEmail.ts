@@ -5,8 +5,14 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
 export const sendVerificationEmail = async (
   to: string,
   verificationToken: string,
+  isAffiliate?: boolean
 ) => {
-  const verificationLink = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+  let verificationLink ;
+  verificationLink= `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+
+  if (isAffiliate) {
+    verificationLink= `${process.env.CLIENT_URL}/verify-affiliate-email?token=${verificationToken}`;
+  }
 
   const htmlContent = `
     <!DOCTYPE html>

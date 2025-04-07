@@ -69,6 +69,7 @@ export const register = async (req: Request, res: Response) => {
           is_2fa_enabled: player.is_2fa_enabled,
           balance: balance.balance,
           currency: player.currency,
+          referredBy: player.referredBy,
         },
         token,
         expiresIn,
@@ -746,7 +747,6 @@ export const facebookCallback = (req: Request, res: Response) => {
 
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
-
   if (!token || typeof token !== 'string') {
     return sendErrorResponse(res, 400, 'Invalid or missing token');
   }
@@ -1151,6 +1151,93 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     });
   }
 };
+export const updateAffliateUsersDetails = async (
+  req: Request,
+  res: Response,
+) => {
+  try {
+    const user = req.user as { id: string };
+    const id = user.id;
+
+    // Find Affiliate user
+    const affiliateUser = await Affiliate.findById(id);
+    if (!affiliateUser) {
+      return res.status(404).json({
+        success: false,
+        message: messages.invalidAffiliateId,
+      });
+    }
+
+    const {
+      firstname,
+      lastname,
+      country,
+      promotionMethod,
+      hearAboutUs,
+      status,
+      marketingEmailsOptIn,
+      phonenumber,
+    } = req.body;
+
+    // Directly update fields on the fetched document
+    affiliateUser.firstname = firstname || affiliateUser.firstname;
+    affiliateUser.lastname = lastname || affiliateUser.lastname;
+    affiliateUser.country = country || affiliateUser.country;
+    affiliateUser.promotionMethod =
+      promotionMethod || affiliateUser.promotionMethod;
+    affiliateUser.hearAboutUs = hearAboutUs || affiliateUser.hearAboutUs;
+    affiliateUser.status = status || affiliateUser.status;
+    affiliateUser.phonenumber = phonenumber || affiliateUser.phonenumber;
+    affiliateUser.marketingEmailsOptIn =
+      marketingEmailsOptIn !== undefined
+        ? marketingEmailsOptIn
+        : affiliateUser.marketingEmailsOptIn;
+
+    // Save the updated document
+    const updatedAffiliate = await affiliateUser.save();
+
+    if (!updatedAffiliate) {
+      return res.status(400).json({
+        success: false,
+        message: messages.failedToUpdateAffiliate,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: messages.updateAffiliateUser,
+      data: {},
+    });
+  } catch (error) {
+    console.error('Error updating affiliate:', error);
+    return res.status(500).json({
+      success: false,
+      message: messages.error,
+    });
+  }
+};
+
+export const affiliatelogin = async (req: Request, res: Response) => {
+  try {
+    const { user, token } = await authService.loginAffiliate(req.body);
+
+    res.status(200).json({
+      success: true,
+      message: messages.login,
+      data: {
+        user,
+        token,
+        expiresIn: 28800,
+      },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      401,
+      error instanceof Error ? error.message : 'Invalid username or password',
+    );
+  }
+};
 
 export const startSumsubVerification = async (
   req: CustomRequest,
@@ -1257,5 +1344,41 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
     } else {
       sendErrorResponse(res, 400, 'Invalid request. Please check your input');
     }
+  }
+};
+
+export const verifyAffiliateEmail = async (req: Request, res: Response) => {
+  const { token } = req.query;
+  if (!token || typeof token !== 'string') {
+    return sendErrorResponse(res, 400, 'Invalid or missing token');
+  }
+
+  try {
+    const affiliate = await Affiliate.findOne({
+      verification_token: token,
+      verification_token_expires: { $gt: new Date() },
+    });
+
+    if (!affiliate) {
+      return sendErrorResponse(res, 400, 'Invalid or expired token');
+    }
+
+    affiliate.status = 'Active';
+    affiliate.verification_token = undefined;
+    affiliate.verification_token_expires = undefined;
+
+    await affiliate.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verified successfully. Please login with your new email.',
+      redirectUrl: `${process.env.CLIENT_URL}/login`,
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to verify email',
+    );
   }
 };

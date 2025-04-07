@@ -48,3 +48,12 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
   }
   next();
 };
+
+
+export const affiliateloginValidation = [
+  body('email')
+  .isEmail()
+  .normalizeEmail()
+  .withMessage('Valid email is required'),
+  body('password').notEmpty().withMessage('Password is required'),
+];

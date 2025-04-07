@@ -11,7 +11,7 @@ import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
 import { generateTokenResponse } from '../utils/auth';
 import { IPlayer } from '../models/player';
-import {validateStripeConfig,handleValidationErrors,validateAffiliate}from "../validation/authValidation";
+import {validateStripeConfig,handleValidationErrors,validateAffiliate,affiliateloginValidation}from "../validation/authValidation";
 import { startSumsubVerification, sumsubWebhook } from '../controllers/authController';
 
 const router = Router();
@@ -424,9 +424,12 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 
 /*Affiliate users apis */
 router.post('/register-affiliate-users',validateAffiliate,handleValidationErrors,authController.addAffliateUsers);
+router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
 router.get('/affiliate-users',authController.getAffliateUsers);
 router.patch('/affiliate-users/status/:id',authController.updateAffliateUsersStatus);
 router.get('/affiliate-users/:id',authController.getAffliateUsersDetails);
+router.patch('/affiliate-users',verifyToken,authController.updateAffliateUsersDetails);
+router.post('/affiliate-login', affiliateloginValidation, handleValidationErrors, authController.affiliatelogin);
 
 /* SumSub Apis */
 
