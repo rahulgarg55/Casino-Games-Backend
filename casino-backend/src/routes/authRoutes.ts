@@ -436,9 +436,9 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 /*Affiliate users apis */
 router.post('/register-affiliate-users',validateAffiliate,handleValidationErrors,authController.addAffliateUsers);
 router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
-router.get('/affiliate-users',authController.getAffliateUsers);
-router.patch('/affiliate-users/status/:id',authController.updateAffliateUsersStatus);
-router.get('/affiliate-users/:id',authController.getAffliateUsersDetails);
+router.get('/affiliate-users',verifyAdmin,authController.getAffliateUsers);
+router.patch('/affiliate-users/status/:id',verifyAdmin,authController.updateAffliateUsersStatus);
+router.get('/affiliate-users/:id',verifyAdmin,authController.getAffliateUsersDetails);
 router.patch('/affiliate-users',verifyToken,authController.updateAffliateUsersDetails);
 router.post('/affiliate-login', affiliateloginValidation, handleValidationErrors, authController.affiliatelogin);
 
