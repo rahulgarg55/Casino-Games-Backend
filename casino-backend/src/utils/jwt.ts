@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 const ROLE_IDS = {
   USER: 0,
   ADMIN: 1,
-  GAME_PROVIDER: 2,
+  AFFFILIATE: 2,
 };
 
 interface CustomRequest extends Request {

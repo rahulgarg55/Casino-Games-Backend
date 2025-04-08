@@ -129,8 +129,19 @@ router.post(
   authController.register,
 );
 
-router.post('/login', loginValidation, validateRequest, authController.login);
 router.post(
+  '/affiliate/register',
+  authController.affiliateRegister
+);
+
+router.post('/login', loginValidation, validateRequest, authController.login);
+
+router.post(
+  '/affiliate/login',
+  loginValidation,
+  validateRequest,
+  authController.affiliateLogin
+);router.post(
   '/forgot-password',
   oneOf(
     [
