@@ -23,6 +23,8 @@ import language from '../models/language';
 import mongoose from 'mongoose';
 import { session } from 'passport';
 import { Affiliate, IAffiliate } from '../models/affiliate';
+// import { Affiliate } from '../models/affiliate';
+import Role from '../models/role';
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -223,6 +225,81 @@ export const register = async (data: RegistrationData) => {
   }
 };
 
+
+export const affiliateRegister = async (data: RegistrationData) => {
+  const { email, password, username, phone_number, fullname } = data;
+
+  const affiliateRole = await Role.findOne({ role_id: 2 });
+  if (!affiliateRole) {
+    throw new Error('Affiliate role not configured in the system');
+  }
+
+  const existingPlayer = await Player.findOne({
+    $or: [{ email }, { phone_number }],
+  });
+  if (existingPlayer) {
+    throw new Error('Email or phone number already in use');
+  }
+
+  const saltRounds = 10;
+  const password_hash = await bcrypt.hash(password, saltRounds);
+
+  const player = new Player({
+    email,
+    phone_number,
+    username,
+    password_hash,
+    role_id: 2,
+    status: 1,
+    is_verified: true,
+    last_login: new Date(),
+    fullname,
+    currency: 0,
+  });
+
+  await player.save();
+
+  const referral_code = `AFF${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const affiliate = new Affiliate({
+    user_id: player._id,
+    referral_code,
+    commission_rate: 10,
+    total_earnings: 0,
+    status: 'Active',
+  });
+
+  await affiliate.save();
+
+  const playerBalance = new PlayerBalance({
+    player_id: player._id,
+    balance: 0,
+    currency: 0,
+  });
+  await playerBalance.save();
+
+  if (!process.env.JWT_SECRET) {
+    throw new Error('An unexpected error occurred. Please try again later');
+  }
+
+  const tokenData = generateTokenResponse(player);
+
+  return {
+    token: tokenData.token,
+    user: {
+      id: player._id,
+      username: player.username,
+      email: player.email,
+      phone_number: player.phone_number,
+      role: player.role_id,
+      status: player.status,
+      balance: playerBalance.balance,
+      currency: playerBalance.currency,
+      is_verified: player.is_verified,
+      fullname: player.fullname,
+      referral_code: affiliate.referral_code,
+    },
+  };
+};
 export const verifyPhoneNumber = async (phoneNumber: string, code: string) => {
   const player = await Player.findOne({
     phone_number: phoneNumber,
@@ -311,6 +388,79 @@ export const login = async (data: LoginData) => {
       is_verified: player.is_verified,
       fullname: player.fullname,
       requires2FA: player.is_2fa_enabled === TWO_FA.ENABLED,
+    },
+  };
+};
+
+export const affiliateLogin = async (data: LoginData) => {
+  const { email, phone_number, password, role_id = 2 } = data;
+
+  if (!email && !phone_number) {
+    throw new Error('Invalid request. Please check your input');
+  }
+
+  const query = {
+    role_id, 
+    $or: [
+      { email: { $eq: email, $exists: true } },
+      { phone_number: { $eq: phone_number, $exists: true } },
+    ],
+  };
+
+  const player = await Player.findOne(query).select('+password_hash');
+
+  if (!player) {
+    throw new Error('Affiliate does not exist');
+  }
+
+  const isMatch = await bcrypt.compare(password, player.password_hash);
+  if (!isMatch) {
+    throw new Error('Invalid password');
+  }
+
+  if (player.is_verified === VERIFICATION.UNVERIFIED) {
+    throw new Error('Please verify your account');
+  }
+
+  if (player.status !== STATUS.ACTIVE) {
+    throw new Error('Your account has been locked. Please contact support');
+  }
+
+  const affiliate = await Affiliate.findOne({ user_id: player._id });
+  if (!affiliate) {
+    throw new Error('Affiliate profile not found');
+  }
+
+  player.last_login = new Date();
+  await player.save();
+
+  const playerBalance = await PlayerBalance.findOne({ player_id: player._id });
+
+  if (!process.env.JWT_SECRET) {
+    throw new Error('An unexpected error occurred. Please try again later');
+  }
+
+  const tokenData = generateTokenResponse(player);
+
+  return {
+    token: tokenData.token,
+    user: {
+      id: player._id,
+      username: player.username,
+      email: player.email,
+      phone_number: player.phone_number,
+      role: player.role_id,
+      status: player.status,
+      gender: player.gender,
+      language: player.language,
+      country: player.country,
+      city: player.city,
+      balance: playerBalance?.balance || 0,
+      currency: playerBalance?.currency || 'USD',
+      profile_picture: player.profile_picture,
+      is_verified: player.is_verified,
+      fullname: player.fullname,
+      referral_code: affiliate.referral_code,
     },
   };
 };

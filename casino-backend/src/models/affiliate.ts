@@ -15,6 +15,7 @@ export interface IAffiliate extends Document {
   verification_token?: string;
   verification_token_expires?: Date;
   marketingEmailsOptIn?: boolean;
+  referral_code?: string;
 }
 
 // Define the Mongoose schema
@@ -36,6 +37,7 @@ const AffiliateSchema: Schema = new Schema({
     type: Date,
   },
   marketingEmailsOptIn: { type: Boolean, default: false }, 
+  referral_code: { type: String },
 }, { timestamps: true });
 
 // Export the model

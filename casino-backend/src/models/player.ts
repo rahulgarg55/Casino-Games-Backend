@@ -20,7 +20,7 @@ export interface IPlayer extends Document {
   language?: string;
   country?: string;
   city?: string;
-  role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
+  role_id: number; // 0 = User, 1 = Admin, 2 = Affiliate
   reset_password_token?: string;
   reset_password_expires?: Date;
   verification_token?: string;
@@ -148,6 +148,7 @@ const playerSchema: Schema = new Schema(
       type: Number,
       required: true,
       enum: [0, 1, 2],
+      default:0, // Default to USD
     },
     language: {
       type: String,
@@ -164,7 +165,7 @@ const playerSchema: Schema = new Schema(
     role_id: {
       type: Number,
       default: 0, // Default to User
-      enum: [0, 1, 2], // 0 = User, 1 = Admin, 2 = Game Provider
+      enum: [0, 1, 2], // 0 = User, 1 = Admin, 2 = Affiliate
     },
     reset_password_token: {
       type: String,

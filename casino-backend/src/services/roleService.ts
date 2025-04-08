@@ -1,7 +1,7 @@
 import Role, { IRole } from '../models/role';
 
 interface RoleData {
-  role_id: number; // 0 = User, 1 = Admin, 2 = Game Provider
+  role_id: number; // 0 = User, 1 = Admin, 2 = Affiliate
   name: string;
   description?: string;
 }
