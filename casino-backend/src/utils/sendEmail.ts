@@ -119,3 +119,106 @@ export const sendVerificationEmail = async (
     throw new Error('Failed to send verification email');
   }
 };
+
+
+export const sendStatusUpdateEmail = async (
+  to: string,
+  status: string,
+  username?: string
+) => {
+  const subject = 'Account Status Update - Basta X Casino';
+  const greeting = username ? `Hi ${username},` : 'Hi,';
+
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Status Update - Basta X Casino</title>
+      </head>
+      <body
+        style="
+          background-color: #fff;
+          font-family: Arial, sans-serif;
+          color: #ffffff;
+          text-align: center;
+          font-size: 12px;
+          margin: 0;
+          padding: 0;
+        "
+      >
+        <div
+          style="
+            max-width: 600px;
+            margin: 0 auto;
+            background: #102a4e;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.1);
+            border: 2px solid #ff3366;
+            color: #ffffff;
+            text-align: center;
+          "
+        >
+          <div
+            style="
+              background: linear-gradient(180deg, #102a4e 0%, #1e3a72 100%);
+              width: 100%;
+              height: 115px;
+              border-radius: 10px;
+              position: relative;
+              margin-bottom: 20px;
+              text-align: center;
+            "
+          >
+            <table role="presentation" width="100%" height="120">
+              <tr>
+                <td align="center" valign="middle">
+                  <img
+                    src="https://res.cloudinary.com/dfgbdr9o4/image/upload/v1741341426/vyi78ke0du3ta1zntseh.png"
+                    alt="Basta X Casino Logo"
+                    style="max-width: 200px"
+                  />
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="color: #ffffff; font-size: 18px; font-weight: bold; margin-bottom: 20px">
+            Account Status Updated
+          </div>
+          <div style="margin: 10px; text-align: left; padding: 0 30px 20px;">
+            <p style="color: #ffffff; font-size: 14px;">${greeting}</p>
+            <p style="color: #ffffff; font-size: 14px;">
+              We wanted to keep you informed regarding changes to your account status.
+            </p>
+            <p style="font-size: 14px; margin: 5px 0;"><strong>Status:</strong> ${status}</p>
+            <p style="color: #b0b0b0; font-size: 12px; margin: 10px 0 0 0">
+              If you have any questions, please contact support.
+            </p>
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const textContent = `${greeting}\n\nWe wanted to keep you informed regarding changes to your account status.\nStatus: ${status}'
+  }\n\nIf you have any questions, please contact support.`;
+
+  const msg = {
+    to,
+    from: process.env.EMAIL_FROM!,
+    subject,
+    text: textContent,
+    html: htmlContent,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Status update email sent to ${to}`);
+  } catch (error) {
+    console.error('Error sending status update email:', error);
+    throw new Error('Failed to send status update email');
+  }
+};
+

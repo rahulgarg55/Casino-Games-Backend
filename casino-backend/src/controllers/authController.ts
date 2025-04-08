@@ -9,7 +9,7 @@ import Player from '../models/player';
 import PlayerBalance from '../models/playerBalance';
 import { VERIFICATION } from '../constants';
 import crypto from 'crypto';
-import { sendVerificationEmail } from '../utils/sendEmail';
+import { sendVerificationEmail,sendStatusUpdateEmail } from '../utils/sendEmail';
 import bcrypt from 'bcryptjs';
 import moment from 'moment';
 import { messages } from '../utils/messages';
@@ -1103,6 +1103,9 @@ export const updateAffliateUsersStatus = async (
         message: messages.failedToUpdateAffiliateStatus,
       });
     }
+
+    /*Send update status email by Admin*/
+    await sendStatusUpdateEmail(updatedAffiliate.email,updatedAffiliate.status,updatedAffiliate.firstname);
 
     return res.status(200).json({
       success: true,
