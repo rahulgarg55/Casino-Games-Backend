@@ -1182,17 +1182,34 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
 
     // Find Affiliate user
     const affiliateUser = await Affiliate.findById(id).select('-password');
+   
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
         message: messages.invalidAffiliateId,
       });
     }
+    const referredPlayers = await Player.find({
+      referredBy: affiliateUser._id,
+      is_verified: 1,
+      status: STATUS.ACTIVE,
+    })
+    .sort({ created_at: -1 });
+    
+    const referredPlayersCount = await Player.countDocuments({
+      referredBy: affiliateUser._id,
+      is_verified: 1,
+      status: STATUS.ACTIVE,
+    });
+    
 
     return res.status(200).json({
       success: true,
       message: messages.affiliateFound,
-      data: affiliateUser,
+      data: {affiliateUser,
+        referredPlayers:referredPlayers||[],
+        referredPlayersCount:referredPlayersCount||0
+      }
     });
   } catch (error) {
     console.error('Error get affiliate user details:', error);
