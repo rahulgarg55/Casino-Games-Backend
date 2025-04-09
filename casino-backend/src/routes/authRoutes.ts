@@ -442,6 +442,18 @@ router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeCon
 
 /*Affiliate users apis */
 router.post('/register-affiliate-users',validateAffiliate,handleValidationErrors,authController.addAffliateUsers);
+
+router.post(
+  '/affiliate/resend-verification-email',
+  resendEmailLimiter,
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  validateRequest,
+  authController.resendVerificationEmailAffiliate,
+);
+
 router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
 router.get('/affiliate-users',verifyAdmin,authController.getAffliateUsers);
 router.patch('/affiliate-users/status/:id',verifyAdmin,authController.updateAffliateUsersStatus);
