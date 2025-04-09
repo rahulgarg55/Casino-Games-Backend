@@ -70,6 +70,7 @@ export const register = async (req: Request, res: Response) => {
           balance: balance.balance,
           currency: player.currency,
           referredBy: player.referredBy,
+          referredByName: player.referredByName,
         },
         token,
         expiresIn,
@@ -344,8 +345,8 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
 
 export const getAllPlayers = async (req: Request, res: Response) => {
   try {
-    const players = await Player.find()
-      .select('-password_hash')
+    const players = await Player.find({ role_id: 0 }) // Only get non-admin users
+      .select('-password_hash -verification_token -reset_password_token')
       .sort({ created_at: -1 });
 
     const playersWithBalance = await Promise.all(
@@ -368,6 +369,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
           city: player.city,
           is_2fa_enabled: player.is_2fa_enabled,
           balance: balance?.balance || 0,
+          referredByName: player.referredByName,
         };
       }),
     );

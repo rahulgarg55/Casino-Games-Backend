@@ -175,7 +175,7 @@ export const register = async (data: RegistrationData) => {
     }
 
     playerData.referredBy = referringAffiliate._id;
-  }
+    playerData.referredByName = `${referringAffiliate.firstname} ${referringAffiliate.lastname}`;  }
 
   // const session = await mongoose.startSession();
   // session.startTransaction();
