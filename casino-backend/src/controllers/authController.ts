@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { Request, Response } from 'express';
 import * as authService from '../services/authService';
 import { generateTokenResponse } from '../utils/auth';
@@ -5,8 +6,8 @@ import passport from 'passport';
 import { generateResetToken, getNotifications } from '../services/authService';
 import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
-import Player from '../models/player';
-import PlayerBalance from '../models/playerBalance';
+import Player, { IPlayer } from '../models/player';
+import PlayerBalance, { IPlayerBalance } from '../models/playerBalance';
 import { STATUS, VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail,sendStatusUpdateEmail } from '../utils/sendEmail';
@@ -16,6 +17,7 @@ import { messages } from '../utils/messages';
 import { months, quarters, daysOfWeek } from '../utils/constant';
 import { StripeConfig } from '../models/stripeConfig';
 import { Affiliate } from '../models/affiliate';
+import Transaction, { ITransaction } from '../models/transaction';
 import {
   initiateSumsubVerification,
   updateSumsubStatus,
@@ -384,6 +386,105 @@ export const getAllPlayers = async (req: Request, res: Response) => {
       res,
       400,
       error instanceof Error ? error.message : 'Failed to retrieve players',
+    );
+  }
+};
+
+export const getPlayerDetails = async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return sendErrorResponse(res, 400, 'Invalid user ID format');
+    }
+
+    const player = await Player.findById(userId)
+      .select([
+        '-password_hash',
+        '-reset_password_token',
+        '-reset_password_expires',
+        '-verification_token',
+        '-verification_token_expires',
+        '-sms_code',
+        '-sms_code_expires',
+        '-two_factor_secret',
+        '-two_factor_expires',
+        '-refreshToken',
+      ])
+      .lean() as IPlayer | null;
+
+    if (!player) {
+      return sendErrorResponse(res, 404, 'Player not found');
+    }
+
+    const balance = await PlayerBalance.findOne({ player_id: userId }).lean() as IPlayerBalance | null;
+
+    const currencyMap = { 0: 'USD', 1: 'INR', 2: 'GBP' };
+    const playerCurrency = currencyMap[player.currency];
+
+    const transactionStats = await Transaction.aggregate([
+      {
+        $match: {
+          player_id: new mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          transaction_type: { $in: ['topup', 'withdrawal'] },
+          currency: playerCurrency,
+        },
+      },
+      {
+        $group: {
+          _id: '$transaction_type',
+          total: { $sum: '$amount' },
+          last_date: { $max: '$created_at' },
+        },
+      },
+    ]);
+
+    const totalDeposits = transactionStats.find(t => t._id === 'topup')?.total || 0;
+    const totalWithdrawals = transactionStats.find(t => t._id === 'withdrawal')?.total || 0;
+    const lastDepositDate = transactionStats.find(t => t._id === 'topup')?.last_date || null;
+    const lastWithdrawalDate = transactionStats.find(t => t._id === 'withdrawal')?.last_date || null;
+
+    const winStats = await Transaction.aggregate([
+      {
+        $match: {
+          player_id: new mongoose.Types.ObjectId(userId),
+          status: 'completed',
+          transaction_type: 'win',
+          currency: playerCurrency,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+    const bonusBalance = winStats[0]?.total || balance?.bonus_balance || 0;
+
+    const playerData = {
+      ...player,
+      balance: balance?.balance || player.balance || 0,
+      bonus_balance: bonusBalance,
+      total_deposits: totalDeposits,
+      total_withdrawals: totalWithdrawals,
+      last_deposit_date: lastDepositDate,
+      last_withdrawal_date: lastWithdrawalDate,
+      is_2fa: player.is_2fa_enabled,
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Player details retrieved successfully',
+      data: { player: playerData },
+    });
+  } catch (error) {
+    console.error('Error in getPlayerDetails:', error);
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error ? `Server error: ${error.message}` : 'Failed to retrieve player details'
     );
   }
 };

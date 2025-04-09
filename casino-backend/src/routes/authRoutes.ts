@@ -171,6 +171,13 @@ router.post(
 router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);
+
+router.get(
+  '/players/:userId',
+  verifyToken, 
+  verifyAdmin,
+  authController.getPlayerDetails 
+);
 /*Get players statistics*/
 router.get('/players/statistics', verifyAdmin, authController.getPlayerStats);
 
