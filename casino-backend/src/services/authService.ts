@@ -225,7 +225,6 @@ export const register = async (data: RegistrationData) => {
   }
 };
 
-
 export const affiliateRegister = async (data: RegistrationData) => {
   const { email, password, username, phone_number, fullname } = data;
 
@@ -400,7 +399,7 @@ export const affiliateLogin = async (data: LoginData) => {
   }
 
   const query = {
-    role_id, 
+    role_id,
     $or: [
       { email: { $eq: email, $exists: true } },
       { phone_number: { $eq: phone_number, $exists: true } },
@@ -1077,9 +1076,15 @@ export const registerAffiliate = async (data: IAffiliate) => {
     }
   }
 
-  if (password.length < 8 || !/\d/.test(password)) {
+  if (
+    password.length < 8 ||
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/\d/.test(password) ||
+    !/[@$!%*?&]/.test(password)
+  ) {
     throw new Error(
-      'Password must be at least 8 characters long and include a number',
+      'Password must be at least 8 characters and include uppercase, lowercase, number, and special character',
     );
   }
 
@@ -1129,7 +1134,9 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
   }
 
   if (affiliate.status === STATUS.BANNED) {
-    throw new Error('Ohh! Your account is suspended due to some reason! PLease contact Adminstator ');
+    throw new Error(
+      'Ohh! Your account is suspended due to some reason! PLease contact Adminstator ',
+    );
   }
 
   const isMatch = await bcrypt.compare(password, affiliate.password);

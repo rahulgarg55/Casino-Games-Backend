@@ -41,4 +41,4 @@ const AffiliateSchema: Schema = new Schema({
 }, { timestamps: true });
 
 // Export the model
-export const Affiliate = mongoose.model<IAffiliate>('AffiliateUser', AffiliateSchema);
+export const Affiliate = mongoose.model<IAffiliate>('Affiliates', AffiliateSchema);
