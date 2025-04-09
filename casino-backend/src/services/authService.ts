@@ -166,7 +166,7 @@ export const register = async (data: RegistrationData) => {
   if (referralCode) {
     const referringAffiliate = await Affiliate.findOne({
       referralCode,
-      status: 'Active',
+      status: STATUS.ACTIVE,
     });
     if (!referringAffiliate) {
       throw new Error(
@@ -1124,11 +1124,11 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
     throw new Error('Invalid email address! ');
   }
 
-  if (affiliate.status === 'Inactive') {
+  if (affiliate.status === STATUS.INACTIVE) {
     throw new Error('Your account is Inactive , please verify your account');
   }
 
-  if (affiliate.status === 'Banned') {
+  if (affiliate.status === STATUS.BANNED) {
     throw new Error('Ohh! Your account is suspended due to some reason! PLease contact Adminstator ');
   }
 
