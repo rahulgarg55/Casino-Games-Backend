@@ -1452,3 +1452,46 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
     );
   }
 };
+
+export const resendVerificationEmailAffiliate = async (req: Request, res: Response) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return sendErrorResponse(res, 400, 'Email is required');
+    }
+
+    const affiliate = await Affiliate.findOne({ email });
+    if (!affiliate) {
+      return sendErrorResponse(
+        res,
+        404,
+        'No account found with this email address',
+      );
+    }
+
+    if (affiliate.status===STATUS.ACTIVE)
+      return sendErrorResponse(res, 400, 'Email is already verified');
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    affiliate.verification_token = verificationToken;
+    affiliate.verification_token_expires = new Date(Date.now() + 3600000);
+    await affiliate.save();
+    
+    await sendVerificationEmail(email, verificationToken,true);
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification email has been sent',
+      data: { verification_token: verificationToken },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error
+        ? error.message
+        : 'Failed to resend verification email',
+    );
+  }
+};
