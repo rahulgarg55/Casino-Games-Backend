@@ -8,6 +8,7 @@ export interface IPlayerBalance extends Document {
   is_deleted: number;
   created_at: Date;
   updated_at: Date;
+  bonus_balance?: number;
 }
 
 const playerBalanceSchema: Schema = new Schema(
@@ -34,6 +35,7 @@ const playerBalanceSchema: Schema = new Schema(
       enum: [0, 1],
       default: 0,
     },
+    bonus_balance: { type: Number, default: 0, min: 0 },
   },
   {
     timestamps: {
