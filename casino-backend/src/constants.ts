@@ -1,6 +1,7 @@
 export const STATUS = {
   ACTIVE: 1,
   INACTIVE: 0,
+  BANNED:2
 };
 
 export const VERIFICATION = {

@@ -11,7 +11,7 @@ export interface IAffiliate extends Document {
   referralCode?: string;
   promotionMethod?: { type: string[] }; 
   hearAboutUs: string;
-  status: 'Active' | 'Inactive' | 'Banned';
+  status: number;
   verification_token?: string;
   verification_token_expires?: Date;
   marketingEmailsOptIn?: boolean;
@@ -29,7 +29,7 @@ const AffiliateSchema: Schema = new Schema({
   referralCode: { type: String },
   promotionMethod: { type: [String] }, 
   hearAboutUs: { type: String, required: true },
-  status: { type: String, enum: ['Active', 'Inactive', 'Banned'], default: 'Inactive' },
+  status: { type: Number, default:0 },     //  ACTIVE: 1,INACTIVE: 0, BANNED:2
   verification_token: {
     type: String,
   },
@@ -41,4 +41,4 @@ const AffiliateSchema: Schema = new Schema({
 }, { timestamps: true });
 
 // Export the model
-export const Affiliate = mongoose.model<IAffiliate>('AffiliateUser', AffiliateSchema);
+export const Affiliate = mongoose.model<IAffiliate>('Affiliates', AffiliateSchema);

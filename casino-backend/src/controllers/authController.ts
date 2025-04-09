@@ -7,7 +7,7 @@ import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player from '../models/player';
 import PlayerBalance from '../models/playerBalance';
-import { VERIFICATION } from '../constants';
+import { STATUS, VERIFICATION } from '../constants';
 import crypto from 'crypto';
 import { sendVerificationEmail,sendStatusUpdateEmail } from '../utils/sendEmail';
 import bcrypt from 'bcryptjs';
@@ -1129,7 +1129,7 @@ export const updateAffliateUsersStatus = async (
       });
     }
 
-    const statusString = String(status) as 'Active' | 'Inactive' | 'Banned';
+    const statusString = Number(status);
 
     // Find Affiliate user
     const affiliateUser = await Affiliate.findById(id);
@@ -1153,9 +1153,15 @@ export const updateAffliateUsersStatus = async (
         message: messages.failedToUpdateAffiliateStatus,
       });
     }
-
+  
+    const newStatus = updatedAffiliate.status === 1
+    ? 'Active'
+    : updatedAffiliate.status === 0
+    ? 'InActive'
+    : 'Banned';
+  
     /*Send update status email by Admin*/
-    await sendStatusUpdateEmail(updatedAffiliate.email,updatedAffiliate.status,updatedAffiliate.firstname);
+    await sendStatusUpdateEmail(updatedAffiliate.email,newStatus,updatedAffiliate.firstname);
 
     return res.status(200).json({
       success: true,
@@ -1408,7 +1414,7 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
 
-    affiliate.status = 'Active';
+    affiliate.status = STATUS.ACTIVE;
     affiliate.verification_token = undefined;
     affiliate.verification_token_expires = undefined;
 

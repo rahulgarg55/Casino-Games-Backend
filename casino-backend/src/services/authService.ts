@@ -166,7 +166,7 @@ export const register = async (data: RegistrationData) => {
   if (referralCode) {
     const referringAffiliate = await Affiliate.findOne({
       referralCode,
-      status: 'Active',
+      status: STATUS.ACTIVE,
     });
     if (!referringAffiliate) {
       throw new Error(
@@ -224,7 +224,6 @@ export const register = async (data: RegistrationData) => {
     throw error;
   }
 };
-
 
 export const affiliateRegister = async (data: RegistrationData) => {
   const { email, password, username, phone_number, fullname } = data;
@@ -400,7 +399,7 @@ export const affiliateLogin = async (data: LoginData) => {
   }
 
   const query = {
-    role_id, 
+    role_id,
     $or: [
       { email: { $eq: email, $exists: true } },
       { phone_number: { $eq: phone_number, $exists: true } },
@@ -1077,9 +1076,15 @@ export const registerAffiliate = async (data: IAffiliate) => {
     }
   }
 
-  if (password.length < 8 || !/\d/.test(password)) {
+  if (
+    password.length < 8 ||
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/\d/.test(password) ||
+    !/[@$!%*?&]/.test(password)
+  ) {
     throw new Error(
-      'Password must be at least 8 characters long and include a number',
+      'Password must be at least 8 characters and include uppercase, lowercase, number, and special character',
     );
   }
 
@@ -1124,12 +1129,14 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
     throw new Error('Invalid email address! ');
   }
 
-  if (affiliate.status === 'Inactive') {
+  if (affiliate.status === STATUS.INACTIVE) {
     throw new Error('Your account is Inactive , please verify your account');
   }
 
-  if (affiliate.status === 'Banned') {
-    throw new Error('Ohh! Your account is suspended due to some reason! PLease contact Adminstator ');
+  if (affiliate.status === STATUS.BANNED) {
+    throw new Error(
+      'Ohh! Your account is suspended due to some reason! PLease contact Adminstator ',
+    );
   }
 
   const isMatch = await bcrypt.compare(password, affiliate.password);
