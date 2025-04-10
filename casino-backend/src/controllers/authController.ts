@@ -10,7 +10,10 @@ import Player, { IPlayer } from '../models/player';
 import PlayerBalance, { IPlayerBalance } from '../models/playerBalance';
 import { STATUS, VERIFICATION } from '../constants';
 import crypto from 'crypto';
-import { sendVerificationEmail,sendStatusUpdateEmail } from '../utils/sendEmail';
+import {
+  sendVerificationEmail,
+  sendStatusUpdateEmail,
+} from '../utils/sendEmail';
 import bcrypt from 'bcryptjs';
 import moment from 'moment';
 import { messages } from '../utils/messages';
@@ -398,7 +401,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 400, 'Invalid user ID format');
     }
 
-    const player = await Player.findById(userId)
+    const player = (await Player.findById(userId)
       .select([
         '-password_hash',
         '-reset_password_token',
@@ -411,13 +414,15 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
         '-two_factor_expires',
         '-refreshToken',
       ])
-      .lean() as IPlayer | null;
+      .lean()) as IPlayer | null;
 
     if (!player) {
       return sendErrorResponse(res, 404, 'Player not found');
     }
 
-    const balance = await PlayerBalance.findOne({ player_id: userId }).lean() as IPlayerBalance | null;
+    const balance = (await PlayerBalance.findOne({
+      player_id: userId,
+    }).lean()) as IPlayerBalance | null;
 
     const currencyMap = { 0: 'USD', 1: 'INR', 2: 'GBP' };
     const playerCurrency = currencyMap[player.currency];
@@ -440,10 +445,14 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       },
     ]);
 
-    const totalDeposits = transactionStats.find(t => t._id === 'topup')?.total || 0;
-    const totalWithdrawals = transactionStats.find(t => t._id === 'withdrawal')?.total || 0;
-    const lastDepositDate = transactionStats.find(t => t._id === 'topup')?.last_date || null;
-    const lastWithdrawalDate = transactionStats.find(t => t._id === 'withdrawal')?.last_date || null;
+    const totalDeposits =
+      transactionStats.find((t) => t._id === 'topup')?.total || 0;
+    const totalWithdrawals =
+      transactionStats.find((t) => t._id === 'withdrawal')?.total || 0;
+    const lastDepositDate =
+      transactionStats.find((t) => t._id === 'topup')?.last_date || null;
+    const lastWithdrawalDate =
+      transactionStats.find((t) => t._id === 'withdrawal')?.last_date || null;
 
     const winStats = await Transaction.aggregate([
       {
@@ -484,7 +493,9 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? `Server error: ${error.message}` : 'Failed to retrieve player details'
+      error instanceof Error
+        ? `Server error: ${error.message}`
+        : 'Failed to retrieve player details',
     );
   }
 };
@@ -1256,15 +1267,20 @@ export const updateAffliateUsersStatus = async (
         message: messages.failedToUpdateAffiliateStatus,
       });
     }
-  
-    const newStatus = updatedAffiliate.status === 1
-    ? 'Active'
-    : updatedAffiliate.status === 0
-    ? 'InActive'
-    : 'Banned';
-  
+
+    const newStatus =
+      updatedAffiliate.status === 1
+        ? 'Active'
+        : updatedAffiliate.status === 0
+          ? 'InActive'
+          : 'Banned';
+
     /*Send update status email by Admin*/
-    await sendStatusUpdateEmail(updatedAffiliate.email,newStatus,updatedAffiliate.firstname);
+    await sendStatusUpdateEmail(
+      updatedAffiliate.email,
+      newStatus,
+      updatedAffiliate.firstname,
+    );
 
     return res.status(200).json({
       success: true,
@@ -1285,7 +1301,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
 
     // Find Affiliate user
     const affiliateUser = await Affiliate.findById(id).select('-password');
-   
+
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
@@ -1296,23 +1312,22 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
       referredBy: affiliateUser._id,
       is_verified: 1,
       status: STATUS.ACTIVE,
-    })
-    .sort({ created_at: -1 });
-    
+    }).sort({ created_at: -1 });
+
     const referredPlayersCount = await Player.countDocuments({
       referredBy: affiliateUser._id,
       is_verified: 1,
       status: STATUS.ACTIVE,
     });
-    
 
     return res.status(200).json({
       success: true,
       message: messages.affiliateFound,
-      data: {affiliateUser,
-        referredPlayers:referredPlayers||[],
-        referredPlayersCount:referredPlayersCount||0
-      }
+      data: {
+        affiliateUser,
+        referredPlayers: referredPlayers || [],
+        referredPlayersCount: referredPlayersCount || 0,
+      },
     });
   } catch (error) {
     console.error('Error get affiliate user details:', error);
@@ -1554,7 +1569,10 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
   }
 };
 
-export const resendVerificationEmailAffiliate = async (req: Request, res: Response) => {
+export const resendVerificationEmailAffiliate = async (
+  req: Request,
+  res: Response,
+) => {
   const { email } = req.body;
 
   try {
@@ -1571,15 +1589,15 @@ export const resendVerificationEmailAffiliate = async (req: Request, res: Respon
       );
     }
 
-    if (affiliate.status===STATUS.ACTIVE)
+    if (affiliate.status === STATUS.ACTIVE)
       return sendErrorResponse(res, 400, 'Email is already verified');
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     affiliate.verification_token = verificationToken;
     affiliate.verification_token_expires = new Date(Date.now() + 3600000);
     await affiliate.save();
-    
-    await sendVerificationEmail(email, verificationToken,true);
+
+    await sendVerificationEmail(email, verificationToken, true);
 
     res.status(200).json({
       success: true,
@@ -1593,6 +1611,87 @@ export const resendVerificationEmailAffiliate = async (req: Request, res: Respon
       error instanceof Error
         ? error.message
         : 'Failed to resend verification email',
+    );
+  }
+};
+
+export const getAffiliateEarnings = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    if (!req.user?.id) {
+      return sendErrorResponse(res, 401, 'Authentication required');
+    }
+
+    const affiliateId = req.user.id;
+
+    const referredPlayers = await Player.find({
+      referredBy: new mongoose.Types.ObjectId(affiliateId),
+      is_verified: VERIFICATION.VERIFIED,
+      status: STATUS.ACTIVE,
+    }).lean();
+
+    if (!referredPlayers.length) {
+      return res.status(200).json({
+        success: true,
+        message: 'No referred players found',
+        data: { earnings: [], totalEarnings: 0 },
+      });
+    }
+
+    const earningsData = await Promise.all(
+      referredPlayers.map(async (player) => {
+        const transactions = await Transaction.aggregate([
+          {
+            $match: {
+              player_id: player._id,
+              status: 'completed',
+              transaction_type: 'topup',
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              totalDeposits: { $sum: '$amount' },
+            },
+          },
+        ]);
+
+        const totalDeposits = transactions[0]?.totalDeposits || 0;
+        const earnings = totalDeposits * 0.1; // 10% commission
+
+        return {
+          id: player._id.toString(),
+          username: player.username || 'Anonymous',
+          email: player.email || 'N/A',
+          earnings,
+          date: player.created_at.toISOString().split('T')[0],
+        };
+      }),
+    );
+
+    const totalEarnings = earningsData.reduce(
+      (sum, entry) => sum + entry.earnings,
+      0,
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Affiliate earnings retrieved successfully',
+      data: {
+        earnings: earningsData,
+        totalEarnings,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching affiliate earnings:', error);
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error
+        ? error.message
+        : 'Failed to fetch affiliate earnings',
     );
   }
 };

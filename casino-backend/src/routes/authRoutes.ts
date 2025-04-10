@@ -11,8 +11,16 @@ import passport, { authenticate } from 'passport';
 import upload from '../middlewares/uploadMiddleware';
 import { generateTokenResponse } from '../utils/auth';
 import { IPlayer } from '../models/player';
-import {validateStripeConfig,handleValidationErrors,validateAffiliate,affiliateloginValidation}from "../validation/authValidation";
-import { startSumsubVerification, sumsubWebhook } from '../controllers/authController';
+import {
+  validateStripeConfig,
+  handleValidationErrors,
+  validateAffiliate,
+  affiliateloginValidation,
+} from '../validation/authValidation';
+import {
+  startSumsubVerification,
+  sumsubWebhook,
+} from '../controllers/authController';
 
 const router = Router();
 const authLimiter = rateLimit({
@@ -129,10 +137,7 @@ router.post(
   authController.register,
 );
 
-router.post(
-  '/affiliate/register',
-  authController.affiliateRegister
-);
+router.post('/affiliate/register', authController.affiliateRegister);
 
 router.post('/login', loginValidation, validateRequest, authController.login);
 
@@ -140,8 +145,9 @@ router.post(
   '/affiliate/login',
   loginValidation,
   validateRequest,
-  authController.affiliateLogin
-);router.post(
+  authController.affiliateLogin,
+);
+router.post(
   '/forgot-password',
   oneOf(
     [
@@ -174,9 +180,9 @@ router.get('/players', authController.getAllPlayers);
 
 router.get(
   '/players/:userId',
-  verifyToken, 
+  verifyToken,
   verifyAdmin,
-  authController.getPlayerDetails 
+  authController.getPlayerDetails,
 );
 /*Get players statistics*/
 router.get('/players/statistics', verifyAdmin, authController.getPlayerStats);
@@ -188,7 +194,7 @@ router.get(
   authController.getPlayerRegionStats,
 );
 
-router.delete('/players/:userId', verifyAdmin,authController.deletePlayer);
+router.delete('/players/:userId', verifyAdmin, authController.deletePlayer);
 router.put(
   '/players/:userId/status',
   body('status').isInt({ min: 0, max: 1 }).withMessage('Status must be 0 or 1'),
@@ -437,11 +443,24 @@ router.post(
 );
 
 /*Stripe config apis*/
-router.get('/stripe-config-details',verifyAdmin,authController.geStripeConfig);
-router.patch('/stripe-config-details',verifyAdmin,authController.updateStripeConfig);
+router.get(
+  '/stripe-config-details',
+  verifyAdmin,
+  authController.geStripeConfig,
+);
+router.patch(
+  '/stripe-config-details',
+  verifyAdmin,
+  authController.updateStripeConfig,
+);
 
 /*Affiliate users apis */
-router.post('/register-affiliate-users',validateAffiliate,handleValidationErrors,authController.addAffliateUsers);
+router.post(
+  '/register-affiliate-users',
+  validateAffiliate,
+  handleValidationErrors,
+  authController.addAffliateUsers,
+);
 
 router.post(
   '/affiliate/resend-verification-email',
@@ -454,22 +473,46 @@ router.post(
   authController.resendVerificationEmailAffiliate,
 );
 
-router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
-router.get('/affiliate-users',verifyAdmin,authController.getAffliateUsers);
-router.patch('/affiliate-users/status/:id',verifyAdmin,authController.updateAffliateUsersStatus);
-router.get('/affiliate-users/:id',verifyAdmin,authController.getAffliateUsersDetails);
-router.patch('/affiliate-users',verifyToken,authController.updateAffliateUsersDetails);
-router.post('/affiliate-login', affiliateloginValidation, handleValidationErrors, authController.affiliatelogin);
-
+router.get(
+  '/verify-affiliate-email',
+  validateRequest,
+  authController.verifyAffiliateEmail,
+);
+router.get('/affiliate-users', verifyAdmin, authController.getAffliateUsers);
+router.patch(
+  '/affiliate-users/status/:id',
+  verifyAdmin,
+  authController.updateAffliateUsersStatus,
+);
+router.get(
+  '/affiliate-users/:id',
+  verifyAdmin,
+  authController.getAffliateUsersDetails,
+);
+router.patch(
+  '/affiliate-users',
+  verifyToken,
+  authController.updateAffliateUsersDetails,
+);
+router.post(
+  '/affiliate-login',
+  affiliateloginValidation,
+  handleValidationErrors,
+  authController.affiliatelogin,
+);
+router.get(
+  '/affiliate/earnings',
+  verifyToken,
+  authController.getAffiliateEarnings,
+);
 /* SumSub Apis */
 
 router.post(
   '/sumsub/start',
   passport.authenticate('jwt', { session: false }),
-  startSumsubVerification
+  startSumsubVerification,
 );
 router.post('/sumsub/webhook', sumsubWebhook);
-
 
 //Payment Configuration Routes
 
@@ -477,14 +520,14 @@ router.get(
   '/payment-configs/all',
   verifyToken,
   verifyAdmin,
-  paymentController.getPaymentConfigs
+  paymentController.getPaymentConfigs,
 );
 
 router.get(
   '/payment-configs/:id',
   verifyToken,
   verifyAdmin,
-  paymentController.getPaymentConfig
+  paymentController.getPaymentConfig,
 );
 
 router.put(
@@ -492,19 +535,28 @@ router.put(
   verifyToken,
   verifyAdmin,
   [
-    body('config').optional().isObject().withMessage('Config must be an object'),
-    body('mode').optional().isIn(['test', 'live']).withMessage('Mode must be either "test" or "live"'),
-    body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+    body('config')
+      .optional()
+      .isObject()
+      .withMessage('Config must be an object'),
+    body('mode')
+      .optional()
+      .isIn(['test', 'live'])
+      .withMessage('Mode must be either "test" or "live"'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean'),
   ],
   validateRequest,
-  paymentController.updatePaymentConfig
+  paymentController.updatePaymentConfig,
 );
 
 router.delete(
   '/payment-configs/:id',
   verifyToken,
   verifyAdmin,
-  paymentController.deletePaymentConfig
+  paymentController.deletePaymentConfig,
 );
 
 export default router;

@@ -58,7 +58,6 @@ export const generateTokenForAffialite = (user: IAffiliate) => {
   };
 };
 
-
 /*Function for generate Referral code */
 export const generateReferralCode = (userId: any) => {
   const userIdStr = userId.toString();

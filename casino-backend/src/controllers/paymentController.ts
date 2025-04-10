@@ -4,10 +4,11 @@ import Player from '../models/player';
 import Transaction from '../models/transaction';
 import PaymentMethod from '../models/paymentMethod';
 import PaymentConfig from '../models/paymentConfig';
-import {sendErrorResponse} from './authController';
+import { sendErrorResponse } from './authController';
 import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
+
 interface CustomRequest extends Request {
   user?: {
     sub: string;
@@ -42,6 +43,7 @@ export const createStripeCustomer = async (
     throw new Error(`Stripe Customer Creation Failed: ${error.message}`);
   }
 };
+
 async function updatePlayerBalance(
   playerId: string,
   amount: number,
@@ -452,10 +454,9 @@ export const createPaymentIntent = async (
 ): Promise<void> => {
   try {
     if (!req.user?.id) {
-      res.status(401).json({
-        success: false,
-        error: 'Authentication required',
-      });
+      res
+        .status(401)
+        .json({ success: false, error: 'Authentication required' });
       return;
     }
 
@@ -463,28 +464,23 @@ export const createPaymentIntent = async (
     const { amount, currency, payment_method_id, description } = req.body;
 
     if (!amount || !currency) {
-      res.status(400).json({
-        success: false,
-        error: 'Amount and currency are required',
-      });
+      res
+        .status(400)
+        .json({ success: false, error: 'Amount and currency are required' });
       return;
     }
 
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      res.status(400).json({
-        success: false,
-        error: 'Amount must be a positive number',
-      });
+      res
+        .status(400)
+        .json({ success: false, error: 'Amount must be a positive number' });
       return;
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      res.status(404).json({
-        success: false,
-        message: 'Player not found',
-      });
+      res.status(404).json({ success: false, message: 'Player not found' });
       return;
     }
 
@@ -550,6 +546,9 @@ export const createPaymentIntent = async (
           return 'completed';
         case 'canceled':
           return 'cancelled';
+        case 'processing':
+        case 'requires_payment_method_update':
+          return 'pending';
         default:
           return 'pending';
       }
@@ -577,10 +576,7 @@ export const createPaymentIntent = async (
       status: paymentIntent.status,
       requiresAction: paymentIntent.status === 'requires_action',
       nextAction: paymentIntent.next_action
-        ? {
-            type: paymentIntent.next_action.type,
-            ...paymentIntent.next_action,
-          }
+        ? { type: paymentIntent.next_action.type, ...paymentIntent.next_action }
         : null,
     });
   } catch (error: any) {
@@ -693,7 +689,6 @@ async function handlePaymentIntentSucceeded(
     const transaction = await Transaction.findOne({
       payment_intent_id: paymentIntent.id,
     });
-
     if (!transaction) {
       logger.error(
         `Transaction not found for PaymentIntent: ${paymentIntent.id}`,
@@ -740,7 +735,6 @@ async function handlePaymentIntentFailed(
     const transaction = await Transaction.findOne({
       payment_intent_id: paymentIntent.id,
     });
-
     if (!transaction) {
       logger.error(
         `Transaction not found for PaymentIntent: ${paymentIntent.id}`,
@@ -773,7 +767,6 @@ async function handlePaymentIntentRequiresAction(
     const transaction = await Transaction.findOne({
       payment_intent_id: paymentIntent.id,
     });
-
     if (!transaction) {
       logger.error(
         `Transaction not found for PaymentIntent: ${paymentIntent.id}`,
@@ -815,7 +808,6 @@ async function handleChargeFailed(charge: Stripe.Charge): Promise<void> {
     const transaction = await Transaction.findOne({
       stripe_charge_id: charge.id,
     });
-
     if (transaction) {
       transaction.status = 'failed';
       transaction.error = charge.failure_message || 'Charge failed';
@@ -838,7 +830,6 @@ async function handlePayoutSucceeded(payout: Stripe.Payout): Promise<void> {
     const transaction = await Transaction.findOne({
       payment_intent_id: payout.id,
     });
-
     if (!transaction) {
       logger.error(`Transaction not found for payout: ${payout.id}`);
       return;
@@ -868,7 +859,6 @@ async function handlePayoutFailed(payout: Stripe.Payout): Promise<void> {
     const transaction = await Transaction.findOne({
       _id: payout.metadata.transactionId,
     });
-
     if (!transaction) {
       logger.error(`Transaction not found for payout: ${payout.id}`);
       return;
@@ -906,7 +896,6 @@ async function handleDisputeCreated(dispute: Stripe.Dispute): Promise<void> {
     const transaction = await Transaction.findOne({
       payment_intent_id: dispute.payment_intent,
     });
-
     if (!transaction) {
       logger.error(`Transaction not found for dispute: ${dispute.id}`);
       return;
@@ -1342,8 +1331,10 @@ export const seedPaymentConfigs = async () => {
         STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
         STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
         STRIPE_TEST_SECRET_KEY: process.env.STRIPE_TEST_SECRET_KEY || '',
-        STRIPE_TEST_PUBLISHABLE_KEY: process.env.STRIPE_TEST_PUBLISHABLE_KEY || '',
-        STRIPE_TEST_WEBHOOK_SECRET: process.env.STRIPE_TEST_WEBHOOK_SECRET || '',
+        STRIPE_TEST_PUBLISHABLE_KEY:
+          process.env.STRIPE_TEST_PUBLISHABLE_KEY || '',
+        STRIPE_TEST_WEBHOOK_SECRET:
+          process.env.STRIPE_TEST_WEBHOOK_SECRET || '',
       },
       mode: 'test',
       isActive: true,
@@ -1366,10 +1357,11 @@ export const seedPaymentConfigs = async () => {
     await PaymentConfig.findOneAndUpdate(
       { paymentMethodId: config.paymentMethodId },
       { $set: config },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
   }
 };
+
 export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || req.user.role !== 1) {
@@ -1381,7 +1373,7 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
     res.status(200).json({
       success: true,
       message: 'Payment configurations retrieved successfully',
-      data: paymentConfigs.map(config => ({
+      data: paymentConfigs.map((config) => ({
         id: config._id,
         paymentMethodId: config.paymentMethodId,
         name: config.name,
@@ -1394,7 +1386,9 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to retrieve payment configurations'
+      error instanceof Error
+        ? error.message
+        : 'Failed to retrieve payment configurations',
     );
   }
 };
@@ -1428,12 +1422,17 @@ export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to retrieve payment configuration'
+      error instanceof Error
+        ? error.message
+        : 'Failed to retrieve payment configuration',
     );
   }
 };
 
-export const updatePaymentConfig = async (req: CustomRequest, res: Response) => {
+export const updatePaymentConfig = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user || req.user.role !== 1) {
       return sendErrorResponse(res, 403, 'Admin access required');
@@ -1469,12 +1468,17 @@ export const updatePaymentConfig = async (req: CustomRequest, res: Response) => 
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to update payment configuration'
+      error instanceof Error
+        ? error.message
+        : 'Failed to update payment configuration',
     );
   }
 };
 
-export const deletePaymentConfig = async (req: CustomRequest, res: Response) => {
+export const deletePaymentConfig = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user || req.user.role !== 1) {
       return sendErrorResponse(res, 403, 'Admin access required');
@@ -1496,7 +1500,9 @@ export const deletePaymentConfig = async (req: CustomRequest, res: Response) => 
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to delete payment configuration'
+      error instanceof Error
+        ? error.message
+        : 'Failed to delete payment configuration',
     );
   }
 };

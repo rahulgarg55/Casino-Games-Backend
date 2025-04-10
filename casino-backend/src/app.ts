@@ -11,7 +11,7 @@ import './utils/passportConfig';
 import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
-import dotenv from  'dotenv';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -78,7 +78,7 @@ app.use(helmet());
 app.use(
   cors({
     origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE','PATCH'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature'],
     credentials: true,
   }),
@@ -101,7 +101,6 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(passport.initialize());
 app.use(passport.session());
-
 
 const initializeApp = async () => {
   try {

@@ -46,7 +46,7 @@ export interface IPlayer extends Document {
   phone_verified?: boolean;
   referredBy?: mongoose.Types.ObjectId;
   referredByName?: string;
-  sumsub_id?:string;
+  sumsub_id?: string;
   sumsub_status?: 'pending' | 'approved' | 'rejected' | null;
   sumsub_verification_date?: Date;
   new_email?: string;
@@ -72,7 +72,8 @@ const playerSchema: Schema = new Schema(
     photo: {
       type: String,
       validate: {
-        validator: (v: string) => /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v),
+        validator: (v: string) =>
+          /^(https?|ftp):\/\/[^\s/$.?#].[^\s]*$/.test(v),
         message: 'Invalid URL format for photo',
       },
     },
@@ -149,7 +150,7 @@ const playerSchema: Schema = new Schema(
       type: Number,
       required: true,
       enum: [0, 1, 2],
-      default:0, // Default to USD
+      default: 0, // Default to USD
     },
     language: {
       type: String,
@@ -241,7 +242,11 @@ const playerSchema: Schema = new Schema(
       enum: ['accepted', 'rejected', 'pending'],
       default: 'pending',
     },
-    referredBy: { type: Schema.Types.ObjectId, ref: 'Affiliate', default: null },
+    referredBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'Affiliate',
+      default: null,
+    },
     referredByName: {
       type: String,
       default: null,
@@ -280,11 +285,11 @@ const playerSchema: Schema = new Schema(
         return ret;
       },
     },
-  }
+  },
 );
 
 playerSchema.virtual('full_phone_number').get(function () {
-  return this.country_code && this.phone_number 
+  return this.country_code && this.phone_number
     ? `${this.country_code}${this.phone_number}`
     : null;
 });
