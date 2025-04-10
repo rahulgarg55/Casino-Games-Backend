@@ -1161,3 +1161,39 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
     user,
   };
 };
+
+export const affiliateforgotPassword = async (data: ForgotPasswordData) => {
+  const { email } = data;
+  if (!email ) {
+    throw new Error('Invalid request. Please check your input');
+  }
+
+  const affiliate = await Affiliate.findOne({email});
+  if (!affiliate) {
+    throw new Error('No account found with this email address');
+  }
+
+  const token = crypto.randomBytes(20).toString('hex');
+  affiliate.reset_password_token = token;
+  affiliate.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
+
+  await affiliate.save();
+  await sendResetEmail(email, token);
+};
+
+export const affiliateResetPassword = async (data: ResetPasswordData) => {
+  const { token, password } = data;
+  const affiliate = await Affiliate.findOne({
+    reset_password_token: token,
+    reset_password_expires: { $gt: new Date() },
+  });
+
+  if (!affiliate) {
+    throw new Error('Invalid or expired reset token');
+  }
+  affiliate.password = await bcrypt.hash(password, 12);
+  affiliate.reset_password_token = undefined;
+  affiliate.reset_password_expires = undefined;
+
+  await affiliate.save();
+};
