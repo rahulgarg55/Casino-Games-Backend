@@ -908,8 +908,10 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
-      new_email: { $exists: true, $ne: null },
+      // new_email: { $exists: true, $ne: null },
     });
+
+    console.log("=====player===",player)
 
     if (!player) {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
@@ -1294,15 +1296,11 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     }
     const referredPlayers = await Player.find({
       referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
     })
     .sort({ created_at: -1 });
     
     const referredPlayersCount = await Player.countDocuments({
       referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
     });
     
 
