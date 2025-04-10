@@ -1294,15 +1294,11 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     }
     const referredPlayers = await Player.find({
       referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
     })
     .sort({ created_at: -1 });
     
     const referredPlayersCount = await Player.countDocuments({
       referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
     });
     
 
