@@ -22,7 +22,12 @@ export interface SumsubError {
 /**
  * Generates a signature for Sumsub API requests.
  */
-const generateSignature = (method: string, path: string, body: string, timestamp: number): string => {
+const generateSignature = (
+  method: string,
+  path: string,
+  body: string,
+  timestamp: number,
+): string => {
   return crypto
     .createHmac('sha256', SUMSUB_SECRET_KEY)
     .update(`${timestamp}${method}${path}${body}`)
@@ -39,7 +44,7 @@ const generateSignature = (method: string, path: string, body: string, timestamp
 export const generateSumsubAccessToken = async (
   playerId: string,
   externalUserId: string,
-  levelName: string = 'basic-kyc'
+  levelName: string = 'basic-kyc',
 ): Promise<SumsubTokenResponse> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
@@ -63,7 +68,7 @@ export const generateSumsubAccessToken = async (
           'X-App-Access-Ts': timestamp.toString(),
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     return {
@@ -76,7 +81,7 @@ export const generateSumsubAccessToken = async (
     throw new Error(
       `Sumsub token generation failed: ${
         errorData?.description || axiosError.message
-      }`
+      }`,
     );
   }
 };
@@ -90,7 +95,7 @@ export const generateSumsubAccessToken = async (
 export const createSumsubApplicant = async (
   playerId: string,
   email: string,
-  phone?: string
+  phone?: string,
 ): Promise<string> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
@@ -117,7 +122,7 @@ export const createSumsubApplicant = async (
           'X-App-Access-Ts': timestamp.toString(),
           'Content-Type': 'application/json',
         },
-      }
+      },
     );
 
     return response.data.applicantId;
@@ -127,7 +132,7 @@ export const createSumsubApplicant = async (
     throw new Error(
       `Sumsub applicant creation failed: ${
         errorData?.description || axiosError.message
-      }`
+      }`,
     );
   }
 };
@@ -137,7 +142,10 @@ export const createSumsubApplicant = async (
  * @param signature - Signature from 'x-payload-signature' header
  * @returns Boolean indicating if the signature is valid
  */
-export const validateWebhookSignature = (body: any, signature: string): boolean => {
+export const validateWebhookSignature = (
+  body: any,
+  signature: string,
+): boolean => {
   const computedSignature = crypto
     .createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET || '')
     .update(JSON.stringify(body))
