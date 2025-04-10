@@ -1316,8 +1316,6 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
 
     const referredPlayersCount = await Player.countDocuments({
       referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
     });
 
     return res.status(200).json({
