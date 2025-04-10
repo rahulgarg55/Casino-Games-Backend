@@ -454,12 +454,38 @@ router.post(
   authController.resendVerificationEmailAffiliate,
 );
 
-router.get('/verify-affiliate-email', validateRequest, authController.verifyAffiliateEmail);
+router.get('/verify-affiliate-email', authController.verifyAffiliateEmail);
 router.get('/affiliate-users',verifyAdmin,authController.getAffliateUsers);
 router.patch('/affiliate-users/status/:id',verifyAdmin,authController.updateAffliateUsersStatus);
 router.get('/affiliate-users/:id',verifyAdmin,authController.getAffliateUsersDetails);
 router.patch('/affiliate-users',verifyToken,authController.updateAffliateUsersDetails);
 router.post('/affiliate-login', affiliateloginValidation, handleValidationErrors, authController.affiliatelogin);
+
+router.post(
+  '/affiliate/forgot-password',
+  body('email')
+  .isEmail()
+  .normalizeEmail()
+  .withMessage('Valid email is required'),
+validateRequest,
+  authController.affiliateForgotPassword,
+);
+
+router.post(
+  '/affiliate/reset-password',
+  body('token').notEmpty().withMessage('Token is required'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .matches(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+    )
+    .withMessage(
+      'Password must contain uppercase, lowercase, number, and special character',
+    ),
+  validateRequest,
+  authController.affiliateResetPassword,
+);
 
 /* SumSub Apis */
 

@@ -1592,3 +1592,45 @@ export const resendVerificationEmailAffiliate = async (req: Request, res: Respon
     );
   }
 };
+
+export const affiliateForgotPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+  
+    await authService.affiliateforgotPassword({ email});
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset link has been sent to your email',
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error
+        ? error.message
+        : 'Failed to process password reset',
+    );
+  }
+};
+
+export const affiliateResetPassword = async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return sendErrorResponse(res, 400, 'Token and password are required');
+    }
+    await authService.affiliateResetPassword({ token, password });
+
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Invalid or expired reset token',
+    );
+  }
+};
