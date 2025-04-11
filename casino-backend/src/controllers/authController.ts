@@ -919,18 +919,14 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
-      $or: [
-        { new_email: { $exists: false } },
-        { new_email: null },
-        { new_email: { $exists: true, $ne: null } },
-      ],
-    });  
+      email: { $exists: true, $ne: null },
+    });
 
     if (!player) {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
 
-    player.email = player.new_email;
+    player.email = player.email;
     player.new_email = undefined;
     player.is_verified = VERIFICATION.VERIFIED;
     player.email_verified = true;
@@ -1640,7 +1636,6 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
 
 export const affiliateResetPassword = async (req: Request, res: Response) => {
   try {
-    console.log("===in api==============")
     const { token, password } = req.body;
     if (!token || !password) {
       return sendErrorResponse(res, 400, 'Token and password are required');
