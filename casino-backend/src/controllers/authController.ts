@@ -919,7 +919,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
-      new_email: { $exists: true, $ne: null },
+      // new_email: { $exists: true, $ne: null },
     });
 
     if (!player) {
