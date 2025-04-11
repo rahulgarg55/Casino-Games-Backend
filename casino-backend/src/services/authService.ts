@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
-import { sendResetEmail } from '../utils/sendResetEmail';
+import { sendResetEmail ,sendResetAffiliateEmail} from '../utils/sendResetEmail';
 import {
   generateTokenResponse,
   generateReferralCode,
@@ -1178,7 +1178,7 @@ export const affiliateforgotPassword = async (data: ForgotPasswordData) => {
   affiliate.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
 
   await affiliate.save();
-  await sendResetEmail(email, token);
+  await sendResetAffiliateEmail(email, token);
 };
 
 export const affiliateResetPassword = async (data: ResetPasswordData) => {

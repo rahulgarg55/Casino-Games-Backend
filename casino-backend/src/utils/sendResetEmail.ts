@@ -214,3 +214,23 @@ export const sendResetEmail = async (to: string, token: string) => {
     throw new Error('Failed to send reset email');
   }
 };
+
+export const sendResetAffiliateEmail = async (to: string, token: string) => {
+  try {
+    const resetUrl = `${process.env.CLIENT_URL}/affiliate/reset-password?token=${token}`;
+    const { subject, text, html } = getEmailContent(resetUrl);
+
+    const msg = {
+      to,
+      from: process.env.EMAIL_FROM || 'default@example.com',
+      subject,
+      text,
+      html,
+    };
+
+    await sgMail.send(msg);
+  } catch (error) {
+    console.error('Failed to send reset email:', error);
+    throw new Error('Failed to send reset email');
+  }
+};

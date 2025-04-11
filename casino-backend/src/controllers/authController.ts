@@ -1636,7 +1636,6 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
 
 export const affiliateResetPassword = async (req: Request, res: Response) => {
   try {
-    console.log("===in api==============")
     const { token, password } = req.body;
     if (!token || !password) {
       return sendErrorResponse(res, 400, 'Token and password are required');
