@@ -8,7 +8,16 @@ import { resetPassword as resetPasswordService } from '../services/authService';
 import cloudinary from '../utils/cloudinary';
 import Player, { IPlayer } from '../models/player';
 import PlayerBalance, { IPlayerBalance } from '../models/playerBalance';
+import Notification, { NotificationType } from '../models/notification';
 import { STATUS, VERIFICATION } from '../constants';
+import Click from '../models/click';
+import Payout from '../models/payout';
+import ReferralLink from '../models/referralLink';
+import PromoMaterial from '../models/promoMaterial';
+import { Parser } from 'json2csv';
+import PDFDocument from 'pdfkit';
+import { sendEmail } from '../utils/sendEmail';
+import CommissionTier from '../models/comissionTier';
 import crypto from 'crypto';
 import {
   sendVerificationEmail,
@@ -35,6 +44,12 @@ interface CustomRequest extends Request {
     role: number;
   };
 }
+
+const ensureAffiliate = (user: any) => {
+  if (!user || (user.role_id !== undefined && user.role_id !== 2)) {
+    throw new Error('Access denied: Affiliate account required');
+  }
+};
 
 export const sendErrorResponse = (
   res: Response,
@@ -919,21 +934,30 @@ export const verifyEmail = async (req: Request, res: Response) => {
     const player = await Player.findOne({
       verification_token: token,
       verification_token_expires: { $gt: new Date() },
-      email: { $exists: true, $ne: null },
+      //   $or: [
+      //     { new_email: { $exists: false } },
+      //     { new_email: null },
+      //     { new_email: { $exists: true, $ne: null } },
+      //   ],
+      // });
+
+      // email: { $exists: true, $ne: null },
     });
 
     if (!player) {
       return sendErrorResponse(res, 400, 'Invalid or expired token');
     }
+    if (player.new_email) {
+      player.email = player.new_email;
+      player.new_email = undefined;
+    }
 
-    player.email = player.email;
-    player.new_email = undefined;
     player.is_verified = VERIFICATION.VERIFIED;
     player.email_verified = true;
     player.verification_token = undefined;
     player.verification_token_expires = undefined;
-
     player.refreshToken = undefined;
+
     await player.save();
 
     res.status(200).json({
@@ -958,8 +982,15 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 400, 'Email is required');
     }
 
-    const player = await Player.findOne({ email });
+    // Log the incoming email for debugging
+    console.log(`Resend verification email requested for: ${email}`);
+
+    const player = await Player.findOne({
+      $or: [{ email: email }, { new_email: email }],
+    });
+
     if (!player) {
+      console.log(`No player found for email: ${email}`);
       return sendErrorResponse(
         res,
         404,
@@ -967,15 +998,21 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       );
     }
 
-    if (player.email_verified)
+    // If email is already verified and no new_email is pending, no need to resend
+    if (player.email_verified && !player.new_email) {
       return sendErrorResponse(res, 400, 'Email is already verified');
+    }
 
+    // Generate new verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
     player.verification_token = verificationToken;
-    player.verification_token_expires = new Date(Date.now() + 3600000);
+    player.verification_token_expires = new Date(Date.now() + 3600000); // 1 hour
     await player.save();
 
-    await sendVerificationEmail(email, verificationToken);
+    // Send verification email to new_email if set, otherwise current email
+    const targetEmail = player.new_email || player.email;
+    console.log(`Sending verification email to: ${targetEmail}`);
+    await sendVerificationEmail(targetEmail, verificationToken);
 
     res.status(200).json({
       success: true,
@@ -983,6 +1020,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       data: { verification_token: verificationToken },
     });
   } catch (error) {
+    console.error('Error in resendVerificationEmail:', error);
     sendErrorResponse(
       res,
       400,
@@ -1616,8 +1654,8 @@ export const resendVerificationEmailAffiliate = async (
 export const affiliateForgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
-  
-    await authService.affiliateforgotPassword({ email});
+
+    await authService.affiliateforgotPassword({ email });
 
     res.status(200).json({
       success: true,
@@ -1732,5 +1770,760 @@ export const getAffiliateEarnings = async (
         ? error.message
         : 'Failed to fetch affiliate earnings',
     );
+  }
+};
+
+export const getAffiliateDashboard = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({ message: 'Affiliate not found' });
+    }
+
+    const startDate = req.query.startDate
+      ? new Date(req.query.startDate as string)
+      : undefined;
+    const endDate = req.query.endDate
+      ? new Date(req.query.endDate as string)
+      : undefined;
+
+    // Aggregate referral stats
+    const referralStats = await Player.aggregate([
+      {
+        $match: {
+          referredBy: affiliate._id,
+          ...(startDate &&
+            endDate && { created_at: { $gte: startDate, $lte: endDate } }),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalSignups: { $sum: 1 },
+          activeUsers: { $sum: { $cond: [{ $eq: ['$status', 1] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    // Aggregate earnings
+    const earningsStats = await Transaction.aggregate([
+      {
+        $match: {
+          player_id: {
+            $in: await Player.find({ referredBy: affiliate._id }).distinct(
+              '_id',
+            ),
+          },
+          transaction_type: 'win',
+          status: 'completed',
+          ...(startDate &&
+            endDate && { created_at: { $gte: startDate, $lte: endDate } }),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: {
+            $sum: { $multiply: ['$amount', affiliate.commissionRate / 100] },
+          },
+        },
+      },
+    ]);
+
+    res.json({
+      clicks: affiliate.totalClicks || 0,
+      signups: referralStats[0]?.totalSignups || 0,
+      conversions: referralStats[0]?.activeUsers || 0,
+      conversionRate: referralStats[0]?.totalSignups
+        ? (
+            (referralStats[0].activeUsers / referralStats[0].totalSignups) *
+            100
+          ).toFixed(2)
+        : 0,
+      totalEarnings:
+        earningsStats[0]?.totalEarnings || affiliate.totalEarnings || 0,
+      pendingEarnings: affiliate.totalEarnings - (affiliate.paidEarnings || 0),
+      currency: 'USD',
+      recentActivity: await Notification.find({ user_id: affiliate._id })
+        .sort({ created_at: -1 })
+        .limit(5)
+        .select('type message created_at'),
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 2. Create Referral Link
+export const createReferralLink = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const { campaignName, destinationUrl } = req.body;
+    const trackingId = `AFF${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
+    const referralLink = new ReferralLink({
+      affiliateId,
+      trackingId,
+      campaignName,
+      destinationUrl,
+    });
+
+    await referralLink.save();
+
+    res.status(201).json({
+      trackingId,
+      referralLink: `${destinationUrl}?ref=${trackingId}`,
+      campaignName,
+      createdAt: referralLink.createdAt,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 3. List Referral Links
+export const getReferralLinks = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const referralLinks = await ReferralLink.find({ affiliateId }).select(
+      'trackingId campaignName destinationUrl clicks signups conversions createdAt',
+    );
+
+    res.json(
+      referralLinks.map((link) => ({
+        trackingId: link.trackingId,
+        referralLink: `${link.destinationUrl}?ref=${link.trackingId}`,
+        campaignName: link.campaignName,
+        clicks: link.clicks,
+        signups: link.signups,
+        conversions: link.conversions,
+      })),
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 4. Track Referral Click
+export const trackReferralClick = async (req: Request, res: Response) => {
+  try {
+    const { trackingId, ipAddress, userAgent, referrer } = req.body;
+
+    const referralLink = await ReferralLink.findOne({ trackingId });
+    if (!referralLink) {
+      return res.status(404).json({ message: 'Invalid tracking ID' });
+    }
+
+    const click = new Click({
+      affiliateId: referralLink.affiliateId,
+      trackingId,
+      ipAddress,
+      userAgent,
+      referrer,
+    });
+
+    await click.save();
+
+    await ReferralLink.updateOne({ trackingId }, { $inc: { clicks: 1 } });
+    await Affiliate.updateOne(
+      { _id: referralLink.affiliateId },
+      { $inc: { totalClicks: 1 } },
+    );
+
+    res.json({ status: 'Click recorded' });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 5. Request Payout
+export const requestPayout = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const { amount, paymentMethodId, currency } = req.body;
+
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({ message: 'Affiliate not found' });
+    }
+
+    const availableEarnings =
+      affiliate.totalEarnings - (affiliate.paidEarnings || 0);
+    if (amount > availableEarnings) {
+      return res
+        .status(400)
+        .json({ message: 'Requested amount exceeds available earnings' });
+    }
+
+    const payout = new Payout({
+      affiliateId,
+      amount,
+      currency,
+      paymentMethodId,
+      status: 'pending',
+    });
+
+    await payout.save();
+
+    const notification = new Notification({
+      type: NotificationType.WITHDRAWAL_REQUESTED,
+      message: `Affiliate ${affiliate.email} requested a payout of ${amount} ${currency}`,
+      user_id: affiliateId,
+      metadata: { payoutId: payout._id, amount, currency },
+    });
+    await notification.save();
+
+    // Notify admin (assuming admin email is configured)
+    await sendEmail(
+      process.env.ADMIN_EMAIL || 'admin@bastaxcasino.com',
+      'New Payout Request',
+      `Affiliate ${affiliate.firstname} ${affiliate.lastname} (${affiliate.email}) has requested a payout of ${amount} ${currency}. Please review in the admin dashboard.`,
+    );
+
+    res.status(201).json({
+      payoutId: payout._id,
+      amount,
+      status: payout.status,
+      requestedAt: payout.createdAt,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 6. List Payouts
+export const getPayouts = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const payouts = await Payout.find({ affiliateId })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select('amount currency status adminNotes createdAt');
+
+    const total = await Payout.countDocuments({ affiliateId });
+
+    res.json({
+      payouts,
+      pagination: {
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 7. Admin Update Payout Status
+export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
+  try {
+    const { payoutId } = req.params;
+    const { status, adminNotes } = req.body;
+
+    const payout = await Payout.findById(payoutId).populate('affiliateId');
+    if (!payout) {
+      return res.status(404).json({ message: 'Payout not found' });
+    }
+
+    const affiliate = payout.affiliateId as any;
+
+    if (status === 'approved') {
+      // Simulate Stripe payout (replace with actual Stripe API as in paymentController)
+      payout.stripePayoutId = `po_${Math.random().toString(36).substring(2, 10)}`;
+    } else if (status === 'paid') {
+      await Affiliate.updateOne(
+        { _id: affiliate._id },
+        { $inc: { paidEarnings: payout.amount } },
+      );
+    }
+
+    payout.status = status;
+    payout.adminNotes = adminNotes || payout.adminNotes;
+
+    await payout.save();
+
+    if (affiliate.notificationPreferences?.payoutProcessed) {
+      await sendEmail(
+        affiliate.email,
+        'Payout Status Update',
+        `Your payout request of ${payout.amount} ${payout.currency} has been ${status}.${adminNotes ? ` Notes: ${adminNotes}` : ''}`,
+        `${affiliate.firstname} ${affiliate.lastname}`,
+      );
+    }
+
+    const notification = new Notification({
+      type: NotificationType.WITHDRAWAL_REQUESTED,
+      message: `Payout ${payoutId} updated to ${status} for affiliate ${affiliate.email}`,
+      user_id: affiliate._id,
+      metadata: { payoutId, status, adminNotes },
+    });
+    await notification.save();
+
+    res.json({
+      payoutId,
+      status: payout.status,
+      updatedAt: payout.updatedAt,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 8. Admin List All Payouts
+export const getAllPayouts = async (req: CustomRequest, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const status = req.query.status as string;
+
+    const query: any = {};
+    if (status) query.status = status;
+
+    const payouts = await Payout.find(query)
+      .populate('affiliateId', 'email firstname lastname')
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select('affiliateId amount currency status createdAt');
+
+    const total = await Payout.countDocuments(query);
+
+    res.json({
+      payouts: payouts.map((payout) => ({
+        payoutId: payout._id,
+        affiliate: {
+          id: (payout.affiliateId as any)._id,
+          email: (payout.affiliateId as any).email,
+          name: `${(payout.affiliateId as any).firstname} ${(payout.affiliateId as any).lastname}`,
+        },
+        amount: payout.amount,
+        currency: payout.currency,
+        status: payout.status,
+        requestedAt: payout.createdAt,
+      })),
+      pagination: {
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 9. Create Commission Tier
+export const createCommissionTier = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    const { tierName, minReferrals, commissionRate, currency } = req.body;
+
+    const existingTier = await CommissionTier.findOne({ tierName });
+    if (existingTier) {
+      return res.status(400).json({ message: 'Tier name already exists' });
+    }
+
+    const tier = new CommissionTier({
+      tierName,
+      minReferrals,
+      commissionRate,
+      currency,
+    });
+
+    await tier.save();
+
+    res.status(201).json({
+      tierId: tier._id,
+      tierName,
+      commissionRate,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 10. Update Commission Tier
+export const updateCommissionTier = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    const { tierId } = req.params;
+    const { tierName, minReferrals, commissionRate, currency } = req.body;
+
+    const tier = await CommissionTier.findById(tierId);
+    if (!tier) {
+      return res.status(404).json({ message: 'Commission tier not found' });
+    }
+
+    if (tierName) tier.tierName = tierName;
+    if (minReferrals !== undefined) tier.minReferrals = minReferrals;
+    if (commissionRate !== undefined) tier.commissionRate = commissionRate;
+    if (currency) tier.currency = currency;
+
+    await tier.save();
+
+    // Update affiliate commission rates if necessary
+    if (commissionRate !== undefined) {
+      await Affiliate.updateMany(
+        { totalSignups: { $gte: tier.minReferrals } },
+        { commissionRate: tier.commissionRate },
+      );
+
+      // Notify affected affiliates
+      const affectedAffiliates = await Affiliate.find({
+        totalSignups: { $gte: tier.minReferrals },
+      });
+      for (const affiliate of affectedAffiliates) {
+        if (affiliate.notificationPreferences?.campaignUpdates) {
+          await sendEmail(
+            affiliate.email,
+            'Commission Rate Updated',
+            `Your commission rate has been updated to ${tier.commissionRate}% due to your performance in the ${tier.tierName} tier.`,
+            `${affiliate.firstname} ${affiliate.lastname}`,
+          );
+        }
+      }
+    }
+
+    res.json({
+      tierId: tier._id,
+      tierName: tier.tierName,
+      commissionRate: tier.commissionRate,
+      minReferrals: tier.minReferrals,
+      currency: tier.currency,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 11. List Referrals
+export const getReferrals = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const status = req.query.status as string;
+
+    const query: any = { referredBy: affiliateId };
+    if (status) query.status = parseInt(status);
+
+    const referrals = await Player.find(query)
+      .sort({ created_at: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select('username created_at status');
+
+    const total = await Player.countDocuments(query);
+
+    const referralEarnings = await Transaction.aggregate([
+      {
+        $match: {
+          player_id: { $in: referrals.map((r) => r._id) },
+          transaction_type: 'win',
+          status: 'completed',
+        },
+      },
+      {
+        $group: {
+          _id: '$player_id',
+          earnings: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const affiliate =
+      await Affiliate.findById(affiliateId).select('commissionRate');
+
+    res.json({
+      referrals: referrals.map((referral) => {
+        const earningsEntry = referralEarnings.find((e) =>
+          e._id.equals(referral._id),
+        );
+        return {
+          userId: referral._id,
+          username: referral.username,
+          signupDate: referral.created_at,
+          status: referral.status,
+          earnings: earningsEntry
+            ? earningsEntry.earnings * (affiliate.commissionRate / 100)
+            : 0,
+        };
+      }),
+      pagination: {
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 12. List Promotional Materials
+export const getPromoMaterials = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const affiliate =
+      await Affiliate.findById(affiliateId).select('referralCode');
+    const materials = await PromoMaterial.find().select(
+      'type url dimensions trackingLink',
+    );
+
+    res.json(
+      materials.map((material) => ({
+        materialId: material._id,
+        type: material.type,
+        url: material.url,
+        dimensions: material.dimensions,
+        trackingLink: material.trackingLink
+          ? `${material.trackingLink}?ref=${affiliate.referralCode}`
+          : undefined,
+      })),
+    );
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 13. Admin Upload Promotional Material
+export const uploadPromoMaterial = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    const { type, dimensions } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: 'File is required' });
+    }
+
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: 'promo_materials',
+      resource_type: 'auto',
+    });
+
+    const material = new PromoMaterial({
+      type,
+      url: result.secure_url,
+      dimensions,
+    });
+
+    await material.save();
+
+    // Notify affiliates about new promotional material
+    const affiliates = await Affiliate.find({
+      'notificationPreferences.campaignUpdates': true,
+    });
+    for (const affiliate of affiliates) {
+      await sendEmail(
+        affiliate.email,
+        'New Promotional Material Available',
+        `A new ${type} has been added to your affiliate dashboard. Check it out to boost your campaigns!`,
+        `${affiliate.firstname} ${affiliate.lastname}`,
+      );
+    }
+
+    res.status(201).json({
+      materialId: material._id,
+      type: material.type,
+      url: material.url,
+      dimensions: material.dimensions,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 14. Generate Performance Report
+export const generatePerformanceReport = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const { startDate, endDate, format } = req.query;
+
+    const affiliate =
+      await Affiliate.findById(affiliateId).select('commissionRate');
+    const query: any = { referredBy: affiliateId };
+    if (startDate && endDate) {
+      query.created_at = {
+        $gte: new Date(startDate as string),
+        $lte: new Date(endDate as string),
+      };
+    }
+
+    const referrals = await Player.find(query).select(
+      'username created_at status',
+    );
+    const clicks = await Click.find({
+      affiliateId,
+      ...(startDate && endDate && query.created_at),
+    }).countDocuments();
+    const earnings = await Transaction.aggregate([
+      {
+        $match: {
+          player_id: { $in: referrals.map((r) => r._id) },
+          transaction_type: 'win',
+          status: 'completed',
+          ...(startDate && endDate && { created_at: query.created_at }),
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          total: { $sum: '$amount' },
+        },
+      },
+    ]);
+
+    const data = {
+      clicks,
+      signups: referrals.length,
+      conversions: referrals.filter((r) => r.status === 1).length,
+      totalEarnings: earnings[0]?.total
+        ? earnings[0].total * (affiliate.commissionRate / 100)
+        : 0,
+      referrals: referrals.map((r) => ({
+        username: r.username,
+        signupDate: r.created_at,
+        status: r.status,
+      })),
+    };
+
+    if (format === 'csv') {
+      const fields = ['clicks', 'signups', 'conversions', 'totalEarnings'];
+      const csvParser = new Parser({ fields });
+      const csv = csvParser.parse([data]);
+      res.header('Content-Type', 'text/csv');
+      res.attachment(`affiliate_report_${Date.now()}.csv`);
+      return res.send(csv);
+    } else {
+      const doc = new PDFDocument();
+      res.header('Content-Type', 'application/pdf');
+      res.attachment(`affiliate_report_${Date.now()}.pdf`);
+
+      doc
+        .fontSize(20)
+        .text('Affiliate Performance Report', { align: 'center' });
+      doc.moveDown();
+      doc.fontSize(14).text(`Clicks: ${data.clicks}`);
+      doc.text(`Signups: ${data.signups}`);
+      doc.text(`Conversions: ${data.conversions}`);
+      doc.text(`Total Earnings: ${data.totalEarnings.toFixed(2)} USD`);
+      doc.moveDown();
+      doc.text('Referrals:', { underline: true });
+      data.referrals.forEach((r) => {
+        doc.text(`- ${r.username} (Signed up: ${r.signupDate.toISOString()})`);
+      });
+
+      doc.pipe(res);
+      doc.end();
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+// 15. Update Communication Preferences
+export const updatePreferences = async (req: CustomRequest, res: Response) => {
+  try {
+    const affiliateId = req.user.id;
+    ensureAffiliate(req.user);
+
+    const { marketingEmailsOptIn, notificationPreferences } = req.body;
+
+    const affiliate = await Affiliate.findById(affiliateId);
+    if (!affiliate) {
+      return res.status(404).json({ message: 'Affiliate not found' });
+    }
+
+    if (marketingEmailsOptIn !== undefined) {
+      affiliate.marketingEmailsOptIn = marketingEmailsOptIn;
+      if (marketingEmailsOptIn) {
+        await sendEmail(
+          affiliate.email,
+          'Welcome to Our Newsletter',
+          'You’ve subscribed to our marketing emails. Stay tuned for exclusive updates and offers!',
+          `${affiliate.firstname} ${affiliate.lastname}`,
+        );
+      }
+    }
+    if (notificationPreferences) {
+      affiliate.notificationPreferences = {
+        ...affiliate.notificationPreferences,
+        ...notificationPreferences,
+      };
+    }
+
+    await affiliate.save();
+
+    res.json({
+      marketingEmailsOptIn: affiliate.marketingEmailsOptIn,
+      notificationPreferences: affiliate.notificationPreferences,
+    });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Server error', error: (error as Error).message });
   }
 };

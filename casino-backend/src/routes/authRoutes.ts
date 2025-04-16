@@ -2,7 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
 import * as paymentController from '../controllers/paymentController';
-import { body, oneOf } from 'express-validator';
+import { body, oneOf, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
 import { verifyToken, verifyAdmin } from '../utils/jwt';
@@ -27,6 +27,13 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: 'Too many attempts from this IP, please try again later',
+});
+
+const clickLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100,
+  message:
+    'Too many click tracking requests from this IP, please try again later',
 });
 const resendEmailLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -474,19 +481,36 @@ router.post(
 );
 
 router.get('/verify-affiliate-email', authController.verifyAffiliateEmail);
-router.get('/affiliate-users',verifyAdmin,authController.getAffliateUsers);
-router.patch('/affiliate-users/status/:id',verifyAdmin,authController.updateAffliateUsersStatus);
-router.get('/affiliate-users/:id',verifyAdmin,authController.getAffliateUsersDetails);
-router.patch('/affiliate-users',verifyToken,authController.updateAffliateUsersDetails);
-router.post('/affiliate-login', affiliateloginValidation, handleValidationErrors, authController.affiliatelogin);
+router.get('/affiliate-users', verifyAdmin, authController.getAffliateUsers);
+router.patch(
+  '/affiliate-users/status/:id',
+  verifyAdmin,
+  authController.updateAffliateUsersStatus,
+);
+router.get(
+  '/affiliate-users/:id',
+  verifyAdmin,
+  authController.getAffliateUsersDetails,
+);
+router.patch(
+  '/affiliate-users',
+  verifyToken,
+  authController.updateAffliateUsersDetails,
+);
+router.post(
+  '/affiliate-login',
+  affiliateloginValidation,
+  handleValidationErrors,
+  authController.affiliatelogin,
+);
 
 router.post(
   '/affiliate/forgot-password',
   body('email')
-  .isEmail()
-  .normalizeEmail()
-  .withMessage('Valid email is required'),
-validateRequest,
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  validateRequest,
   authController.affiliateForgotPassword,
 );
 
@@ -590,6 +614,197 @@ router.delete(
   verifyToken,
   verifyAdmin,
   paymentController.deletePaymentConfig,
+);
+
+// Affiliate Dashboard
+router.get(
+  '/affiliate/dashboard',
+  verifyToken,
+  authController.getAffiliateDashboard,
+);
+
+// Create Referral Link
+router.post(
+  '/affiliate/referral-links',
+  verifyToken,
+  [
+    body('campaignName')
+      .trim()
+      .notEmpty()
+      .withMessage('Campaign name is required'),
+    body('destinationUrl').isURL().withMessage('Invalid destination URL'),
+  ],
+  validateRequest,
+  authController.createReferralLink,
+);
+
+// List Referral Links
+router.get(
+  '/affiliate/referral-links',
+  verifyToken,
+  authController.getReferralLinks,
+);
+
+// Track Referral Click
+router.post(
+  '/affiliate/track-click',
+  clickLimiter,
+  [
+    body('trackingId').notEmpty().withMessage('Tracking ID is required'),
+    body('ipAddress').optional().isIP().withMessage('Invalid IP address'),
+  ],
+  validateRequest,
+  authController.trackReferralClick,
+);
+
+router.post(
+  '/affiliate/payouts/request',
+  verifyToken,
+  [
+    body('amount').isFloat({ min: 1 }).withMessage('Amount must be at least 1'),
+    body('paymentMethodId')
+      .optional()
+      .isString()
+      .withMessage('Invalid payment method ID'),
+    body('currency').isString().withMessage('Currency is required'),
+  ],
+  validateRequest,
+  authController.requestPayout,
+);
+
+// List Payouts
+router.get('/affiliate/payouts', verifyToken, authController.getPayouts);
+
+// Admin Update Payout Status
+router.patch(
+  '/admin/affiliate/payouts/:payoutId',
+  verifyToken,
+  verifyAdmin,
+  [
+    body('status')
+      .isIn(['approved', 'rejected', 'paid'])
+      .withMessage('Invalid status'),
+    body('adminNotes').optional().trim(),
+  ],
+  validateRequest,
+  authController.updatePayoutStatus,
+);
+
+// Admin List All Payouts
+router.get(
+  '/admin/affiliate/payouts',
+  verifyToken,
+  verifyAdmin,
+  authController.getAllPayouts,
+);
+
+// Create Commission Tier
+router.post(
+  '/admin/affiliate/tiers',
+  verifyToken,
+  verifyAdmin,
+  [
+    body('tierName').trim().notEmpty().withMessage('Tier name is required'),
+    body('minReferrals')
+      .isInt({ min: 0 })
+      .withMessage('Minimum referrals must be a non-negative integer'),
+    body('commissionRate')
+      .isFloat({ min: 0, max: 100 })
+      .withMessage('Commission rate must be between 0 and 100'),
+    body('currency').isString().withMessage('Currency is required'),
+  ],
+  validateRequest,
+  authController.createCommissionTier,
+);
+
+// Update Commission Tier
+router.patch(
+  '/admin/affiliate/tiers/:tierId',
+  verifyToken,
+  verifyAdmin,
+  [
+    body('tierName')
+      .optional()
+      .trim()
+      .notEmpty()
+      .withMessage('Tier name cannot be empty'),
+    body('minReferrals')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Minimum referrals must be a non-negative integer'),
+    body('commissionRate')
+      .optional()
+      .isFloat({ min: 0, max: 100 })
+      .withMessage('Commission rate must be between 0 and 100'),
+    body('currency').optional().isString().withMessage('Currency is required'),
+  ],
+  validateRequest,
+  authController.updateCommissionTier,
+);
+
+// List Referrals
+router.get('/affiliate/referrals', verifyToken, authController.getReferrals);
+
+// List Promotional Materials
+router.get(
+  '/affiliate/promo-materials',
+  verifyToken,
+  authController.getPromoMaterials,
+);
+
+// Admin Upload Promotional Material
+router.post(
+  '/admin/affiliate/promo-materials',
+  verifyToken,
+  verifyAdmin,
+  upload.single('file'),
+  [
+    body('type')
+      .isIn(['banner', 'logo', 'video'])
+      .withMessage('Invalid material type'),
+    body('dimensions').optional().trim(),
+  ],
+  validateRequest,
+  authController.uploadPromoMaterial,
+);
+
+// Generate Performance Report
+router.get(
+  '/affiliate/reports',
+  verifyToken,
+  [
+    query('startDate').optional().isISO8601().withMessage('Invalid start date'),
+    query('endDate').optional().isISO8601().withMessage('Invalid end date'),
+    query('format').isIn(['csv', 'pdf']).withMessage('Invalid format'),
+  ],
+  validateRequest,
+  authController.generatePerformanceReport,
+);
+
+// Update Communication Preferences
+router.patch(
+  '/affiliate/preferences',
+  verifyToken,
+  [
+    body('marketingEmailsOptIn')
+      .optional()
+      .isBoolean()
+      .withMessage('Marketing emails opt-in must be a boolean'),
+    body('notificationPreferences.newReferral')
+      .optional()
+      .isBoolean()
+      .withMessage('New referral preference must be a boolean'),
+    body('notificationPreferences.payoutProcessed')
+      .optional()
+      .isBoolean()
+      .withMessage('Payout processed preference must be a boolean'),
+    body('notificationPreferences.campaignUpdates')
+      .optional()
+      .isBoolean()
+      .withMessage('Campaign updates preference must be a boolean'),
+  ],
+  validateRequest,
+  authController.updatePreferences,
 );
 
 export default router;

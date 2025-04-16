@@ -4,7 +4,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { STATUS, VERIFICATION, TWO_FA } from '../constants';
-import { sendResetEmail ,sendResetAffiliateEmail} from '../utils/sendResetEmail';
+import {
+  sendResetEmail,
+  sendResetAffiliateEmail,
+} from '../utils/sendResetEmail';
 import {
   generateTokenResponse,
   generateReferralCode,
@@ -835,7 +838,6 @@ export const updateProfile = async (
   if (!player) throw new Error('User not found');
 
   const updates: any = {};
-  let logoutRequired = false;
   let verificationToken: string | undefined;
 
   if (data.email && data.email !== player.email) {
@@ -853,10 +855,12 @@ export const updateProfile = async (
     verificationToken = crypto.randomBytes(32).toString('hex');
     updates.new_email = data.email;
     updates.verification_token = verificationToken;
-    updates.verification_token_expires = new Date(Date.now() + 3600000); // 1 hour
-    logoutRequired = true;
+    updates.verification_token_expires = new Date(Date.now() + 3600000);
+    updates.email_verified = false;
+    console.log(`Setting new_email to ${data.email} for player ${playerId}`);
   }
 
+  // Handle other fields
   if (data.phone_number !== undefined) {
     if (data.phone_number && !/^\+?[1-9]\d{1,14}$/.test(data.phone_number)) {
       throw new Error('Invalid phone number format');
@@ -876,7 +880,6 @@ export const updateProfile = async (
     }
   }
 
-  // Handle other fields
   if (data.fullname) updates.fullname = data.fullname;
   if (data.username) updates.username = data.username;
   if (data.language) updates.language = data.language;
@@ -888,13 +891,16 @@ export const updateProfile = async (
 
   Object.assign(player, updates);
   await player.save();
+  console.log(`Player ${playerId} updated with new_email: ${player.new_email}`);
 
   if (verificationToken && updates.new_email) {
+    console.log(`Sending verification email to ${updates.new_email}`);
     await sendVerificationEmail(updates.new_email, verificationToken);
   }
+
   return {
     ...player.toObject(),
-    logoutRequired,
+    logoutRequired: false,
   };
 };
 
@@ -1164,11 +1170,11 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
 
 export const affiliateforgotPassword = async (data: ForgotPasswordData) => {
   const { email } = data;
-  if (!email ) {
+  if (!email) {
     throw new Error('Invalid request. Please check your input');
   }
 
-  const affiliate = await Affiliate.findOne({email});
+  const affiliate = await Affiliate.findOne({ email });
   if (!affiliate) {
     throw new Error('No account found with this email address');
   }

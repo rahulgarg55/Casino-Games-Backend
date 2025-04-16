@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { STATUS } from '../constants';
 
-// Define the interface for TypeScript
 export interface IAffiliate extends Document {
   firstname: string;
   lastname: string;
@@ -8,8 +8,8 @@ export interface IAffiliate extends Document {
   phonenumber?: string;
   country: string;
   password?: string;
-  referralCode?: string;
-  promotionMethod?: { type: string[] };
+  referralCode: string;
+  promotionMethod?: string[];
   hearAboutUs: string;
   status: number;
   verification_token?: string;
@@ -18,9 +18,18 @@ export interface IAffiliate extends Document {
   referral_code?: string;
   reset_password_token?: string;
   reset_password_expires?: Date;
+  totalClicks?: number;
+  totalSignups?: number;
+  totalEarnings?: number;
+  paidEarnings?: number;
+  commissionRate?: number;
+  notificationPreferences?: {
+    newReferral?: boolean;
+    payoutProcessed?: boolean;
+    campaignUpdates?: boolean;
+  };
 }
 
-// Define the Mongoose schema
 const AffiliateSchema: Schema = new Schema(
   {
     firstname: { type: String, required: true },
@@ -29,30 +38,36 @@ const AffiliateSchema: Schema = new Schema(
     phonenumber: { type: String },
     country: { type: String, required: true },
     password: { type: String },
-    referralCode: { type: String },
+    referralCode: { type: String, required: true, unique: true },
     promotionMethod: { type: [String] },
     hearAboutUs: { type: String, required: true },
-    status: { type: Number, default: 0 }, //  ACTIVE: 1,INACTIVE: 0, BANNED:2
-    verification_token: {
-      type: String,
+    status: {
+      type: Number,
+      enum: [STATUS.INACTIVE, STATUS.ACTIVE, STATUS.BANNED],
+      default: STATUS.INACTIVE,
     },
-    verification_token_expires: {
-      type: Date,
-    },
+    verification_token: { type: String },
+    verification_token_expires: { type: Date },
     marketingEmailsOptIn: { type: Boolean, default: false },
-    referral_code: { type: String },
-    reset_password_token: {
-      type: String,
-    },
-    reset_password_expires: {
-      type: Date,
+    reset_password_token: { type: String },
+    reset_password_expires: { type: Date },
+    totalClicks: { type: Number, default: 0 },
+    totalSignups: { type: Number, default: 0 },
+    totalEarnings: { type: Number, default: 0 },
+    paidEarnings: { type: Number, default: 0 },
+    commissionRate: { type: Number, default: 10 },
+    notificationPreferences: {
+      newReferral: { type: Boolean, default: true },
+      payoutProcessed: { type: Boolean, default: true },
+      campaignUpdates: { type: Boolean, default: true },
     },
   },
   { timestamps: true },
 );
 
-// Export the model
+AffiliateSchema.index({ referralCode: 1 }, { unique: true });
+
 export const Affiliate = mongoose.model<IAffiliate>(
-  'Affiliates',
+  'Affiliate',
   AffiliateSchema,
 );
