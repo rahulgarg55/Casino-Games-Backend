@@ -36,6 +36,8 @@ import {
 } from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
+import { server_messages,LanguageRequest } from "../utils/server_messages";
+
 
 interface CustomRequest extends Request {
   user?: {
@@ -364,6 +366,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
 };
 
 export const getAllPlayers = async (req: Request, res: Response) => {
+  const lang = (req as LanguageRequest).language || 'en';
   try {
     const players = await Player.find({ role_id: 0 }) // Only get non-admin users
       .select('-password_hash -verification_token -reset_password_token')
@@ -396,14 +399,14 @@ export const getAllPlayers = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Players retrieved successfully',
+      message: server_messages[lang].playersList,
       data: { players: playersWithBalance },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to retrieve players',
+      error instanceof Error ? error.message : server_messages[lang].playersFailed,
     );
   }
 };

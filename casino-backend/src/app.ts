@@ -12,6 +12,7 @@ import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import dotenv from 'dotenv';
+import languageMiddleware from "./middlewares/languageMiddleware";
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ const logger = winston.createLogger({
   ],
 });
 
+app.use(languageMiddleware);
 app.use(
   expressWinston.logger({
     winstonInstance: logger,
