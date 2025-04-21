@@ -80,7 +80,7 @@ interface UpdateProfileData {
   country?: string;
 }
 
-export const register = async (data: RegistrationData) => {
+export const register = async (data: RegistrationData,req:any) => {
   const {
     username,
     email,
@@ -111,7 +111,7 @@ export const register = async (data: RegistrationData) => {
 
   const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
-    throw new Error('User already registered');
+    throw new Error((req as any).__('USER_ALREADY_EXIST'));
   }
   if (existingUser) {
     if (existingUser.username === username) {
@@ -173,7 +173,7 @@ export const register = async (data: RegistrationData) => {
     });
     if (!referringAffiliate) {
       throw new Error(
-        'Invalid referral code, Please enter valid referral code',
+        (req as any).__('INVALID_REFERRAL')
       );
     }
 

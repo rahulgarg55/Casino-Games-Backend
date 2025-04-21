@@ -69,10 +69,11 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { player, balance, token, expiresIn } = await authService.register(
       req.body,
+      req
     );
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: (req as any).__('USER_REGISTER'),
       data: {
         user: {
           id: player._id,
@@ -102,24 +103,24 @@ export const register = async (req: Request, res: Response) => {
     if (error instanceof Error) {
       if (error.message.includes('Username is already taken')) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: 'Username is already taken' },
+          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
         ]);
       } else if (error.message.includes('Email is already registered')) {
         sendErrorResponse(res, 409, [
-          { param: 'email', message: 'Email is already registered' },
+          { param: 'email', message: (req as any).__('EMIAL_ALREADY_REGISTER') },
         ]);
       } else if (error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
           {
             param: 'phone_number',
-            message: 'Phone number is already registered',
+            message:  (req as any).__('PHONE_ALREADY_REGISTER'),
           },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
       }
     } else {
-      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
+      sendErrorResponse(res, 400,  (req as any).__('INVALID_REQUEST'));
     }
   }
 };
@@ -320,7 +321,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const viewProfile = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const playerId = req.user.id;
@@ -338,14 +339,14 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     ]);
 
     if (!player) {
-      return sendErrorResponse(res, 404, 'User not found');
+      return sendErrorResponse(res, 404, (req as any).__('USER_NOT_FOUND'));
     }
 
     const balance = await PlayerBalance.findOne({ player_id: playerId });
 
     res.status(200).json({
       success: true,
-      message: 'User profile retrieved successfully',
+      message:(req as any).__('USER_PROFILE_FOUND'),
       data: {
         user: {
           ...player.toObject(),
@@ -360,13 +361,12 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to retrieve profile',
+      error instanceof Error ? error.message : (req as any).__('USER_PROFILE_FAILED'),
     );
   }
 };
 
 export const getAllPlayers = async (req: Request, res: Response) => {
-  const lang = (req as LanguageRequest).language || 'en';
   try {
     const players = await Player.find({ role_id: 0 }) // Only get non-admin users
       .select('-password_hash -verification_token -reset_password_token')
@@ -399,14 +399,14 @@ export const getAllPlayers = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: server_messages[lang].playersList,
+      message: (req as any).__('PLAYERS_LIST'),
       data: { players: playersWithBalance },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : server_messages[lang].playersFailed,
+      error instanceof Error ? error.message :(req as any).__('PLAYERS_FAILED'),
     );
   }
 };
@@ -416,7 +416,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return sendErrorResponse(res, 400, 'Invalid user ID format');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_ID'));
     }
 
     const player = (await Player.findById(userId)
@@ -435,7 +435,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       .lean()) as IPlayer | null;
 
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     const balance = (await PlayerBalance.findOne({
@@ -503,7 +503,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Player details retrieved successfully',
+      message: (req as any).__('PLAYERS_DETAILS'),
       data: { player: playerData },
     });
   } catch (error) {
@@ -513,7 +513,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? `Server error: ${error.message}`
-        : 'Failed to retrieve player details',
+        : (req as any).__('PLAYERS_DETAILS_FAILED'),
     );
   }
 };
@@ -707,19 +707,19 @@ export const updatePlayerStatus = async (req: Request, res: Response) => {
       { new: true },
     );
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Player status updated successfully',
+      message: (req as any).__('PLAYER_STATUS_UPDATED'),
       data: { id: player._id, status: player.status },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to update player status',
+      error instanceof Error ? error.message :  (req as any).__('PLAYER_STATUS_FAILED'),
     );
   }
 };
@@ -730,19 +730,19 @@ export const deletePlayer = async (req: Request, res: Response) => {
 
     const player = await Player.findByIdAndDelete(userId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Player deleted successfully',
+      message: (req as any).__('PLAYER_DELETED'),
       data: { id: player._id },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to delete player',
+      error instanceof Error ? error.message : (req as any).__('PLAYER_DELETED_FAILDED'),
     );
   }
 };

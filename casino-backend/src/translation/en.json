@@ -1,0 +1,23 @@
+{
+  "AUTHENTICATION_REQUIRED": "Authentication required",
+  "USER_NOT_FOUND": "User not found",
+  "USER_PROFILE_FOUND": "User profile retrieved successfully",
+  "USER_PROFILE_FAILED": "Failed to retrieve profile",
+  "USER_REGISTER":"User registered successfully",
+  "USER_NAME_ALREADY":"Username is already taken",
+  "USER_ALREADY_EXIST":"User already registered",
+  "EMIAL_ALREADY_REGISTER":"Email is already registered",
+ "PHONE_ALREADY_REGISTER":"Phone number is already registered",
+ "INVALID_REQUEST":"Invalid request. Please check your input",
+ "INVALID_REFERRAL":"Invalid referral code, Please enter valid referral code",
+  "INVALID_ID": "Invalid user ID format",
+  "PLAYERS_LIST": "Players retrieved successfully",
+  "PLAYERS_FAILED": "Failed to retrieve players",
+  "PLAYER_NOT_FOUND": "Player not found",
+  "PLAYERS_DETAILS": "Player details retrieved successfully",
+  "PLAYERS_DETAILS_FAILED": "Failed to retrieve player details",
+  "PLAYER_DELETED": "Player deleted successfully",
+  "PLAYER_DELETED_FAILDED": "Failed to delete player",
+  "PLAYER_STATUS_UPDATED": "Player status updated successfully",
+  "PLAYER_STATUS_FAILED": "Failed to update player status"
+}

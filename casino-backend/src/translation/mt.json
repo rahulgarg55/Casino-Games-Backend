@@ -1,0 +1,23 @@
+{
+    "AUTHENTICATION_REQUIRED": "Huwa meħtieġ l-awtentikazzjoni",
+    "USER_NOT_FOUND": "L-utent ma nstabx",
+    "USER_PROFILE_FOUND": "Profil tal-utent irkuprat b'suċċess",
+    "USER_PROFILE_FAILED": "Fallu li jinġabar il-profil",
+    "USER_REGISTER": "Utent irreġistrat b'suċċess",
+    "USER_NAME_ALREADY": "L-isem tal-utent diġà jintuża",
+    "USER_ALREADY_EXIST": "L-utent diġà irreġistrat",
+    "EMIAL_ALREADY_REGISTER": "L-email diġà rreġistrata",
+    "PHONE_ALREADY_REGISTER": "In-numru tat-telefon diġà rreġistrat",
+    "INVALID_REQUEST": "Talba invalida. Jekk jogħġbok iċċekkja d-dejta tiegħek",
+    "INVALID_REFERRAL": "Kodiċi ta' referenza invalidu, jekk jogħġbok daħħal kodiċi validu",
+    "INVALID_ID": "Format tal-ID tal-utent mhux validu",
+    "PLAYERS_LIST": "Plejers irkuprati b'suċċess",
+    "PLAYERS_FAILED": "Fallu li jiġu rkuprati l-plejers",
+    "PLAYER_NOT_FOUND": "Il-plejer ma nstabx",
+    "PLAYERS_DETAILS": "Dettalji tal-plejer irkuprati b'suċċess",
+    "PLAYERS_DETAILS_FAILED": "Fallu li jiġu rkuprati d-dettalji tal-plejer",
+    "PLAYER_DELETED": "Il-plejer tħassar b'suċċess",
+    "PLAYER_DELETED_FAILDED": "Fallu fit-tħassir tal-plejer",
+    "PLAYER_STATUS_UPDATED": "L-istatus tal-plejer aġġornat b'suċċess",
+    "PLAYER_STATUS_FAILED": "Fallu fl-aġġornament tal-istatus tal-plejer"
+  }  
