@@ -149,7 +149,7 @@ export const affiliateRegister = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { user, token } = await authService.login(req.body);
+    const { user, token } = await authService.login(req.body,req);
 
     if (user.requires2FA) {
       await authService.initiate2FA(user.id);
@@ -161,7 +161,7 @@ export const login = async (req: Request, res: Response) => {
     }
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: (req as any).__('LOGIN_SUCCESSFULLY'),
       data: {
         user: {
           ...user,
@@ -178,7 +178,7 @@ export const login = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid username or password',
+      error instanceof Error ? error.message : (req as any).__('INVALID_USERNAME_PASSWORD'),
     );
   }
 };
@@ -215,23 +215,24 @@ export const verify2FA = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
     if (!playerId || !otp) {
-      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+      return sendErrorResponse(res, 400, (req as any).__('PLAYERSID_OTP_REQUIRED'));
     }
     const { token, expiresIn, user } = await authService.verify2FA(
       playerId,
       otp,
+      req
     );
 
     res.status(200).json({
       success: true,
-      message: '2FA verification successful',
+      message: (req as any).__('2FA_VERIFIED'),
       data: { user, token, expiresIn },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid OTP',
+      error instanceof Error ? error.message : (req as any).__('INVALID_OTP'),
     );
   }
 };
@@ -239,14 +240,14 @@ export const verify2FA = async (req: Request, res: Response) => {
 export const toggle2FA = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
     const { enabled, method, password } = req.body;
     if (typeof enabled !== 'boolean' || !method || !password) {
       return sendErrorResponse(
         res,
         400,
-        'Enabled, method, and password are required',
+        (req as any).__('TOGGLE-2FA-REQUIRED-FIELD'),
       );
     }
     const result = await authService.toggle2FA(
@@ -254,6 +255,7 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
       enabled,
       method,
       password,
+      req
     );
 
     res.status(200).json({
@@ -265,7 +267,7 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to toggle 2FA',
+      error instanceof Error ? error.message : (req as any).__('FAILED_TOOGLE_2FA'),
     );
   }
 };
@@ -277,14 +279,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'Please provide either email or phone number',
+        (req as any).__('PLEASE_PROVIDE_EMAIL_OR_PHONE')
       );
     }
-    await authService.forgotPassword({ email, phone_number });
+    await authService.forgotPassword({ email, phone_number},req);
 
     res.status(200).json({
       success: true,
-      message: 'Password reset link has been sent to your email',
+      message: (req as any).__('PASSWORD_LINK_SENT'),
     });
   } catch (error) {
     sendErrorResponse(
@@ -292,7 +294,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to process password reset',
+        : (req as any).__('FAILED_PASSWORD_LINK'),
     );
   }
 };
@@ -301,19 +303,18 @@ export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
-      return sendErrorResponse(res, 400, 'Token and password are required');
+      return sendErrorResponse(res, 400,(req as any).__('TOKEN_PASSWORD_REQUIRED'));
     }
-    await resetPasswordService({ token, password });
-
+    await resetPasswordService({ token, password },req);
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message:(req as any).__('PASSWORD_UPDATED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Invalid or expired reset token',
+      error instanceof Error ? error.message : (req as any).__('INVALID_EXPRIRE_TOKEN'),
     );
   }
 };
@@ -755,14 +756,14 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
     const result = await getNotifications(page, limit);
     res.status(200).json({
       success: true,
-      message: 'Notifications retrieved successfully',
+      message: (req as any).__('NOTIFICATION_FOUND'),
       data: result,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to fetch notifications',
+      error instanceof Error ? error.message : (req as any).__('FAILED_NOTIFICATION'),
     );
   }
 };
@@ -846,16 +847,16 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 export const uploadPhoto = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.file) {
-      return sendErrorResponse(res, 400, 'No photo provided');
+      return sendErrorResponse(res, 400,  (req as any).__('PHOTO_REQUIRED'));
     }
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401,  (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const playerId = req.user.id;
     const player = await Player.findById(playerId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'User not found');
+      return sendErrorResponse(res, 404,(req as any).__('USER_NOT_FOUND'));
     }
 
     const result = await cloudinary.uploader.upload(req.file.path, {
@@ -866,14 +867,14 @@ export const uploadPhoto = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Photo uploaded successfully',
+      message:(req as any).__('PHOTO_UPLOADED'),
       data: { photo: player.photo },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to upload photo',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PHOTO_UPLOAD'),
     );
   }
 };
@@ -930,7 +931,7 @@ export const facebookCallback = (req: Request, res: Response) => {
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
   if (!token || typeof token !== 'string') {
-    return sendErrorResponse(res, 400, 'Invalid or missing token');
+    return sendErrorResponse(res, 400, (req as any).__('INVALID_MISSING_TOKEN'));
   }
 
   try {
@@ -948,7 +949,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     });
 
     if (!player) {
-      return sendErrorResponse(res, 400, 'Invalid or expired token');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_EXPRIRE_TOKEN'));
     }
     if (player.new_email) {
       player.email = player.new_email;
@@ -965,14 +966,14 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully. Please login with your new email.',
+      message: (req as any).__('EMAIL_VERIFIED'),
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to verify email',
+      error instanceof Error ? error.message : (req as any).__('FAILED_EMAIL_VERIFIED'),
     );
   }
 };
@@ -982,7 +983,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
 
   try {
     if (!email) {
-      return sendErrorResponse(res, 400, 'Email is required');
+      return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
     }
 
     // Log the incoming email for debugging
@@ -997,13 +998,13 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       return sendErrorResponse(
         res,
         404,
-        'No account found with this email address',
+        (req as any).__('NO_ACCOUNT_WITH_EMAIL'),
       );
     }
 
     // If email is already verified and no new_email is pending, no need to resend
     if (player.email_verified && !player.new_email) {
-      return sendErrorResponse(res, 400, 'Email is already verified');
+      return sendErrorResponse(res, 400,  (req as any).__('EMAIL_ALREADY_VERIFIED'));
     }
 
     // Generate new verification token
@@ -1019,7 +1020,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Verification email has been sent',
+      message: (req as any).__('EMAIL_VERIFICATION_LINK_SENT'),
       data: { verification_token: verificationToken },
     });
   } catch (error) {
@@ -1029,7 +1030,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to resend verification email',
+        : (req as any).__('FAILED_TO_RESEND_EMAIL_LINK'),
     );
   }
 };
@@ -1038,19 +1039,19 @@ export const verifyPhone = async (req: Request, res: Response) => {
   try {
     const { phone_number, code } = req.body;
     if (!phone_number || !code) {
-      return sendErrorResponse(res, 400, 'Phone number and code are required');
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
     }
 
-    await authService.verifyPhoneNumber(phone_number, code);
+    await authService.verifyPhoneNumber(phone_number, code,req);
     res.status(200).json({
       success: true,
-      message: 'Phone number verified successfully',
+      message: (req as any).__('PHONE_VERIFIED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Phone verification failed',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION'),
     );
   }
 };
@@ -1059,24 +1060,25 @@ export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
     if (!playerId || !otp) {
-      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+      return sendErrorResponse(res, 400,  (req as any).__('PLAYERSID_OTP_REQUIRED'));
     }
 
     const { token, expiresIn, user } = await authService.verifyOTP(
       playerId,
       otp,
+      req
     );
 
     res.status(200).json({
       success: true,
-      message: 'OTP verified successfully',
+      message:(req as any).__('OTP_VERIFIED'),
       data: { user, token, expiresIn },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid OTP',
+      error instanceof Error ? error.message : (req as any).__('INVALID_OTP'),
     );
   }
 };
@@ -1085,12 +1087,12 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
   try {
     const { playerId, consent } = req.body;
     if (!playerId || consent === undefined) {
-      return sendErrorResponse(res, 400, 'Player ID and consent are required');
+      return sendErrorResponse(res, 400, (req as any).__('PLAYERSID_CONSENT_REQUIRED'));
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     player.cookieConsent = consent;
@@ -1098,7 +1100,7 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Cookie consent updated successfully',
+      message:  (req as any).__('COIKIE_CONSENT_UPDATED'),
       data: { playerId: player._id, cookieConsent: player.cookieConsent },
     });
   } catch (error) {
@@ -1107,7 +1109,7 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to update cookie consent',
+        :  (req as any).__('FAILED_UPDATE_CONSENT'),
     );
   }
 };
@@ -1118,14 +1120,14 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
 
   try {
     if (!playerId) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     if (!currentPassword || !newPassword) {
       return sendErrorResponse(
         res,
         400,
-        'Both current and new passwords are required',
+        (req as any).__('CURRENT_PASSWORD_NEW_PASSWORD_REQUIRED'),
       );
     }
 
@@ -1133,18 +1135,18 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'Password must be at least 8 characters long and include a number',
+        (req as any).__('PASSWORD_MUST_LONG'),
       );
     }
 
     const player = await Player.findById(playerId).select('+password_hash');
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
-
+    
     const isMatch = await bcrypt.compare(currentPassword, player.password_hash);
     if (!isMatch) {
-      return sendErrorResponse(res, 400, 'Current password is incorrect');
+      return sendErrorResponse(res, 400,  (req as any).__('CURRENT_PASSWORD_INCORRECT'));
     }
 
     const isSamePassword = await bcrypt.compare(
@@ -1155,7 +1157,7 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'New password must be different from current password',
+        (req as any).__('NEW_PASSWORD_DIFFERENT'),
       );
     }
 
@@ -1165,14 +1167,14 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully',
+      message: (req as any).__('PASSWORD_CHANGED'),
     });
   } catch (error) {
     console.error('Error changing password:', error);
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to change password',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PASSWORD_CHANGED'),
     );
   }
 };

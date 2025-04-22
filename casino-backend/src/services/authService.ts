@@ -303,14 +303,14 @@ export const affiliateRegister = async (data: RegistrationData) => {
     },
   };
 };
-export const verifyPhoneNumber = async (phoneNumber: string, code: string) => {
+export const verifyPhoneNumber = async (phoneNumber: string, code: string,req:any) => {
   const player = await Player.findOne({
     phone_number: phoneNumber,
     sms_code: code,
     sms_code_expires: { $gt: new Date() },
   });
   if (!player) {
-    throw new Error('Invalid or expired verification code');
+    throw new Error((req as any).__('INVALID_CODE'));
   }
   player.is_verified = VERIFICATION.VERIFIED;
   player.sms_code = undefined;
@@ -324,11 +324,11 @@ const generateOTP = (): string => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-export const login = async (data: LoginData) => {
+export const login = async (data: LoginData,req:any) => {
   const { email, phone_number, password, role_id = 0 } = data;
 
   if (!email && !phone_number) {
-    throw new Error('Invalid request. Please check your input');
+    throw new Error((req as any).__('INVALID_REQUEST'));
   }
   const query = {
     role_id,
@@ -342,21 +342,21 @@ export const login = async (data: LoginData) => {
 
   if (!player) {
     if (email) {
-      throw new Error('Email does not exist');
+      throw new Error((req as any).__('EMAIL_NOT_EXIST'));
     }
-    throw new Error('User does not exist');
+    throw new Error((req as any).__('USER_NOT_EXIST'));
   }
 
   const isMatch = await bcrypt.compare(password, player.password_hash);
   if (!isMatch) {
-    throw new Error('Invalid password');
+    throw new Error((req as any).__('INVALID_PASSWORD'));
   }
   if (player.is_verified === VERIFICATION.UNVERIFIED) {
-    throw new Error('Please verify your account');
+    throw new Error((req as any).__('VERIFY_YOUR_ACCOUNT'));
   }
 
   if (player.status !== STATUS.ACTIVE) {
-    throw new Error('Your account has been locked. Please contact support');
+    throw new Error((req as any).__('YOUR_ACCOUNT_IS_LOCK'));
   }
 
   player.last_login = new Date();
@@ -365,7 +365,7 @@ export const login = async (data: LoginData) => {
   const playerBalance = await PlayerBalance.findOne({ player_id: player._id });
 
   if (!process.env.JWT_SECRET) {
-    throw new Error('An unexpected error occurred. Please try again later');
+    throw new Error((req as any).__('UNEXPECTED_ERR'));
   }
 
   const tokenData = generateTokenResponse(player);
@@ -492,21 +492,21 @@ export const initiate2FA = async (playerId: string) => {
 
   return { message: 'OTP sent successfully' };
 };
-export const verify2FA = async (playerId: string, otp: string) => {
+export const verify2FA = async (playerId: string, otp: string,req:any) => {
   const player = await Player.findById(playerId).select(
     '+two_factor_secret +two_factor_expires',
   );
   if (!player) {
-    throw new Error('Player not found');
+    throw new Error((req as any).__('PLAYER_NOT_FOUND'));
   }
   if (!player.two_factor_secret || !player.two_factor_expires) {
-    throw new Error('2FA not initiated');
+    throw new Error((req as any).__('2FA_NOT_INITATED'));
   }
   if (new Date() > player.two_factor_expires) {
-    throw new Error('OTP has expired');
+    throw new Error((req as any).__('OTP_EXPIRED'));
   }
   if (player.two_factor_secret !== otp) {
-    throw new Error('Invalid OTP');
+    throw new Error((req as any).__('INVALID_OTP'));
   }
 
   player.two_factor_secret = undefined;
@@ -541,18 +541,19 @@ export const toggle2FA = async (
   enabled: boolean,
   method?: 'email' | 'phone',
   password?: string,
+  req?:any
 ) => {
   const player = await Player.findById(playerId).select('+password_hash');
   if (!player) {
-    throw new Error('Player not found');
+    throw new Error((req as any).__('PLAYER_NOT_FOUND'));
   }
   if (password) {
     const isMatch = await bcrypt.compare(password, player.password_hash);
     if (!isMatch) {
-      throw new Error('Invalid password');
+      throw new Error((req as any).__('INVALID_PASSWORD'));
     }
   } else {
-    throw new Error('Password is required to toggle 2FA');
+    throw new Error((req as any).__('PASSWORD_REQUIRED_FOR_TOGGLE'));
   }
 
   player.is_2fa_enabled = enabled ? TWO_FA.ENABLED : TWO_FA.DISABLED;
@@ -772,15 +773,15 @@ const sendOTPBySMS = async (to: string, otp: string) => {
   });
 };
 
-export const forgotPassword = async (data: ForgotPasswordData) => {
+export const forgotPassword = async (data: ForgotPasswordData,req:any) => {
   const { email, phone_number } = data;
   if (!email && !phone_number) {
-    throw new Error('Invalid request. Please check your input');
+    throw new Error((req as any).__('INVALID_REQUEST'));
   }
 
   const player = await Player.findOne({ $or: [{ email }, { phone_number }] });
   if (!player) {
-    throw new Error('No account found with this email address');
+    throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL'));
   }
 
   const token = crypto.randomBytes(20).toString('hex');
@@ -792,7 +793,7 @@ export const forgotPassword = async (data: ForgotPasswordData) => {
   await sendResetEmail(email || phone_number!, token);
 };
 
-export const resetPassword = async (data: ResetPasswordData) => {
+export const resetPassword = async (data: ResetPasswordData,req:any) => {
   const { token, password } = data;
   const player = await Player.findOne({
     reset_password_token: token,
@@ -800,7 +801,7 @@ export const resetPassword = async (data: ResetPasswordData) => {
   });
 
   if (!player) {
-    throw new Error('Invalid or expired reset token');
+    throw new Error((req as any).__('INVALID_EXPRIRE_TOKEN'));
   }
   player.password_hash = await bcrypt.hash(password, 12);
   player.reset_password_token = undefined;
@@ -935,13 +936,13 @@ export const generateToken = async (player: any) => {
   return { token, expiresIn: 28800 };
 };
 
-export const verifyOTP = async (playerId: string, otp: string) => {
+export const verifyOTP = async (playerId: string, otp: string,req:any) => {
   const player = await Player.findById(playerId).select(
     '+two_factor_secret +two_factor_expires',
   );
 
   if (!player) {
-    throw new Error('Player not found');
+    throw new Error((req as any).__('PLAYER_NOT_FOUND'));
   }
 
   if (
@@ -950,7 +951,7 @@ export const verifyOTP = async (playerId: string, otp: string) => {
     player.two_factor_secret !== otp ||
     new Date() > player.two_factor_expires
   ) {
-    throw new Error('Invalid or expired OTP');
+    throw new Error((req as any).__('OTP_EXPIRED'));
   }
 
   player.two_factor_secret = undefined;
