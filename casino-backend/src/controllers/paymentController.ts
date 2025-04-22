@@ -4,6 +4,8 @@ import Player from '../models/player';
 import Transaction from '../models/transaction';
 import PaymentMethod from '../models/paymentMethod';
 import PaymentConfig from '../models/paymentConfig';
+import { Affiliate, IAffiliate } from '../models/affiliate';
+import Notification, { NotificationType } from '../models/notification';
 import { sendErrorResponse } from './authController';
 import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
@@ -713,6 +715,37 @@ async function handlePaymentIntentSucceeded(
         transaction.player_id.toString(),
         transaction.amount,
       );
+    } else if (transaction.transaction_type === 'win') {
+      const player = await Player.findById(transaction.player_id);
+      if (player && player.referredBy) {
+        const affiliate = await Affiliate.findById(player.referredBy);
+        if (affiliate) {
+          // Calculate 2% commission
+          const commission = transaction.amount * 0.02;
+          transaction.affiliateId = affiliate._id;
+          transaction.affiliateCommission = commission;
+          await transaction.save();
+
+          affiliate.totalEarnings = (affiliate.totalEarnings || 0) + commission;
+          affiliate.pendingEarnings = (affiliate.pendingEarnings || 0) + commission;
+          await affiliate.save();
+
+          const notification = new Notification({
+            type: NotificationType.AFFILIATE_COMMISSION,
+            message: `Earned ${commission.toFixed(2)} ${transaction.currency} commission from player ${player.username || 'Anonymous'}'s win`,
+            user_id: affiliate._id,
+            metadata: {
+              playerId: player._id,
+              transactionId: transaction._id,
+              amount: commission,
+              currency: transaction.currency,
+            },
+          });
+          await notification.save();
+
+          logger.info(`Affiliate ${affiliate.email} earned ${commission} commission from player ${player._id}`);
+        }
+      }
     }
 
     logger.info(`Transaction ${transaction._id} completed successfully`);

@@ -1145,8 +1145,9 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
       'Ohh! Your account is suspended due to some reason! PLease contact Adminstator ',
     );
   }
-
+  console.log('affiliate.status :>> ', affiliate.status);
   const isMatch = await bcrypt.compare(password, affiliate.password);
+  console.log('isMatch :>> ', isMatch);
 
   if (!isMatch) {
     throw new Error('Invalid password');

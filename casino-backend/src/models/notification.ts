@@ -7,12 +7,13 @@ export enum NotificationType {
   EMAIL_VERIFIED = 'EMAIL_VERIFIED',
   PHONE_VERIFIED = 'PHONE_VERIFIED',
   KYC_UPDATE = 'KYC_UPDATE',
+  AFFILIATE_COMMISSION = 'AFFILIATE_COMMISSION',
 }
 
 export interface INotification extends Document {
   type: NotificationType;
   message: string;
-  user_id: mongoose.Types.ObjectId;
+  user_id: mongoose.Types.ObjectId | null;
   metadata?: Record<string, any>;
   created_at: Date;
 }
@@ -29,8 +30,8 @@ const notificationSchema = new Schema({
   },
   user_id: {
     type: Schema.Types.ObjectId,
-    ref: 'Player',
-    required: true,
+    ref: 'Affiliate',
+    default: null,
   },
   metadata: {
     type: Schema.Types.Mixed,
