@@ -1186,19 +1186,19 @@ export const geStripeConfig = async (req: Request, res: Response) => {
     if (!existingConfig) {
       return res.status(404).json({
         success: false,
-        message: messages.stripeConfigNotFound,
+        message: (req as any).__('STRIPE_CONFIG_NOT_FOUND'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.stripeConfigFound,
+      message:(req as any).__('STRIPE_CONFIG_FOUND'),
       data: existingConfig,
     });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1213,7 +1213,7 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
     if (!existingConfig) {
       return res.status(404).json({
         success: false,
-        message: messages.stripeConfigNotFound,
+        message: (req as any).__('STRIPE_CONFIG_NOT_FOUND'),
       });
     }
 
@@ -1228,13 +1228,13 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: messages.stripeConfigUpdated,
+      message: (req as any).__('STRIPE_CONFIG_UPDATED'),
       data: updatedStripeConfig,
     });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1250,13 +1250,13 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
     if (!affiliateUserList.length) {
       return res.status(404).json({
         success: false,
-        message: messages.dataNotFound,
+        message: (req as any).__('DATA_NOT_FOUND'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.affiliateUserList,
+      message:(req as any).__('AFFILIATE_USERS_LIST'),
       data: {
         total: totalAffiliates,
         data: affiliateUserList,
@@ -1265,7 +1265,7 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1282,7 +1282,7 @@ export const updateAffliateUsersStatus = async (
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: messages.statusRequired,
+        message: (req as any).__('STATUS_REQUIRED'),
       });
     }
 
@@ -1293,7 +1293,7 @@ export const updateAffliateUsersStatus = async (
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
 
@@ -1307,7 +1307,7 @@ export const updateAffliateUsersStatus = async (
     if (!updatedAffiliate) {
       return res.status(400).json({
         success: false,
-        message: messages.failedToUpdateAffiliateStatus,
+        message: (req as any).__('FAILDE_TO_UPDATE_AFFILIATE_STATUS'),
       });
     }
 
@@ -1327,14 +1327,14 @@ export const updateAffliateUsersStatus = async (
 
     return res.status(200).json({
       success: true,
-      message: messages.updateAffiliateUserStatus,
+      message:(req as any).__('UPDATE_AFFILIATE_STATUS'),
       data: {},
     });
   } catch (error) {
     console.error('Error updating affiliate status:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1348,7 +1348,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
     const referredPlayers = await Player.find({
@@ -1363,7 +1363,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: messages.affiliateFound,
+      message:  (req as any).__('AFFILIATE_FOUND'),
       data: {
         affiliateUser,
         referredPlayers: referredPlayers || [],
@@ -1374,7 +1374,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     console.error('Error get affiliate user details:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message: (req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1391,7 +1391,7 @@ export const updateAffliateUsersDetails = async (
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
 
@@ -1426,31 +1426,31 @@ export const updateAffliateUsersDetails = async (
     if (!updatedAffiliate) {
       return res.status(400).json({
         success: false,
-        message: messages.failedToUpdateAffiliate,
+        message:  (req as any).__('FAILED_TO_UPDATE_AFFILIATE'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.updateAffiliateUser,
+      message: (req as any).__('AFFILIATE_PROFILE_UPDATED'),
       data: {},
     });
   } catch (error) {
     console.error('Error updating affiliate:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message: (req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
 
 export const affiliatelogin = async (req: Request, res: Response) => {
   try {
-    const { user, token } = await authService.loginAffiliate(req.body);
+    const { user, token } = await authService.loginAffiliate(req.body,req);
 
     res.status(200).json({
       success: true,
-      message: messages.login,
+      message: (req as any).__('LOGIN_SUCCESSFULLY'),
       data: {
         user,
         token,
@@ -1461,7 +1461,7 @@ export const affiliatelogin = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid username or password',
+      error instanceof Error ? error.message : (req as any).__('INVALID_USERNAME_PASSWORD'),
     );
   }
 };
@@ -1472,14 +1472,14 @@ export const startSumsubVerification = async (
 ) => {
   try {
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401,(req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const tokenResponse = await initiateSumsubVerification(req.user.id);
 
     res.status(200).json({
       success: true,
-      message: 'Sumsub verification initiated successfully',
+      message: (req as any).__('SUB_VERIFICATION'),
       data: {
         accessToken: tokenResponse.token,
         externalUserId: tokenResponse.userId,
@@ -1491,8 +1491,8 @@ export const startSumsubVerification = async (
       res,
       400,
       error instanceof Error
-        ? error.message
-        : 'Failed to initiate Sumsub verification',
+        ? error.message 
+        :  (req as any).__('FAILED_SUB_VERIFICATION'),
     );
   }
 };
@@ -1501,21 +1501,21 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
   try {
     const signature = req.headers['x-payload-signature'] as string;
     if (!signature) {
-      return sendErrorResponse(res, 400, 'Missing webhook signature');
+      return sendErrorResponse(res, 400, (req as any).__('MISSING_WEBHOOK_SIGNATURE'));
     }
 
     if (!validateWebhookSignature(req.body, signature)) {
-      return sendErrorResponse(res, 401, 'Invalid webhook signature');
+      return sendErrorResponse(res, 401,  (req as any).__('INVALID_WEBHOOK_SIGNATURE'));
     }
 
     const { applicantId, reviewStatus, reviewResult } = req.body;
     if (!applicantId || !reviewStatus) {
-      return sendErrorResponse(res, 400, 'Invalid webhook payload');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_WEBHOOK_PAYLOAD'));
     }
 
     const player = await Player.findOne({ sumsub_id: applicantId });
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     const status =
@@ -1526,7 +1526,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Webhook processed successfully',
+      message:  (req as any).__('WEBOOK_PROCESSED'),
     });
   } catch (error) {
     console.error('Webhook error:', error);
@@ -1535,41 +1535,41 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to process Sumsub webhook',
+        : (req as any).__('FAILED_WEBHOOK'),
     );
   }
 };
 
 export const addAffliateUsers = async (req: Request, res: Response) => {
   try {
-    const AffiliateUserData = await authService.registerAffiliate(req.body);
+    const AffiliateUserData = await authService.registerAffiliate(req.body,req);
     res.status(200).json({
       success: true,
-      message: messages.registerAffiliate,
+      message:  (req as any).__('REGISTER_AFFILIATE'),
       data: AffiliateUserData || {},
     });
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('Username is already taken')) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: 'Username is already taken' },
+          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
         ]);
       } else if (error.message.includes('Email is already registered')) {
         sendErrorResponse(res, 409, [
-          { param: 'email', message: 'Email is already registered' },
+          { param: 'email',message: (req as any).__('EMIAL_ALREADY_REGISTER')},
         ]);
       } else if (error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
           {
             param: 'phone_number',
-            message: 'Phone number is already registered',
+            message:  (req as any).__('PHONE_ALREADY_REGISTER'),
           },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
       }
     } else {
-      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
+      sendErrorResponse(res, 400, (req as any).__('INVALID_REQUEST'));
     }
   }
 };
@@ -1577,7 +1577,7 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
 export const verifyAffiliateEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
   if (!token || typeof token !== 'string') {
-    return sendErrorResponse(res, 400, 'Invalid or missing token');
+    return sendErrorResponse(res, 400, (req as any).__('INVALID_MISSING_TOKEN'));
   }
 
   try {
@@ -1587,7 +1587,7 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
     });
 
     if (!affiliate) {
-      return sendErrorResponse(res, 400, 'Invalid or expired token');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_EXPRIRE_TOKEN'));
     }
 
     affiliate.status = STATUS.ACTIVE;
@@ -1598,14 +1598,14 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully. Please login with your new email.',
+      message: (req as any).__('EMAIL_VERIFIED'),
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to verify email',
+      error instanceof Error ? error.message : (req as any).__('FAILED_EMAIL_VERIFIED'),
     );
   }
 };
@@ -1618,7 +1618,7 @@ export const resendVerificationEmailAffiliate = async (
 
   try {
     if (!email) {
-      return sendErrorResponse(res, 400, 'Email is required');
+      return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
     }
 
     const affiliate = await Affiliate.findOne({ email });
@@ -1626,12 +1626,12 @@ export const resendVerificationEmailAffiliate = async (
       return sendErrorResponse(
         res,
         404,
-        'No account found with this email address',
+        (req as any).__('NO_ACCOUNT_WITH_EMAIL'),
       );
     }
 
     if (affiliate.status === STATUS.ACTIVE)
-      return sendErrorResponse(res, 400, 'Email is already verified');
+    return sendErrorResponse(res, 400,  (req as any).__('EMAIL_ALREADY_VERIFIED'));
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     affiliate.verification_token = verificationToken;
@@ -1642,7 +1642,7 @@ export const resendVerificationEmailAffiliate = async (
 
     res.status(200).json({
       success: true,
-      message: 'Verification email has been sent',
+      message: (req as any).__('EMAIL_VERIFICATION_LINK_SENT'),
       data: { verification_token: verificationToken },
     });
   } catch (error) {
@@ -1651,7 +1651,7 @@ export const resendVerificationEmailAffiliate = async (
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to resend verification email',
+        : (req as any).__('FAILED_TO_RESEND_EMAIL_LINK'),
     );
   }
 };
@@ -1660,11 +1660,11 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
 
-    await authService.affiliateforgotPassword({ email });
+    await authService.affiliateforgotPassword({ email },req);
 
     res.status(200).json({
       success: true,
-      message: 'Password reset link has been sent to your email',
+      message: (req as any).__('PASSWORD_LINK_SENT'),
     });
   } catch (error) {
     sendErrorResponse(
@@ -1672,7 +1672,7 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to process password reset',
+        : (req as any).__('FAILED_PASSWORD_LINK'),
     );
   }
 };
@@ -1681,19 +1681,19 @@ export const affiliateResetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
-      return sendErrorResponse(res, 400, 'Token and password are required');
+      return sendErrorResponse(res, 400,(req as any).__('TOKEN_PASSWORD_REQUIRED'));
     }
-    await authService.affiliateResetPassword({ token, password });
+    await authService.affiliateResetPassword({ token, password },req);
 
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message:(req as any).__('PASSWORD_UPDATED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Invalid or expired reset token',
+      error instanceof Error ? error.message : (req as any).__('INVALID_EXPRIRE_TOKEN'),
     );
   }
 };
@@ -1703,7 +1703,7 @@ export const getAffiliateEarnings = async (
 ) => {
   try {
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const affiliateId = req.user.id;
@@ -1717,7 +1717,7 @@ export const getAffiliateEarnings = async (
     if (!referredPlayers.length) {
       return res.status(200).json({
         success: true,
-        message: 'No referred players found',
+        message: (req as any).__('NO_REFERRED'),
         data: { earnings: [], totalEarnings: 0 },
       });
     }
@@ -1760,7 +1760,7 @@ export const getAffiliateEarnings = async (
 
     res.status(200).json({
       success: true,
-      message: 'Affiliate earnings retrieved successfully',
+      message: (req as any).__('AFFILIATE_EARNINGS_FOUND'),
       data: {
         earnings: earningsData,
         totalEarnings,
@@ -1773,7 +1773,7 @@ export const getAffiliateEarnings = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to fetch affiliate earnings',
+        : (req as any).__('FAILED_AFFILIATE_EARNINGS'),
     );
   }
 };
@@ -1788,7 +1788,7 @@ export const getAffiliateDashboard = async (
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message:(req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     const startDate = req.query.startDate
@@ -1924,8 +1924,8 @@ export const trackReferralClick = async (req: Request, res: Response) => {
     const { trackingId, ipAddress, userAgent, referrer } = req.body;
 
     const referralLink = await ReferralLink.findOne({ trackingId });
-    if (!referralLink) {
-      return res.status(404).json({ message: 'Invalid tracking ID' });
+    if (!referralLink) {     
+      return res.status(404).json({ message:  (req as any).__('INVALID_TRACKID') });
     }
 
     const click = new Click({
@@ -1962,14 +1962,14 @@ export const requestPayout = async (req: CustomRequest, res: Response) => {
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message:(req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     const availableEarnings = affiliate.pendingEarnings || 0;
     if (amount > availableEarnings) {
       return res
         .status(400)
-        .json({ message: 'Requested amount exceeds available earnings' });
+        .json({ message: (req as any).__('REQUEST_AMOUNT_EXCEEDS') });
     }
 
     const payout = new Payout({
@@ -2057,7 +2057,7 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
 
     const payout = await Payout.findById(payoutId).populate('affiliateId');
     if (!payout) {
-      return res.status(404).json({ message: 'Payout not found' });
+      return res.status(404).json({ message: (req as any).__('PAYOUT_NOT_FOUND') });
     }
 
     const affiliate = payout.affiliateId as any;
@@ -2169,7 +2169,7 @@ export const createCommissionTier = async (
 
     const existingTier = await CommissionTier.findOne({ tierName });
     if (existingTier) {
-      return res.status(400).json({ message: 'Tier name already exists' });
+      return res.status(400).json({ message: (req as any).__('TIER_ALREADY_EXIST') });
     }
 
     const tier = new CommissionTier({
@@ -2204,7 +2204,7 @@ export const updateCommissionTier = async (
 
     const tier = await CommissionTier.findById(tierId);
     if (!tier) {
-      return res.status(404).json({ message: 'Commission tier not found' });
+      return res.status(404).json({ message: (req as any).__('TIER_NOT_FOUND') });
     }
 
     if (tierName) tier.tierName = tierName;
@@ -2359,7 +2359,7 @@ export const uploadPromoMaterial = async (
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ message: 'File is required' });
+      return res.status(400).json({ message: (req as any).__('FILE_REQUIRED') });
     }
 
     const result = await cloudinary.uploader.upload(file.path, {
@@ -2506,7 +2506,7 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message: (req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     if (marketingEmailsOptIn !== undefined) {

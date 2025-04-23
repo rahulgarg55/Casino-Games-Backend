@@ -1141,7 +1141,7 @@ export const getStripeConfig = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -1151,13 +1151,13 @@ export const getStripeConfig = async (
     if (!player) {
       res.status(404).json({
         success: false,
-        message: 'Player not found',
+        message:(req as any).__('PLAYER_NOT_FOUND'),
       });
       return;
     }
 
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
-      throw new Error('Stripe configuration missing');
+      throw new Error((req as any).__('STRIPE_CONFIG_MISSING'));
     }
 
     res.status(200).json({
@@ -1173,7 +1173,7 @@ export const getStripeConfig = async (
     });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch Stripe config',
+      error: (req as any).__('FAILED_STRIPE_CONFIG'),
       details: error.message,
     });
   }

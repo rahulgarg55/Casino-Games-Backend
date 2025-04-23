@@ -1050,7 +1050,7 @@ export const updateSumsubStatus = async (
   return player;
 };
 
-export const registerAffiliate = async (data: IAffiliate) => {
+export const registerAffiliate = async (data: IAffiliate,req:any) => {
   const {
     firstname,
     lastname,
@@ -1080,7 +1080,7 @@ export const registerAffiliate = async (data: IAffiliate) => {
   if (referralCode) {
     const existingReferral = await Affiliate.findOne({ referralCode });
     if (existingReferral) {
-      throw new Error('Referral code is already in use');
+      throw new Error((req as any).__('REFERRAL_CODE_ALREADY_USE'));
     }
   }
 
@@ -1092,7 +1092,7 @@ export const registerAffiliate = async (data: IAffiliate) => {
     !/[@$!%*?&]/.test(password)
   ) {
     throw new Error(
-      'Password must be at least 8 characters and include uppercase, lowercase, number, and special character',
+      (req as any).__('PASSWORD_MUST_LONG'),
     );
   }
 
@@ -1124,38 +1124,36 @@ export const registerAffiliate = async (data: IAffiliate) => {
   }
 };
 
-export const loginAffiliate = async (data: AffiliateLoginData) => {
+export const loginAffiliate = async (data: AffiliateLoginData,req:any) => {
   const { email, password } = data;
 
   if (!email) {
-    throw new Error('Invalid request. Please check your input');
+    throw new Error((req as any).__('INVALID_REQUEST'));
   }
 
   const affiliate = await Affiliate.findOne({ email }).select('+password');
 
   if (!affiliate) {
-    throw new Error('Invalid email address! ');
+    throw new Error((req as any).__('EMAIL_NOT_EXIST'));
   }
 
   if (affiliate.status === STATUS.INACTIVE) {
-    throw new Error('Your account is Inactive , please verify your account');
+    throw new Error((req as any).__('PLEASE_VERIFY_ACCOUNT'));
   }
 
   if (affiliate.status === STATUS.BANNED) {
-    throw new Error(
-      'Ohh! Your account is suspended due to some reason! PLease contact Adminstator ',
-    );
+    throw new Error((req as any).__('AFFILIATE_ACCOUNT_SUSPEND'));
   }
   console.log('affiliate.status :>> ', affiliate.status);
   const isMatch = await bcrypt.compare(password, affiliate.password);
   console.log('isMatch :>> ', isMatch);
 
   if (!isMatch) {
-    throw new Error('Invalid password');
+    throw new Error((req as any).__('INVALID_PASSWORD'));
   }
 
   if (!process.env.JWT_SECRET) {
-    throw new Error('An unexpected error occurred. Please try again later');
+    throw new Error((req as any).__('UNEXPECTED_ERR'));
   }
 
   const tokenData = generateTokenForAffialite(affiliate);
@@ -1170,15 +1168,15 @@ export const loginAffiliate = async (data: AffiliateLoginData) => {
   };
 };
 
-export const affiliateforgotPassword = async (data: ForgotPasswordData) => {
+export const affiliateforgotPassword = async (data: ForgotPasswordData,req:any) => {
   const { email } = data;
   if (!email) {
-    throw new Error('Invalid request. Please check your input');
+    throw new Error((req as any).__('INVALID_REQUEST'));
   }
 
   const affiliate = await Affiliate.findOne({ email });
   if (!affiliate) {
-    throw new Error('No account found with this email address');
+    throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL'));
   }
 
   const token = crypto.randomBytes(20).toString('hex');
@@ -1189,7 +1187,7 @@ export const affiliateforgotPassword = async (data: ForgotPasswordData) => {
   await sendResetAffiliateEmail(email, token);
 };
 
-export const affiliateResetPassword = async (data: ResetPasswordData) => {
+export const affiliateResetPassword = async (data: ResetPasswordData,req:any) => {
   const { token, password } = data;
   const affiliate = await Affiliate.findOne({
     reset_password_token: token,
@@ -1197,7 +1195,7 @@ export const affiliateResetPassword = async (data: ResetPasswordData) => {
   });
 
   if (!affiliate) {
-    throw new Error('Invalid or expired reset token');
+    throw new Error((req as any).__('INVALID_EXPRIRE_TOKEN'));
   }
   affiliate.password = await bcrypt.hash(password, 12);
   affiliate.reset_password_token = undefined;
