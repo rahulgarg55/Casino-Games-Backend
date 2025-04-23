@@ -152,7 +152,7 @@ export const login = async (req: Request, res: Response) => {
     const { user, token } = await authService.login(req.body,req);
 
     if (user.requires2FA) {
-      await authService.initiate2FA(user.id);
+      await authService.initiate2FA(String(user.id));
       return res.status(200).json({
         success: true,
         message: 'OTP sent for 2FA verification',
@@ -1816,15 +1816,11 @@ export const getAffiliateDashboard = async (
       },
     ]);
 
-    // Aggregate earnings
+    // Aggregate earnings from transactions
     const earningsStats = await Transaction.aggregate([
       {
         $match: {
-          player_id: {
-            $in: await Player.find({ referredBy: affiliate._id }).distinct(
-              '_id',
-            ),
-          },
+          affiliateId: affiliate._id,
           transaction_type: 'win',
           status: 'completed',
           ...(startDate &&
@@ -1834,9 +1830,7 @@ export const getAffiliateDashboard = async (
       {
         $group: {
           _id: null,
-          totalEarnings: {
-            $sum: { $multiply: ['$amount', affiliate.commissionRate / 100] },
-          },
+          totalEarnings: { $sum: '$affiliateCommission' },
         },
       },
     ]);
@@ -1850,10 +1844,9 @@ export const getAffiliateDashboard = async (
             (referralStats[0].activeUsers / referralStats[0].totalSignups) *
             100
           ).toFixed(2)
-        : 0,
-      totalEarnings:
-        earningsStats[0]?.totalEarnings || affiliate.totalEarnings || 0,
-      pendingEarnings: affiliate.totalEarnings - (affiliate.paidEarnings || 0),
+        : '0',
+      totalEarnings: affiliate.totalEarnings || 0,
+      pendingEarnings: affiliate.pendingEarnings || 0,
       currency: 'USD',
       recentActivity: await Notification.find({ user_id: affiliate._id })
         .sort({ created_at: -1 })
@@ -1867,7 +1860,7 @@ export const getAffiliateDashboard = async (
   }
 };
 
-// 2. Create Referral Link
+//Create Referral Link
 export const createReferralLink = async (req: CustomRequest, res: Response) => {
   try {
     const affiliateId = req.user.id;
@@ -1898,7 +1891,7 @@ export const createReferralLink = async (req: CustomRequest, res: Response) => {
   }
 };
 
-// 3. List Referral Links
+// List Referral Links
 export const getReferralLinks = async (req: CustomRequest, res: Response) => {
   try {
     const affiliateId = req.user.id;
@@ -1925,7 +1918,7 @@ export const getReferralLinks = async (req: CustomRequest, res: Response) => {
   }
 };
 
-// 4. Track Referral Click
+// Track Referral Click
 export const trackReferralClick = async (req: Request, res: Response) => {
   try {
     const { trackingId, ipAddress, userAgent, referrer } = req.body;
@@ -1959,7 +1952,7 @@ export const trackReferralClick = async (req: Request, res: Response) => {
   }
 };
 
-// 5. Request Payout
+// Request Payout
 export const requestPayout = async (req: CustomRequest, res: Response) => {
   try {
     const affiliateId = req.user.id;
@@ -1972,8 +1965,7 @@ export const requestPayout = async (req: CustomRequest, res: Response) => {
       return res.status(404).json({ message: 'Affiliate not found' });
     }
 
-    const availableEarnings =
-      affiliate.totalEarnings - (affiliate.paidEarnings || 0);
+    const availableEarnings = affiliate.pendingEarnings || 0;
     if (amount > availableEarnings) {
       return res
         .status(400)
@@ -1990,20 +1982,27 @@ export const requestPayout = async (req: CustomRequest, res: Response) => {
 
     await payout.save();
 
-    const notification = new Notification({
+    const affiliateNotification = new Notification({
       type: NotificationType.WITHDRAWAL_REQUESTED,
-      message: `Affiliate ${affiliate.email} requested a payout of ${amount} ${currency}`,
+      message: `You requested a payout of ${amount} ${currency}`,
       user_id: affiliateId,
       metadata: { payoutId: payout._id, amount, currency },
     });
-    await notification.save();
+    await affiliateNotification.save();
 
-    // Notify admin (assuming admin email is configured)
     await sendEmail(
       process.env.ADMIN_EMAIL || 'admin@bastaxcasino.com',
       'New Payout Request',
       `Affiliate ${affiliate.firstname} ${affiliate.lastname} (${affiliate.email}) has requested a payout of ${amount} ${currency}. Please review in the admin dashboard.`,
     );
+
+    const adminNotification = new Notification({
+      type: NotificationType.WITHDRAWAL_REQUESTED,
+      message: `Affiliate ${affiliate.email} requested a payout of ${amount} ${currency}`,
+      user_id: null,
+      metadata: { payoutId: payout._id, affiliateId, amount, currency },
+    });
+    await adminNotification.save();
 
     res.status(201).json({
       payoutId: payout._id,
@@ -2064,18 +2063,26 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
     const affiliate = payout.affiliateId as any;
 
     if (status === 'approved') {
-      // Simulate Stripe payout (replace with actual Stripe API as in paymentController)
+      // Simulate Stripe payout
       payout.stripePayoutId = `po_${Math.random().toString(36).substring(2, 10)}`;
     } else if (status === 'paid') {
+      // Deduct from pendingEarnings and add to paidEarnings
       await Affiliate.updateOne(
         { _id: affiliate._id },
-        { $inc: { paidEarnings: payout.amount } },
+        {
+          $inc: { paidEarnings: payout.amount, pendingEarnings: -payout.amount },
+        },
+      );
+    } else if (status === 'rejected') {
+      // Deduct from pendingEarnings without adding to paidEarnings
+      await Affiliate.updateOne(
+        { _id: affiliate._id },
+        { $inc: { pendingEarnings: -payout.amount } },
       );
     }
 
     payout.status = status;
     payout.adminNotes = adminNotes || payout.adminNotes;
-
     await payout.save();
 
     if (affiliate.notificationPreferences?.payoutProcessed) {
@@ -2087,9 +2094,10 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
       );
     }
 
+    // Create notification for affiliate
     const notification = new Notification({
       type: NotificationType.WITHDRAWAL_REQUESTED,
-      message: `Payout ${payoutId} updated to ${status} for affiliate ${affiliate.email}`,
+      message: `Your payout request of ${payout.amount} ${payout.currency} was ${status}${adminNotes ? `: ${adminNotes}` : ''}`,
       user_id: affiliate._id,
       metadata: { payoutId, status, adminNotes },
     });
@@ -2106,7 +2114,6 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
       .json({ message: 'Server error', error: (error as Error).message });
   }
 };
-
 // 8. Admin List All Payouts
 export const getAllPayouts = async (req: CustomRequest, res: Response) => {
   try {

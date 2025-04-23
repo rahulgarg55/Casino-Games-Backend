@@ -29,6 +29,8 @@ export interface ITransaction extends Document {
   metadata?: Record<string, any>;
   external_reference?: string;
   stripe_charge_id?: string;
+  affiliateId?: mongoose.Types.ObjectId; // Affiliate who referred the player
+  affiliateCommission?: number; // Commission earned by the affiliate (e.g., 2% of win)
 }
 
 const transactionSchema: Schema = new Schema(
@@ -96,6 +98,16 @@ const transactionSchema: Schema = new Schema(
       type: String,
       trim: true,
     },
+    affiliateId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Affiliate',
+      default: null,
+    },
+    affiliateCommission: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
   },
   {
     timestamps: {
@@ -118,10 +130,7 @@ const transactionSchema: Schema = new Schema(
 );
 
 transactionSchema.index({ player_id: 1, created_at: -1 });
-transactionSchema.index(
-  { payment_intent_id: 1 },
-  { unique: true, sparse: true },
-);
+transactionSchema.index({ payment_intent_id: 1 }, { unique: true, sparse: true });
 transactionSchema.index({ dispute_id: 1 }, { sparse: true });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ transaction_type: 1 });

@@ -1,7 +1,9 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, HydratedDocument } from 'mongoose';
+import bcrypt from 'bcrypt';
 import { STATUS } from '../constants';
 
 export interface IAffiliate extends Document {
+  _id: mongoose.Types.ObjectId; 
   firstname: string;
   lastname: string;
   email: string;
@@ -21,6 +23,7 @@ export interface IAffiliate extends Document {
   totalClicks?: number;
   totalSignups?: number;
   totalEarnings?: number;
+  pendingEarnings?: number;
   paidEarnings?: number;
   commissionRate?: number;
   notificationPreferences?: {
@@ -54,7 +57,8 @@ const AffiliateSchema: Schema = new Schema(
     totalClicks: { type: Number, default: 0 },
     totalSignups: { type: Number, default: 0 },
     totalEarnings: { type: Number, default: 0 },
-    paidEarnings: { type: Number, default: 0 },
+    pendingEarnings: { type: Number, default: 0 },
+    paidEarnings: { type: Number, default: 2 },
     commissionRate: { type: Number, default: 10 },
     notificationPreferences: {
       newReferral: { type: Boolean, default: true },
@@ -66,6 +70,14 @@ const AffiliateSchema: Schema = new Schema(
 );
 
 AffiliateSchema.index({ referralCode: 1 }, { unique: true });
+
+// // Hash password before saving
+// AffiliateSchema.pre('save', async function (this: HydratedDocument<IAffiliate>, next) {
+//   if (this.isModified('password') && this.password) {
+//     this.password = await bcrypt.hash(this.password, 12);
+//   }
+//   next();
+// });
 
 export const Affiliate = mongoose.model<IAffiliate>(
   'Affiliate',
