@@ -924,7 +924,7 @@ export const getNotifications = async (
       totalPages: Math.ceil(total / limit),
     },
   };
-};
+};  
 
 export const generateToken = async (player: any) => {
   const token = jwt.sign(

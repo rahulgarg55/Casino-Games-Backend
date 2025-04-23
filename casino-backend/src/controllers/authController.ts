@@ -1440,6 +1440,7 @@ export const updateAffliateUsersDetails = async (
 };
 
 export const affiliatelogin = async (req: Request, res: Response) => {
+  console.log('i am here :>> ');
   try {
     const { user, token } = await authService.loginAffiliate(req.body);
 
@@ -1536,6 +1537,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
 };
 
 export const addAffliateUsers = async (req: Request, res: Response) => {
+  console.log('i am here :>> ');
   try {
     const AffiliateUserData = await authService.registerAffiliate(req.body);
     res.status(200).json({
