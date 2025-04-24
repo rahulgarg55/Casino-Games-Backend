@@ -44,9 +44,13 @@ export const generateTokenForAffialite = (user: IAffiliate) => {
   }
 
   const payload = {
-    sub: user._id,
+    sub: user._id.toString(),
     email: user.email,
+    role: user.role_id,
   };
+
+  console.log('Token Payload:', payload);
+  console.log('JWT_SECRET during token generation:', process.env.JWT_SECRET);
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: '8h',

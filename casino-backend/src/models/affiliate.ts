@@ -26,6 +26,7 @@ export interface IAffiliate extends Document {
   pendingEarnings?: number;
   paidEarnings?: number;
   commissionRate?: number;
+  role_id: number; // 0 = User, 1 = Admin, 2 = Affiliate
   notificationPreferences?: {
     newReferral?: boolean;
     payoutProcessed?: boolean;
@@ -60,6 +61,11 @@ const AffiliateSchema: Schema = new Schema(
     pendingEarnings: { type: Number, default: 0 },
     paidEarnings: { type: Number, default: 2 },
     commissionRate: { type: Number, default: 10 },
+    role_id:{
+      type: Number,
+      default: 2, // Default to Affiliate
+      enum: [0, 1, 2], // 0 = User, 1 = Admin, 2 = Affiliate
+    },
     notificationPreferences: {
       newReferral: { type: Boolean, default: true },
       payoutProcessed: { type: Boolean, default: true },
@@ -69,7 +75,7 @@ const AffiliateSchema: Schema = new Schema(
   { timestamps: true },
 );
 
-AffiliateSchema.index({ referralCode: 1 }, { unique: true });
+// AffiliateSchema.index({ referralCode: 1 }, { unique: true });
 
 // // Hash password before saving
 // AffiliateSchema.pre('save', async function (this: HydratedDocument<IAffiliate>, next) {

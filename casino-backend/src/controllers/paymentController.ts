@@ -29,7 +29,7 @@ export const createStripeCustomer = async (
       phone: player.phone_number,
       metadata: {
         playerId: player._id.toString(),
-        platform: 'Your Platform Name',
+        platform: 'Basta Casino',
       },
     };
 
@@ -91,6 +91,8 @@ export const addPaymentMethod = async (
 
     const playerId = req.user.id;
     const { method_type, details, is_default = false } = req.body;
+    console.log('method_type :>> ', method_type);
+    console.log('details :>> ', details);
 
     if (!method_type || !details) {
       res.status(400).json({
