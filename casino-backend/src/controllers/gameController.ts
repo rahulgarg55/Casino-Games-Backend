@@ -25,7 +25,7 @@ export const createGame = async (req: Request, res: Response) => {
     if (!req.file) {
       return res.status(400).json({
         success: false,
-        error: 'Game image is required',
+        error: (req as any).__('GAMES_IMAGE_REQUIRED'),
       });
     }
 
@@ -43,13 +43,13 @@ export const createGame = async (req: Request, res: Response) => {
 
     res.status(201).json({
       success: true,
-      message: 'Game created successfully',
+      message:  (req as any).__('GAME_CREATED'),
       data: game,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to create game',
+      error: error instanceof Error ? error.message : (req as any).__('FAILED_TO_CREATE_GAME'),
     });
   }
 };
@@ -70,13 +70,13 @@ export const getAllGames = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Games retrieved successfully',
+      message:  (req as any).__('GAMES_FOUND'),
       data: result,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
-      error: 'Failed to retrieve games',
+      error: (req as any).__('FALED_GAME_FOUND'),
     });
   }
 };
@@ -86,18 +86,18 @@ export const updateGameStatus = async (req: Request, res: Response) => {
     const { gameId } = req.params;
     const { status } = req.body;
 
-    const game = await gameService.updateGameStatus(gameId, status);
+    const game = await gameService.updateGameStatus(gameId, status,req);
 
     res.status(200).json({
       success: true,
-      message: 'Game status updated successfully',
+      message:(req as any).__('GAME_STATUS_UPDATED'),
       data: game,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
       error:
-        error instanceof Error ? error.message : 'Failed to update game status',
+        error instanceof Error ? error.message :(req as any).__('FAILED_GAME_STATUS'),
     });
   }
 };
@@ -112,14 +112,14 @@ export const getRGSGames = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'RGS games retrieved',
+      message: (req as any).__('RGS_GAMES_FOUND'),
       data: response.data,
     });
   } catch (error) {
     res.status(400).json({
       success: false,
       error:
-        error instanceof Error ? error.message : 'Failed to retrieve RGS games',
+        error instanceof Error ? error.message : (req as any).__('FAILED_RGS_FOUND'),
     });
   }
 };
@@ -131,7 +131,7 @@ export const launchRGSGame = async (req: CustomRequest, res: Response) => {
     if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
-        error: 'Authentication required or invalid token',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
     }
 
@@ -139,7 +139,7 @@ export const launchRGSGame = async (req: CustomRequest, res: Response) => {
     const player = await Player.findById(playerId);
 
     if (!player) {
-      throw new Error('Player not found');
+      throw new Error((req as any).__('PLAYER_NOT_FOUND'));
     }
 
     const sessionResponse = await axios.post(
@@ -155,7 +155,7 @@ export const launchRGSGame = async (req: CustomRequest, res: Response) => {
     );
 
     if (!sessionResponse.data || !sessionResponse.data.sessionId) {
-      throw new Error('Failed to register session with RGS');
+      throw new Error((req as any).__('FAILED_REGISTER_SESSION'));
     }
 
     const sessId = sessionResponse.data.sessionId;
@@ -170,7 +170,7 @@ export const launchRGSGame = async (req: CustomRequest, res: Response) => {
     res.status(400).json({
       success: false,
       error:
-        error instanceof Error ? error.message : 'Failed to launch RGS game',
+        error instanceof Error ? error.message : (req as any).__('FAILED_LAUNCH_RGS'),
     });
   }
 };
@@ -183,14 +183,14 @@ export const getPlayerBalance = async (req: Request, res: Response) => {
     if (!playerId) {
       return res.status(400).json({
         success: false,
-        error: 'Player ID is required',
+        error: (req as any).__('PLAYERID_REQUIRED'),
       });
     }
 
     const player = await Player.findById(playerId);
 
     if (!player) {
-      throw new Error('Player not found');
+      throw new Error((req as any).__('PLAYER_NOT_FOUND'));
     }
 
     res.status(200).json({
@@ -200,7 +200,7 @@ export const getPlayerBalance = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(400).json({
       error:
-        error instanceof Error ? error.message : 'Failed to get player balance',
+        error instanceof Error ? error.message : (req as any).__('FAILED_GET_PLAYER_BALANCE'),
     });
   }
 };
@@ -212,18 +212,18 @@ export const debitPlayerBalance = async (req: Request, res: Response) => {
     if (!playerId || !amount || !gameRoundId) {
       return res.status(400).json({
         success: false,
-        error: 'Player ID, amount, and game round ID are required',
+        error: (req as any).__('PLAYERID_AMOUNT_ROUND_REQUIRED'),
       });
     }
 
     const player = await Player.findById(playerId);
 
     if (!player) {
-      throw new Error('Player not found');
+      throw new Error((req as any).__('PLAYER_NOT_FOUND'));
     }
 
     if (player.balance < amount) {
-      throw new Error('Insufficient balance');
+      throw new Error((req as any).__('INSUFF_BALANCE'));
     }
 
     player.balance -= amount;
@@ -249,7 +249,7 @@ export const debitPlayerBalance = async (req: Request, res: Response) => {
       error:
         error instanceof Error
           ? error.message
-          : 'Failed to debit player balance',
+          : (req as any).__('FAILED_DEBIT_BALANCE'),
     });
   }
 };
@@ -261,14 +261,14 @@ export const creditPlayerBalance = async (req: Request, res: Response) => {
     if (!playerId || !amount || !gameRoundId) {
       return res.status(400).json({
         success: false,
-        error: 'Player ID, amount, and game round ID are required',
+        error: (req as any).__('PLAYERID_AMOUNT_ROUND_REQUIRED'),
       });
     }
 
     const player = await Player.findById(playerId);
 
     if (!player) {
-      throw new Error('Player not found');
+      throw new Error((req as any).__('PLAYER_NOT_FOUND'));
     }
 
     player.balance += amount;
@@ -294,7 +294,7 @@ export const creditPlayerBalance = async (req: Request, res: Response) => {
       error:
         error instanceof Error
           ? error.message
-          : 'Failed to credit player balance',
+          : (req as any).__('FAILED_CREDIT_BALANCE'),
     });
   }
 };
