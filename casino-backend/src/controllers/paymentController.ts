@@ -1400,14 +1400,14 @@ export const seedPaymentConfigs = async () => {
 export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const paymentConfigs = await PaymentConfig.find().select('-__v');
 
     res.status(200).json({
       success: true,
-      message: 'Payment configurations retrieved successfully',
+      message: (req as any).__('PAYMENT_CONFIGURATIONS_RETRIEVED_SUCCESSFULLY'),
       data: paymentConfigs.map((config) => ({
         id: config._id,
         paymentMethodId: config.paymentMethodId,
@@ -1423,7 +1423,7 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to retrieve payment configurations',
+        : (req as any).__('FAILED_TO_RETRIEVE_PAYMENT_CONFIGURATIONS'),
     );
   }
 };
@@ -1431,19 +1431,19 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
 export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
     const paymentConfig = await PaymentConfig.findById(id).select('-__v');
 
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration retrieved successfully',
+      message:  (req as any).__('PAYMENT_CONFIGURATIONS_RETRIEVED_SUCCESSFULLY'),
       data: {
         id: paymentConfig._id,
         paymentMethodId: paymentConfig.paymentMethodId,
@@ -1458,8 +1458,8 @@ export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
       res,
       500,
       error instanceof Error
-        ? error.message
-        : 'Failed to retrieve payment configuration',
+        ? error.message 
+        :(req as any).__('FAILED_TO_RETRIEVE_PAYMENT_CONFIGURATIONS'),
     );
   }
 };
@@ -1470,7 +1470,7 @@ export const updatePaymentConfig = async (
 ) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
@@ -1478,7 +1478,7 @@ export const updatePaymentConfig = async (
 
     const paymentConfig = await PaymentConfig.findById(id);
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     if (config) paymentConfig.config = config;
@@ -1489,7 +1489,7 @@ export const updatePaymentConfig = async (
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration updated successfully',
+      message:  (req as any).__('PAYMENT_CONFIGURATION_UPDATED_SUCCESSFULLY'),
       data: {
         id: paymentConfig._id,
         paymentMethodId: paymentConfig.paymentMethodId,
@@ -1505,7 +1505,7 @@ export const updatePaymentConfig = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to update payment configuration',
+        :  (req as any).__('FAILED_TO_UPDATE_PAYMENT_CONFIGURATION'),
     );
   }
 };
@@ -1516,19 +1516,19 @@ export const deletePaymentConfig = async (
 ) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+       return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
     const paymentConfig = await PaymentConfig.findByIdAndDelete(id);
 
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration deleted successfully',
+      message: (req as any).__('PAYMENT_CONFIGURATION_DELETED_SUCCESSFULLY'),
       data: { id },
     });
   } catch (error) {
@@ -1537,7 +1537,7 @@ export const deletePaymentConfig = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to delete payment configuration',
+        :  (req as any).__('FAILED_TO_DELETE_PAYMENT_CONFIGURATION'),
     );
   }
 };
