@@ -12,7 +12,6 @@ import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import dotenv from 'dotenv';
-import languageMiddleware from "./middlewares/languageMiddleware";
 import path from 'path'
 import { I18n } from  'i18n';
 
@@ -71,7 +70,6 @@ app.use(function(req,res,next){
   i18n.setLocale(req,req.headers['accept-language']);
   next();
 })
-app.use(languageMiddleware);
 app.use(
   expressWinston.logger({
     winstonInstance: logger,

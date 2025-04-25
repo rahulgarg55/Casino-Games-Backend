@@ -36,8 +36,6 @@ import {
 } from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
-import { server_messages,LanguageRequest } from "../utils/server_messages";
-
 
 interface CustomRequest extends Request {
   user?: {
