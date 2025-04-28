@@ -807,4 +807,7 @@ router.patch(
   authController.updatePreferences,
 );
 
+/*Get languages*/
+router.get('/languages',authController.getLanguages);
+
 export default router;

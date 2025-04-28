@@ -36,6 +36,7 @@ import {
 } from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
+import Languages from '../models/languages';
 
 interface CustomRequest extends Request {
   user?: {
@@ -2537,5 +2538,17 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
     res
       .status(500)
       .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+
+export const getLanguages = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const languages = await Languages.find({}, { name: 1, shortName: 1, _id: 0 });
+    res.status(200).json({ success: true, data: languages });
+  } catch (error) {
+    res
+    .status(500)
+    .json({ message: 'Server error', error: (error as Error).message });
   }
 };
