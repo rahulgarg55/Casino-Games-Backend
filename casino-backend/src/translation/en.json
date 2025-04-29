@@ -167,5 +167,6 @@
   "PAYMENT_CONFIGURATION_UPDATED_SUCCESSFULLY": "Payment configuration updated successfully",
   "FAILED_TO_UPDATE_PAYMENT_CONFIGURATION": "Failed to update payment configuration",
   "PAYMENT_CONFIGURATION_DELETED_SUCCESSFULLY": "Payment configuration deleted successfully",
-  "FAILED_TO_DELETE_PAYMENT_CONFIGURATION": "Failed to delete payment configuration"
+  "FAILED_TO_DELETE_PAYMENT_CONFIGURATION": "Failed to delete payment configuration",
+  "AFFILIATE_NOT_VERFIFIED_YET":"Affiliate is not verified yet. Please ask the affiliate to verify their account via email."
 }

@@ -169,11 +169,16 @@ export const register = async (data: RegistrationData,req:any) => {
   if (referralCode) {
     const referringAffiliate = await Affiliate.findOne({
       referralCode,
-      status: STATUS.ACTIVE,
     });
     if (!referringAffiliate) {
       throw new Error(
         (req as any).__('INVALID_REFERRAL')
+      );
+    }
+
+    if(referringAffiliate.status!=STATUS.ACTIVE){
+      throw new Error(
+        (req as any).__('AFFILIATE_NOT_VERFIFIED_YET')
       );
     }
 
