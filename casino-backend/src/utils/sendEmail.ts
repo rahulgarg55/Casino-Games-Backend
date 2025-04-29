@@ -11,7 +11,7 @@ export const sendVerificationEmail = async (
   verificationLink = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
 
   if (isAffiliate) {
-    verificationLink = `${process.env.DASHBOARD_URL}/affiliate/ verify-affiliate-email?token=${verificationToken}`;
+    verificationLink = `${process.env.DASHBOARD_URL}/affiliate/verify-affiliate-email?token=${verificationToken}`;
   }
 
   const htmlContent = `

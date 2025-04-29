@@ -1,0 +1,385 @@
+{
+  "info": {
+    "name": "Casino Platform API",
+    "description": "Comprehensive API collection for the Casino Platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Player Registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{player_email}}\",\n  \"password\": \"{{player_password}}\",\n  \"firstName\": \"{{player_first_name}}\",\n  \"lastName\": \"{{player_last_name}}\",\n  \"phone\": \"{{player_phone}}\",\n  \"country\": \"{{player_country}}\",\n  \"city\": \"{{player_city}}\",\n  \"address\": \"{{player_address}}\",\n  \"postalCode\": \"{{player_postal_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Player Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{player_email}}\",\n  \"password\": \"{{player_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/admin/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "admin", "login"]
+            }
+          }
+        },
+        {
+          "name": "Affiliate Registration",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{affiliate_email}}\",\n  \"password\": \"{{affiliate_password}}\",\n  \"companyName\": \"{{affiliate_company}}\",\n  \"website\": \"{{affiliate_website}}\",\n  \"paymentMethod\": \"{{affiliate_payment_method}}\",\n  \"paymentDetails\": {\n    \"bankName\": \"{{affiliate_bank_name}}\",\n    \"accountNumber\": \"{{affiliate_account_number}}\",\n    \"routingNumber\": \"{{affiliate_routing_number}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/affiliate/register",
+              "host": ["{{base_url}}"],
+              "path": ["affiliate", "register"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Player",
+      "item": [
+        {
+          "name": "Get Player Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/player/profile",
+              "host": ["{{base_url}}"],
+              "path": ["player", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Update Player Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"{{player_first_name}}\",\n  \"lastName\": \"{{player_last_name}}\",\n  \"phone\": \"{{player_phone}}\",\n  \"country\": \"{{player_country}}\",\n  \"city\": \"{{player_city}}\",\n  \"address\": \"{{player_address}}\",\n  \"postalCode\": \"{{player_postal_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/player/profile",
+              "host": ["{{base_url}}"],
+              "path": ["player", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate",
+      "item": [
+        {
+          "name": "Get Affiliate Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{affiliate_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/affiliate/dashboard",
+              "host": ["{{base_url}}"],
+              "path": ["affiliate", "dashboard"]
+            }
+          }
+        },
+        {
+          "name": "Get Affiliate Players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{affiliate_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/affiliate/players",
+              "host": ["{{base_url}}"],
+              "path": ["affiliate", "players"]
+            }
+          }
+        },
+        {
+          "name": "Request Affiliate Payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{affiliate_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": {{payout_amount}},\n  \"paymentMethod\": \"{{payment_method}}\",\n  \"paymentDetails\": {\n    \"bankName\": \"{{bank_name}}\",\n    \"accountNumber\": \"{{account_number}}\",\n    \"routingNumber\": \"{{routing_number}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/affiliate/payouts/request",
+              "host": ["{{base_url}}"],
+              "path": ["affiliate", "payouts", "request"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Get All Players",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/players",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "players"]
+            }
+          }
+        },
+        {
+          "name": "Update Player Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": {{player_status}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/players/:userId/status",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "players", ":userId", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Stripe Config",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"publicKey\": \"{{stripe_public_key}}\",\n  \"secretKey\": \"{{stripe_secret_key}}\",\n  \"webhookSecret\": \"{{stripe_webhook_secret}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/stripe-config-details",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "stripe-config-details"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Add Payment Method",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method_type\": \"credit_card\",\n  \"details\": {\n    \"cardNumber\": \"{{card_number}}\",\n    \"expMonth\": {{exp_month}},\n    \"expYear\": {{exp_year}},\n    \"cvc\": \"{{cvc}}\"\n  },\n  \"is_default\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/payment/payment-methods",
+              "host": ["{{base_url}}"],
+              "path": ["payment", "payment-methods"]
+            }
+          }
+        },
+        {
+          "name": "Create Payment Intent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": {{payment_amount}},\n  \"currency\": \"{{currency}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/payment/create-payment-intent",
+              "host": ["{{base_url}}"],
+              "path": ["payment", "create-payment-intent"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Game",
+      "item": [
+        {
+          "name": "Get All Games",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/game",
+              "host": ["{{base_url}}"],
+              "path": ["game"]
+            }
+          }
+        },
+        {
+          "name": "Launch RGS Game",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{player_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gameId\": \"{{game_id}}\",\n  \"currency\": \"{{currency}}\",\n  \"language\": \"{{language}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/game/rgs/launch",
+              "host": ["{{base_url}}"],
+              "path": ["game", "rgs", "launch"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+} 
