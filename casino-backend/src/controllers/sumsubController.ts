@@ -1,7 +1,10 @@
 import { Request, Response } from 'express';
 import { validateWebhookSignature } from '../utils/sumsub';
 import { sendErrorResponse } from './authController';
-import { initiateSumsubVerification, updateSumsubStatus } from '../services/sumsubService';
+import {
+  initiateSumsubVerification,
+  updateSumsubStatus,
+} from '../services/sumsubService';
 import Player from '../models/player';
 
 interface CustomRequest extends Request {
@@ -11,7 +14,10 @@ interface CustomRequest extends Request {
   };
 }
 
-export const startSumsubVerification = async (req: CustomRequest, res: Response) => {
+export const startSumsubVerification = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id) {
       return sendErrorResponse(res, 401, 'Authentication required');
@@ -64,7 +70,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
       reviewStatus === 'completed' && reviewResult?.reviewAnswer === 'GREEN'
         ? 'approved'
         : 'rejected';
-    
+
     await updateSumsubStatus(player._id.toString(), status);
 
     res.status(200).json({
@@ -81,4 +87,4 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
         : 'Failed to process Sumsub webhook',
     );
   }
-}; 
+};

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import {Affiliate} from '../models/affiliate';
+import { Affiliate } from '../models/affiliate';
 import Player from '../models/player';
 import Payout from '../models/payout';
 import CommissionTier from '../models/comissionTier';
@@ -16,7 +16,10 @@ interface CustomRequest extends Request {
   };
 }
 
-export const getAffiliateDashboard = async (req: CustomRequest, res: Response) => {
+export const getAffiliateDashboard = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     const affiliateId = req.user.id;
     const affiliate = await Affiliate.findById(affiliateId)
@@ -50,7 +53,8 @@ export const getAffiliateDashboard = async (req: CustomRequest, res: Response) =
         id: affiliate._id,
         name: `${affiliate.firstname} ${affiliate.lastname}`,
         email: affiliate.email,
-        commissionRate: commissionTier?.commissionRate || affiliate.commissionRate,
+        commissionRate:
+          commissionTier?.commissionRate || affiliate.commissionRate,
         totalSignups: referredPlayers.length,
         totalEarnings: totalEarnings[0]?.total || 0,
         pendingEarnings: pendingEarnings[0]?.total || 0,
@@ -116,7 +120,9 @@ export const requestPayout = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to submit payout request',
+      error instanceof Error
+        ? error.message
+        : 'Failed to submit payout request',
     );
   }
 };
@@ -168,12 +174,17 @@ export const getPromoMaterials = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to fetch promotional materials',
+      error instanceof Error
+        ? error.message
+        : 'Failed to fetch promotional materials',
     );
   }
 };
 
-export const updateNotificationPreferences = async (req: CustomRequest, res: Response) => {
+export const updateNotificationPreferences = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     const affiliateId = req.user.id;
     const { preferences } = req.body;
@@ -197,7 +208,9 @@ export const updateNotificationPreferences = async (req: CustomRequest, res: Res
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to update notification preferences',
+      error instanceof Error
+        ? error.message
+        : 'Failed to update notification preferences',
     );
   }
 };
@@ -222,7 +235,9 @@ export const getReferralLink = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to generate referral link',
+      error instanceof Error
+        ? error.message
+        : 'Failed to generate referral link',
     );
   }
-}; 
+};

@@ -39,7 +39,8 @@ export const getAffiliateDashboard = async (affiliateId: string) => {
       id: affiliate._id,
       name: `${affiliate.firstname} ${affiliate.lastname}`,
       email: affiliate.email,
-      commissionRate: commissionTier?.commissionRate || affiliate.commissionRate,
+      commissionRate:
+        commissionTier?.commissionRate || affiliate.commissionRate,
       totalSignups: referredPlayers.length,
       totalEarnings: totalEarnings[0]?.total || 0,
       pendingEarnings: pendingEarnings[0]?.total || 0,
@@ -48,10 +49,13 @@ export const getAffiliateDashboard = async (affiliateId: string) => {
   };
 };
 
-export const requestPayout = async (affiliateId: string, payoutData: {
-  amount: number;
-  currency: string;
-}) => {
+export const requestPayout = async (
+  affiliateId: string,
+  payoutData: {
+    amount: number;
+    currency: string;
+  },
+) => {
   const affiliate = await Affiliate.findById(affiliateId);
   if (!affiliate) {
     throw new Error('Affiliate not found');
@@ -81,7 +85,11 @@ export const requestPayout = async (affiliateId: string, payoutData: {
   return payout;
 };
 
-export const getPayoutHistory = async (affiliateId: string, page: number = 1, limit: number = 20) => {
+export const getPayoutHistory = async (
+  affiliateId: string,
+  page: number = 1,
+  limit: number = 20,
+) => {
   const payouts = await Payout.find({ affiliateId })
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
@@ -104,7 +112,10 @@ export const getPromoMaterials = async () => {
   return materials;
 };
 
-export const updateNotificationPreferences = async (affiliateId: string, preferences: any) => {
+export const updateNotificationPreferences = async (
+  affiliateId: string,
+  preferences: any,
+) => {
   const affiliate = await Affiliate.findByIdAndUpdate(
     affiliateId,
     { notificationPreferences: preferences },
@@ -125,4 +136,4 @@ export const getReferralLink = async (affiliateId: string) => {
   }
 
   return `${process.env.FRONTEND_URL}/register?ref=${affiliate.referralCode}`;
-}; 
+};

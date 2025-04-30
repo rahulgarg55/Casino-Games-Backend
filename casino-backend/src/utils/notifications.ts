@@ -16,4 +16,4 @@ export const getNotifications = async (page: number, limit: number) => {
       totalPages: Math.ceil(total / limit),
     },
   };
-}; 
+};

@@ -7,7 +7,7 @@ import Transaction from '../models/transaction';
 import { sendErrorResponse } from './authController';
 import { STATUS, NotificationType } from '../constants';
 import { sendEmail } from '../utils/sendEmail';
-import {Affiliate} from '../models/affiliate';
+import { Affiliate } from '../models/affiliate';
 import Payout from '../models/payout';
 import CommissionTier from '../models/comissionTier';
 import PromoMaterial from '../models/promoMaterial';
@@ -27,11 +27,32 @@ const messages = {
   stats: 'statistics',
   error: 'An error occurred',
   dataNotFound: 'No data found',
-  regionStats: 'Region statistics retrieved successfully'
+  regionStats: 'Region statistics retrieved successfully',
 };
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const daysOfWeek = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+const months = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 const quarters = ['Q1', 'Q2', 'Q3', 'Q4'];
 
 interface CustomRequest extends Request {
@@ -41,7 +62,10 @@ interface CustomRequest extends Request {
   };
 }
 
-export const getAllPlayersController = async (req: CustomRequest, res: Response) => {
+export const getAllPlayersController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
@@ -62,7 +86,10 @@ export const getAllPlayersController = async (req: CustomRequest, res: Response)
   }
 };
 
-export const getPlayerDetailsController = async (req: CustomRequest, res: Response) => {
+export const getPlayerDetailsController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
@@ -334,7 +361,10 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
   }
 };
 
-export const updatePayoutStatusController = async (req: CustomRequest, res: Response) => {
+export const updatePayoutStatusController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
@@ -403,14 +433,22 @@ export const getAllPayouts = async (req: Request, res: Response) => {
   }
 };
 
-export const createCommissionTierController = async (req: CustomRequest, res: Response) => {
+export const createCommissionTierController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
     }
 
     const { name, minPlayers, commissionRate } = req.body;
-    const tier = await createCommissionTier({ tierName: name, minReferrals: minPlayers, commissionRate, currency: 'USD' });
+    const tier = await createCommissionTier({
+      tierName: name,
+      minReferrals: minPlayers,
+      commissionRate,
+      currency: 'USD',
+    });
 
     res.status(201).json({
       success: true,
@@ -421,12 +459,17 @@ export const createCommissionTierController = async (req: CustomRequest, res: Re
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to create commission tier',
+      error instanceof Error
+        ? error.message
+        : 'Failed to create commission tier',
     );
   }
 };
 
-export const updateCommissionTierController = async (req: CustomRequest, res: Response) => {
+export const updateCommissionTierController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
@@ -434,7 +477,11 @@ export const updateCommissionTierController = async (req: CustomRequest, res: Re
 
     const { tierId } = req.params;
     const { name, minPlayers, commissionRate } = req.body;
-    const tier = await updateCommissionTier(tierId, { tierName: name, minReferrals: minPlayers, commissionRate });
+    const tier = await updateCommissionTier(tierId, {
+      tierName: name,
+      minReferrals: minPlayers,
+      commissionRate,
+    });
 
     res.status(200).json({
       success: true,
@@ -445,12 +492,17 @@ export const updateCommissionTierController = async (req: CustomRequest, res: Re
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to update commission tier',
+      error instanceof Error
+        ? error.message
+        : 'Failed to update commission tier',
     );
   }
 };
 
-export const uploadPromoMaterialController = async (req: CustomRequest, res: Response) => {
+export const uploadPromoMaterialController = async (
+  req: CustomRequest,
+  res: Response,
+) => {
   try {
     if (!req.user?.id || req.user.role !== 1) {
       return sendErrorResponse(res, 401, 'Unauthorized access');
@@ -462,7 +514,11 @@ export const uploadPromoMaterialController = async (req: CustomRequest, res: Res
 
     const { type, dimensions } = req.body;
     if (!['banner', 'logo', 'video'].includes(type)) {
-      return sendErrorResponse(res, 400, 'Invalid material type. Must be banner, logo, or video');
+      return sendErrorResponse(
+        res,
+        400,
+        'Invalid material type. Must be banner, logo, or video',
+      );
     }
 
     const material = await uploadPromoMaterial(req.file, { type, dimensions });
@@ -476,7 +532,9 @@ export const uploadPromoMaterialController = async (req: CustomRequest, res: Res
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to upload promo material',
+      error instanceof Error
+        ? error.message
+        : 'Failed to upload promo material',
     );
   }
-}; 
+};

@@ -1,4 +1,7 @@
-import { generateSumsubAccessToken, createSumsubApplicant } from '../utils/sumsub';
+import {
+  generateSumsubAccessToken,
+  createSumsubApplicant,
+} from '../utils/sumsub';
 import Player from '../models/player';
 import { VERIFICATION } from '../constants';
 import Notification, { NotificationType } from '../models/notification';
@@ -28,7 +31,10 @@ export const initiateSumsubVerification = async (playerId: string) => {
   return generateSumsubAccessToken(playerId, playerId, 'basic-kyc');
 };
 
-export const updateSumsubStatus = async (playerId: string, status: 'pending' | 'approved' | 'rejected') => {
+export const updateSumsubStatus = async (
+  playerId: string,
+  status: 'pending' | 'approved' | 'rejected',
+) => {
   const player = await Player.findById(playerId);
   if (!player) {
     throw new Error('Player not found');
@@ -36,13 +42,13 @@ export const updateSumsubStatus = async (playerId: string, status: 'pending' | '
 
   player.sumsub_status = status;
   player.sumsub_verification_date = new Date();
-  
+
   if (status === 'approved') {
     player.is_verified = VERIFICATION.VERIFIED;
   } else if (status === 'rejected') {
     player.is_verified = VERIFICATION.UNVERIFIED;
   }
-  
+
   await player.save();
 
   const notification = new Notification({
@@ -54,4 +60,4 @@ export const updateSumsubStatus = async (playerId: string, status: 'pending' | '
   await notification.save();
 
   return player;
-}; 
+};

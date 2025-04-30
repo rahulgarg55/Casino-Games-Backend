@@ -17,7 +17,11 @@ router.post(
   paymentController.addPaymentMethod,
 );
 
-router.get('/payment-methods', verifyToken, paymentController.getPaymentMethods);
+router.get(
+  '/payment-methods',
+  verifyToken,
+  paymentController.getPaymentMethods,
+);
 
 router.put(
   '/payment-methods/:id',
@@ -32,7 +36,11 @@ router.put(
   paymentController.updatePaymentMethod,
 );
 
-router.delete('/payment-methods/:id', verifyToken, paymentController.deletePaymentMethod);
+router.delete(
+  '/payment-methods/:id',
+  verifyToken,
+  paymentController.deletePaymentMethod,
+);
 
 router.post(
   '/create-payment-intent',
@@ -61,13 +69,31 @@ router.post(
 
 router.get('/player/balance', verifyToken, paymentController.getPlayerBalance);
 
-router.get('/transactions', verifyToken, paymentController.getTransactionHistory);
+router.get(
+  '/transactions',
+  verifyToken,
+  paymentController.getTransactionHistory,
+);
 
-router.get('/transactions/:id', verifyToken, paymentController.getTransactionDetail);
+router.get(
+  '/transactions/:id',
+  verifyToken,
+  paymentController.getTransactionDetail,
+);
 
-router.get('/payment-configs/all', verifyToken, verifyAdmin, paymentController.getPaymentConfigs);
+router.get(
+  '/payment-configs/all',
+  verifyToken,
+  verifyAdmin,
+  paymentController.getPaymentConfigs,
+);
 
-router.get('/payment-configs/:id', verifyToken, verifyAdmin, paymentController.getPaymentConfig);
+router.get(
+  '/payment-configs/:id',
+  verifyToken,
+  verifyAdmin,
+  paymentController.getPaymentConfig,
+);
 
 router.put(
   '/payment-configs/:id',
@@ -91,6 +117,11 @@ router.put(
   paymentController.updatePaymentConfig,
 );
 
-router.delete('/payment-configs/:id', verifyToken, verifyAdmin, paymentController.deletePaymentConfig);
+router.delete(
+  '/payment-configs/:id',
+  verifyToken,
+  verifyAdmin,
+  paymentController.deletePaymentConfig,
+);
 
 export default router;
