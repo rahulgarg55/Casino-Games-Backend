@@ -261,7 +261,7 @@ router.get('/notifications', authController.getAdminNotifications);
 
 router.post(
   '/payment-methods',
-  verifyAdmin ,
+  verifyAdmin,
   [
     body('method_type').isIn(['credit_card', 'paypal', 'bank_transfer']),
     body('details').isObject(),

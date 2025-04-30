@@ -24,7 +24,9 @@ const connectDB = async () => {
     };
 
     mongoose.connection.on('connected', () => {
-      console.log(`MongoDB connection established successfully to ${mongoose.connection.db.databaseName}`);
+      console.log(
+        `MongoDB connection established successfully to ${mongoose.connection.db.databaseName}`,
+      );
     });
 
     mongoose.connection.on('error', (err) => {
@@ -51,13 +53,18 @@ const connectDB = async () => {
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 5000;
 
-    const connectWithRetry = async (retries: number = MAX_RETRIES): Promise<void> => {
+    const connectWithRetry = async (
+      retries: number = MAX_RETRIES,
+    ): Promise<void> => {
       try {
         await mongoose.connect(mongoURI, options);
         await mongoose.connection.db.command({ ping: 1 });
         console.log('Database indexes ensured');
       } catch (error) {
-        console.error(`MongoDB connection failed (attempt ${MAX_RETRIES - retries + 1}):`, error);
+        console.error(
+          `MongoDB connection failed (attempt ${MAX_RETRIES - retries + 1}):`,
+          error,
+        );
         if (retries > 1) {
           console.log(`Retrying in ${RETRY_DELAY / 1000} seconds...`);
           await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));

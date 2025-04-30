@@ -1,5 +1,8 @@
 import express, { Router } from 'express';
-import { startSumsubVerification, sumsubWebhook } from '../controllers/sumsubController';
+import {
+  startSumsubVerification,
+  sumsubWebhook,
+} from '../controllers/sumsubController';
 import passport from 'passport';
 
 const router = Router();

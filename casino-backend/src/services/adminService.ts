@@ -127,7 +127,11 @@ export const getPlayerDetails = async (userId: string) => {
   };
 };
 
-export const updatePayoutStatus = async (payoutId: string, status: 'approved' | 'rejected' | 'paid' | 'pending', adminNotes?: string) => {
+export const updatePayoutStatus = async (
+  payoutId: string,
+  status: 'approved' | 'rejected' | 'paid' | 'pending',
+  adminNotes?: string,
+) => {
   const payout = await Payout.findById(payoutId).populate('affiliateId');
   if (!payout) {
     throw new Error('Payout not found');
@@ -181,7 +185,9 @@ export const createCommissionTier = async (tierData: {
   commissionRate: number;
   currency: string;
 }) => {
-  const existingTier = await CommissionTier.findOne({ tierName: tierData.tierName });
+  const existingTier = await CommissionTier.findOne({
+    tierName: tierData.tierName,
+  });
   if (existingTier) {
     throw new Error('Tier name already exists');
   }
@@ -192,20 +198,25 @@ export const createCommissionTier = async (tierData: {
   return tier;
 };
 
-export const updateCommissionTier = async (tierId: string, updateData: {
-  tierName?: string;
-  minReferrals?: number;
-  commissionRate?: number;
-  currency?: string;
-}) => {
+export const updateCommissionTier = async (
+  tierId: string,
+  updateData: {
+    tierName?: string;
+    minReferrals?: number;
+    commissionRate?: number;
+    currency?: string;
+  },
+) => {
   const tier = await CommissionTier.findById(tierId);
   if (!tier) {
     throw new Error('Commission tier not found');
   }
 
   if (updateData.tierName) tier.tierName = updateData.tierName;
-  if (updateData.minReferrals !== undefined) tier.minReferrals = updateData.minReferrals;
-  if (updateData.commissionRate !== undefined) tier.commissionRate = updateData.commissionRate;
+  if (updateData.minReferrals !== undefined)
+    tier.minReferrals = updateData.minReferrals;
+  if (updateData.commissionRate !== undefined)
+    tier.commissionRate = updateData.commissionRate;
   if (updateData.currency) tier.currency = updateData.currency;
 
   await tier.save();
@@ -234,10 +245,13 @@ export const updateCommissionTier = async (tierId: string, updateData: {
   return tier;
 };
 
-export const uploadPromoMaterial = async (file: Express.Multer.File, materialData: {
-  type: string;
-  dimensions: string;
-}) => {
+export const uploadPromoMaterial = async (
+  file: Express.Multer.File,
+  materialData: {
+    type: string;
+    dimensions: string;
+  },
+) => {
   if (!file) {
     throw new Error('File is required');
   }
@@ -268,4 +282,4 @@ export const uploadPromoMaterial = async (file: Express.Multer.File, materialDat
   }
 
   return material;
-}; 
+};

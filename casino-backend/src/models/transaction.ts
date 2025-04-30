@@ -129,7 +129,10 @@ const transactionSchema: Schema = new Schema(
 );
 
 transactionSchema.index({ player_id: 1, created_at: -1 });
-transactionSchema.index({ payment_intent_id: 1 }, { unique: true, sparse: true });
+transactionSchema.index(
+  { payment_intent_id: 1 },
+  { unique: true, sparse: true },
+);
 transactionSchema.index({ dispute_id: 1 }, { sparse: true });
 transactionSchema.index({ status: 1 });
 transactionSchema.index({ transaction_type: 1 });

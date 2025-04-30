@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 const ROLE_IDS = {
   USER: 0,
   ADMIN: 1,
-  AFFILIATE: 2, 
+  AFFILIATE: 2,
 };
 
 interface CustomRequest extends Request {
@@ -29,7 +29,9 @@ const extractAndVerifyToken = (
   const authHeader = req.header('Authorization');
   const token = authHeader?.replace('Bearer ', '');
   if (!token) {
-    return res.status(401).json({ message: 'Access denied. No token provided.' });
+    return res
+      .status(401)
+      .json({ message: 'Access denied. No token provided.' });
   }
   try {
     const decoded = jwt.verify(token, secret) as { sub: string; role: number };
@@ -40,7 +42,9 @@ const extractAndVerifyToken = (
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token has expired' });
     }
-    return res.status(400).json({ message: 'Invalid token', error: error.message });
+    return res
+      .status(400)
+      .json({ message: 'Invalid token', error: error.message });
   }
 };
 
@@ -51,9 +55,9 @@ export const verifyToken = (
 ) => {
   const errorResponse = extractAndVerifyToken(req, res, getJwtSecret());
   if (errorResponse) return errorResponse;
-    // if (req.user?.role !== ROLE_IDS.AFFILIATE) {
-    //   return res.status(403).json({ message: 'Invalid Affiliate credentials.' });
-    // }
+  // if (req.user?.role !== ROLE_IDS.AFFILIATE) {
+  //   return res.status(403).json({ message: 'Invalid Affiliate credentials.' });
+  // }
   next();
 };
 

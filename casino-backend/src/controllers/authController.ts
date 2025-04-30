@@ -2071,7 +2071,10 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
       await Affiliate.updateOne(
         { _id: affiliate._id },
         {
-          $inc: { paidEarnings: payout.amount, pendingEarnings: -payout.amount },
+          $inc: {
+            paidEarnings: payout.amount,
+            pendingEarnings: -payout.amount,
+          },
         },
       );
     } else if (status === 'rejected') {

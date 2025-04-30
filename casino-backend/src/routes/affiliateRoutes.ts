@@ -27,7 +27,12 @@ const clickLimiter = rateLimit({
     'Too many click tracking requests from this IP, please try again later',
 });
 
-router.post('/register', validateAffiliate, handleValidationErrors, authController.register);
+router.post(
+  '/register',
+  validateAffiliate,
+  handleValidationErrors,
+  authController.register,
+);
 
 router.post(
   '/login',
@@ -75,7 +80,11 @@ router.post(
 
 router.get('/verify-email', validateRequest, authController.verifyEmail);
 
-router.get('/dashboard', verifyToken, affiliateController.getAffiliateDashboard);
+router.get(
+  '/dashboard',
+  verifyToken,
+  affiliateController.getAffiliateDashboard,
+);
 
 router.post(
   '/payouts/request',
@@ -90,7 +99,11 @@ router.post(
 
 router.get('/payouts', verifyToken, affiliateController.getPayoutHistory);
 
-router.get('/promo-materials', verifyToken, affiliateController.getPromoMaterials);
+router.get(
+  '/promo-materials',
+  verifyToken,
+  affiliateController.getPromoMaterials,
+);
 
 router.get('/referral-link', verifyToken, affiliateController.getReferralLink);
 

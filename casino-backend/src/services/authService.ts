@@ -133,10 +133,10 @@ export const register = async (data: RegistrationData,req:any) => {
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log('verificationToken', verificationToken);
+  // console.log('verificationToken', verificationToken);
   const playerData: any = {
-    email,
-    phone_number,
+    email: email || null,
+    phone_number: phone_number || null,
     fullname,
     password_hash: hashedPassword,
     role_id: role_id || 0, // Default to User
@@ -795,24 +795,53 @@ export const forgotPassword = async (data: ForgotPasswordData,req:any) => {
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
 
   await player.save();
+  const recipient =
+    email || player.email || phone_number || player.phone_number;
+  if (!recipient) {
+    throw new Error('No valid recipient found for password reset');
+  }
   await sendResetEmail(email || phone_number!, token);
 };
 
 export const resetPassword = async (data: ResetPasswordData,req:any) => {
   const { token, password } = data;
+
   const player = await Player.findOne({
     reset_password_token: token,
     reset_password_expires: { $gt: new Date() },
-  });
+  }).select('+password_hash');
 
   if (!player) {
     throw new Error((req as any).__('INVALID_EXPRIRE_TOKEN'));
   }
-  player.password_hash = await bcrypt.hash(password, 12);
-  player.reset_password_token = undefined;
-  player.reset_password_expires = undefined;
 
-  await player.save();
+  console.log(
+    `Resetting password for user: ${player.email || player.phone_number}`,
+  );
+
+  try {
+    player.password_hash = await bcrypt.hash(password, 12);
+
+    player.reset_password_token = undefined;
+    player.reset_password_expires = undefined;
+
+    const savedPlayer = await player.save();
+
+    if (savedPlayer.password_hash) {
+      console.log(
+        `Password updated successfully for ${player.email || player.phone_number}`,
+      );
+      return true;
+    } else {
+      console.error('Password hash not set after save operation');
+      throw new Error('Failed to update password');
+    }
+  } catch (error) {
+    console.error('Error in resetPassword:', error);
+    throw new Error(
+      error instanceof Error ? error.message : 'Failed to update password',
+    );
+  }
 };
 export const generateResetToken = async (email: string) => {
   const resetToken = crypto.randomBytes(32).toString('hex');
@@ -930,7 +959,7 @@ export const getNotifications = async (
       totalPages: Math.ceil(total / limit),
     },
   };
-};  
+};
 
 export const generateToken = async (player: any) => {
   const token = jwt.sign(

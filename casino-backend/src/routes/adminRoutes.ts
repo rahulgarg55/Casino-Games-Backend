@@ -10,11 +10,20 @@ const router = Router();
 
 router.get('/players', adminController.getAllPlayersController);
 
-router.get('/players/:userId', verifyToken, verifyAdmin, adminController.getPlayerDetailsController);
+router.get(
+  '/players/:userId',
+  verifyToken,
+  verifyAdmin,
+  adminController.getPlayerDetailsController,
+);
 
 router.get('/players/statistics', verifyAdmin, adminController.getPlayerStats);
 
-router.get('/players/region/statistics', verifyAdmin, adminController.getPlayerRegionStats);
+router.get(
+  '/players/region/statistics',
+  verifyAdmin,
+  adminController.getPlayerRegionStats,
+);
 
 router.delete('/players/:userId', verifyAdmin, adminController.deletePlayer);
 
@@ -28,9 +37,17 @@ router.put(
 
 router.get('/notifications', adminController.getAdminNotifications);
 
-router.get('/stripe-config-details', verifyAdmin, paymentController.getStripeConfig);
+router.get(
+  '/stripe-config-details',
+  verifyAdmin,
+  paymentController.getStripeConfig,
+);
 
-router.patch('/stripe-config-details', verifyAdmin, authController.updateStripeConfig);
+router.patch(
+  '/stripe-config-details',
+  verifyAdmin,
+  authController.updateStripeConfig,
+);
 
 router.patch(
   '/affiliate/payouts/:payoutId',
@@ -46,7 +63,12 @@ router.patch(
   adminController.updatePayoutStatusController,
 );
 
-router.get('/affiliate/payouts', verifyToken, verifyAdmin, adminController.getAllPayouts);
+router.get(
+  '/affiliate/payouts',
+  verifyToken,
+  verifyAdmin,
+  adminController.getAllPayouts,
+);
 
 router.post(
   '/affiliate/tiers',

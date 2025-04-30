@@ -729,7 +729,8 @@ async function handlePaymentIntentSucceeded(
           await transaction.save();
 
           affiliate.totalEarnings = (affiliate.totalEarnings || 0) + commission;
-          affiliate.pendingEarnings = (affiliate.pendingEarnings || 0) + commission;
+          affiliate.pendingEarnings =
+            (affiliate.pendingEarnings || 0) + commission;
           await affiliate.save();
 
           const notification = new Notification({
@@ -745,7 +746,9 @@ async function handlePaymentIntentSucceeded(
           });
           await notification.save();
 
-          logger.info(`Affiliate ${affiliate.email} earned ${commission} commission from player ${player._id}`);
+          logger.info(
+            `Affiliate ${affiliate.email} earned ${commission} commission from player ${player._id}`,
+          );
         }
       }
     }

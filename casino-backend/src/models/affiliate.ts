@@ -3,7 +3,7 @@ import bcrypt from 'bcrypt';
 import { STATUS } from '../constants';
 
 export interface IAffiliate extends Document {
-  _id: mongoose.Types.ObjectId; 
+  _id: mongoose.Types.ObjectId;
   firstname: string;
   lastname: string;
   email: string;
@@ -61,7 +61,7 @@ const AffiliateSchema: Schema = new Schema(
     pendingEarnings: { type: Number, default: 0 },
     paidEarnings: { type: Number, default: 2 },
     commissionRate: { type: Number, default: 10 },
-    role_id:{
+    role_id: {
       type: Number,
       default: 2, // Default to Affiliate
       enum: [0, 1, 2], // 0 = User, 1 = Admin, 2 = Affiliate
