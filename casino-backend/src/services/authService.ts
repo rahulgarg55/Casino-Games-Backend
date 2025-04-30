@@ -133,7 +133,7 @@ export const register = async (data: RegistrationData) => {
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-  console.log('verificationToken', verificationToken);
+  // console.log('verificationToken', verificationToken);
   const playerData: any = {
     email,
     phone_number,
