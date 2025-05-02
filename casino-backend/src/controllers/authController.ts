@@ -148,7 +148,7 @@ export const affiliateRegister = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { user, token } = await authService.login(req.body,req);
+        const { user, token } = await authService.login(req.body,req);
 
     if (user.requires2FA) {
       await authService.initiate2FA(String(user.id));
@@ -821,8 +821,8 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
       success: true,
       message:
         updateData.email && updateData.email !== currentPlayer.email
-          ? 'Verification email sent to your new email address. Please verify to complete the update.'
-          : 'Profile updated successfully',
+          ? (req as any).__('VERIFICATION_EMAIL_SENT')
+          : (req as any).__('PROFILE_UPDATED'),
       data: {
         user: {
           ...updatedPlayer,
