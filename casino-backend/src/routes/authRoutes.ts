@@ -807,4 +807,8 @@ router.patch(
   authController.updatePreferences,
 );
 
+router.post('/admin/banner', verifyToken, verifyAdmin, authController.saveBannerConfig);
+router.get('/banner', verifyToken, verifyAdmin, authController.getBannerConfig);
+ 
+
 export default router;

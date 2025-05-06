@@ -9,6 +9,7 @@ import cloudinary from '../utils/cloudinary';
 import Player, { IPlayer } from '../models/player';
 import PlayerBalance, { IPlayerBalance } from '../models/playerBalance';
 import Notification, { NotificationType } from '../models/notification';
+import { BannerConfig, IBannerConfig } from '../models/banner'; // Adjust path as needed
 import { STATUS, VERIFICATION } from '../constants';
 import Click from '../models/click';
 import Payout from '../models/payout';
@@ -44,7 +45,17 @@ interface CustomRequest extends Request {
     role: number;
   };
 }
-
+// interface CustomRequest extends Request {
+//   body: {
+//     title?: string;
+//     subtitle?: string;
+//     buttonText?: string;
+//     hours?: string;
+//     minutes?: string;
+//     seconds?: string;
+//     countdown?: string;
+//   };
+// }
 const ensureAffiliate = (user: any) => {
   if (!user || (user.role_id !== undefined && user.role_id !== 2)) {
     throw new Error('Access denied: Affiliate account required');
@@ -2537,5 +2548,88 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
     res
       .status(500)
       .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+export const saveBannerConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    const { title, subtitle, buttonText, hours, minutes, seconds } = req.body;
+
+    console.log('req.body :>> ', req.body);
+
+    // Validate required fields
+    if (!title?.trim() || !subtitle?.trim() || !buttonText?.trim()) {
+      return res.status(400).json({ message: 'Title, subtitle, and button text are required and cannot be empty' });
+    }
+
+    // Validate time inputs
+    if (hours === undefined || minutes === undefined || seconds === undefined) {
+      return res.status(400).json({ message: 'Hours, minutes, and seconds are required' });
+    }
+
+    const h = parseInt(hours, 10);
+    const m = parseInt(minutes, 10);
+    const s = parseInt(seconds, 10);
+
+    if (isNaN(h) || isNaN(m) || isNaN(s)) {
+      return res.status(400).json({ message: 'Hours, minutes, and seconds must be numeric' });
+    }
+
+    // Validate time ranges
+    if (h < 0) {
+      return res.status(400).json({ message: 'Hours cannot be negative' });
+    }
+    if (m < 0 || m > 59) {
+      return res.status(400).json({ message: 'Minutes must be between 0 and 59' });
+    }
+    if (s < 0 || s > 59) {
+      return res.status(400).json({ message: 'Seconds must be between 0 and 59' });
+    }
+
+    // Format countdown to hh:mm:ss
+    const countdown = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+    // Update or create banner configuration
+    const bannerConfig = await BannerConfig.findOneAndUpdate(
+      {}, // Single document for banner config
+      {
+        title: title.trim(),
+        subtitle: subtitle.trim(),
+        buttonText: buttonText.trim(),
+        countdown,
+        updatedAt: new Date(),
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+
+    return res.status(200).json({
+      message: 'Banner configuration saved successfully',
+      data: bannerConfig,
+    });
+  } catch (error) {
+    console.error('Error saving banner config:', error);
+    return res.status(500).json({
+      message: 'Server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+export const getBannerConfig = async (req: CustomRequest, res: Response) => {
+  try {
+    const bannerConfig = await BannerConfig.findOne();
+    if (!bannerConfig) {
+      return res.status(404).json({ message: 'Banner configuration not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Banner configuration retrieved successfully',
+      data: bannerConfig,
+    });
+  } catch (error) {
+    console.error('Error fetching banner config:', error);
+    return res.status(500).json({
+      message: 'Server error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 };
