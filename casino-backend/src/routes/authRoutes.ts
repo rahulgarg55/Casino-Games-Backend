@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
 import * as authController from '../controllers/authController';
 import * as paymentController from '../controllers/paymentController';
+import { setGlobalCommission,getGlobalCommission } from '../controllers/commissionController';
 import { body, oneOf, query } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import validateRequest from '../middlewares/validateRequest';
@@ -809,6 +810,7 @@ router.patch(
 
 router.post('/admin/banner', verifyToken, verifyAdmin, authController.saveBannerConfig);
 router.get('/banner', verifyToken, verifyAdmin, authController.getBannerConfig);
- 
+router.post('/admin/commission', verifyToken, verifyAdmin, setGlobalCommission);
+router.get('/admin/commission', verifyToken, verifyAdmin, getGlobalCommission); 
 
 export default router;
