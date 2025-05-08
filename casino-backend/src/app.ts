@@ -12,14 +12,14 @@ import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import dotenv from 'dotenv';
-import path from 'path'
-import { I18n } from  'i18n';
+import path from 'path';
+import { I18n } from 'i18n';
 
 const i18n = new I18n({
-  locales: ['en','mt',"pt","id","fil","vi"," ko","th"],
+  locales: ['en', 'mt', 'pt', 'id', 'fil', 'vi', 'ko', 'th'],
   directory: path.join(__dirname, 'translation'),
-  defaultLocale:"en"
-})
+  defaultLocale: 'en',
+});
 
 dotenv.config();
 
@@ -65,11 +65,13 @@ const logger = winston.createLogger({
     }),
   ],
 });
-app.use(i18n.init)
-app.use(function(req,res,next){
-  i18n.setLocale(req,req.headers['accept-language']);
+
+app.use(i18n.init);
+app.use(function (req, res, next) {
+  i18n.setLocale(req, req.headers['accept-language']);
   next();
-})
+});
+
 app.use(
   expressWinston.logger({
     winstonInstance: logger,
@@ -80,8 +82,9 @@ app.use(
   }),
 );
 
+// Stripe webhook endpoint
 app.post(
-  '/api/auth/stripe/webhook',
+  '/auth/stripe/webhook',
   express.raw({ type: 'application/json' }),
   paymentController.handleStripeWebhook,
 );
@@ -89,7 +92,7 @@ app.post(
 app.use(helmet());
 app.use(
   cors({
-    origin: true,
+    origin: true, // Allow all origins
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature'],
     credentials: true,
