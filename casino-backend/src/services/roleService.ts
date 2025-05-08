@@ -6,10 +6,10 @@ interface RoleData {
   description?: string;
 }
 
-export const createRole = async (data: RoleData): Promise<IRole> => {
+export const createRole = async (data: RoleData,req:any): Promise<IRole> => {
   const existingRole = await Role.findOne({ role_id: data.role_id });
   if (existingRole) {
-    throw new Error('Role ID already exists');
+    throw new Error((req as any).__('ROLEID_ALREADY'));
   }
 
   const role = new Role(data);
@@ -29,11 +29,12 @@ export const getRoles = async (
 export const updateRole = async (
   id: number,
   data: Partial<RoleData>,
+  req:any
 ): Promise<IRole | null> => {
   if (data.role_id !== undefined) {
     const existingRole = await Role.findOne({ role_id: data.role_id });
     if (existingRole && existingRole.role_id !== id) {
-      throw new Error('Role ID already exists');
+      throw new Error((req as any).__('ROLEID_ALREADY'));
     }
   }
 

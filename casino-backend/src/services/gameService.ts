@@ -39,12 +39,13 @@ export const getAllGames = async (
 export const updateGameStatus = async (
   gameId: string,
   status: number,
+  req:any
 ): Promise<IGame> => {
   const game = await Game.findByIdAndUpdate(
     gameId,
     { status, updated_at: new Date() },
     { new: true },
   );
-  if (!game) throw new Error('Game not found');
+  if (!game) throw new Error((req as any).__('GAME_NOT_FOUND'));
   return game;
 };

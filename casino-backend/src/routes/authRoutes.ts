@@ -808,6 +808,8 @@ router.patch(
   authController.updatePreferences,
 );
 
+/*Get languages*/
+router.get('/languages',authController.getLanguages);
 router.post('/admin/banner', verifyToken, verifyAdmin, authController.saveBannerConfig);
 router.get('/banner', verifyToken, verifyAdmin, authController.getBannerConfig);
 router.post('/admin/commission', verifyToken, verifyAdmin, setGlobalCommission);

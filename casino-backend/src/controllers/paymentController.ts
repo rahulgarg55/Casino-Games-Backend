@@ -84,7 +84,7 @@ export const addPaymentMethod = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -97,7 +97,7 @@ export const addPaymentMethod = async (
     if (!method_type || !details) {
       res.status(400).json({
         success: false,
-        message: 'method_type and details are required',
+        message: (req as any).__('METHODTYPE_DETAILS_REQUIRED'),
       });
       return;
     }
@@ -106,7 +106,7 @@ export const addPaymentMethod = async (
     if (!player) {
       res.status(404).json({
         success: false,
-        message: 'Player not found',
+        message:  (req as any).__('PLAYER_NOT_FOUND'),
       });
       return;
     }
@@ -124,7 +124,7 @@ export const addPaymentMethod = async (
         if (!details.payment_method_id) {
           res.status(400).json({
             success: false,
-            message: 'Payment method ID required for credit_card',
+            message: (req as any).__('PAYMENTID_REQUIRED_CARD'),
           });
           return;
         }
@@ -141,7 +141,7 @@ export const addPaymentMethod = async (
           if (!details.account_number || !details.routing_number) {
             res.status(400).json({
               success: false,
-              message: 'Account and routing numbers required',
+              message: (req as any).__('ACCOUNT_ROUTING_REQUIRED'),
             });
             return;
           }
@@ -175,7 +175,7 @@ export const addPaymentMethod = async (
       default:
         res.status(400).json({
           success: false,
-          message: 'Unsupported method_type',
+          message: (req as any).__('UNSUPPORTED_METHOD'),
         });
         return;
     }
@@ -199,7 +199,7 @@ export const addPaymentMethod = async (
 
     res.status(201).json({
       success: true,
-      message: 'Payment method added successfully',
+      message:  (req as any).__('PAYMENTMETHOD_ADDED'),
       paymentMethod: {
         id: paymentMethod._id,
         method_type: paymentMethod.method_type,
@@ -220,7 +220,7 @@ export const addPaymentMethod = async (
       message:
         error.type === 'StripeCardError'
           ? 'Card error'
-          : 'Failed to add payment method',
+          : (req as any).__('FAILED_ADD_PAYMENTMETHOD'),
       error: error.message,
     });
   }
@@ -234,7 +234,7 @@ export const getPaymentMethods = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -246,7 +246,7 @@ export const getPaymentMethods = async (
     if (isNaN(parsedLimit) || parsedLimit <= 0) {
       res.status(400).json({
         success: false,
-        error: 'Invalid limit parameter',
+        error:  (req as any).__('INVALID_LIMIT_PARM'),
       });
       return;
     }
@@ -285,7 +285,7 @@ export const getPaymentMethods = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch payment methods',
+      message: (req as any).__('FAILED_FETCH_PAYMENTMETHOD'),
       error: error.message,
     });
   }
@@ -299,7 +299,7 @@ export const updatePaymentMethod = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -315,7 +315,7 @@ export const updatePaymentMethod = async (
     if (!paymentMethod) {
       res.status(404).json({
         success: false,
-        message: 'Payment method not found',
+        message: (req as any).__('PAYMENT_METHOD_NOT_FOUND'),
       });
       return;
     }
@@ -324,7 +324,7 @@ export const updatePaymentMethod = async (
     if (!player || !player.stripeCustomerId) {
       res.status(400).json({
         success: false,
-        message: 'Player or Stripe customer not found',
+        message:  (req as any).__('PLAYERS_STRIPE_CUST_NOT_FOUND'),
       });
       return;
     }
@@ -360,7 +360,7 @@ export const updatePaymentMethod = async (
 
     res.status(200).json({
       success: true,
-      message: 'Payment method updated successfully',
+      message: (req as any).__('PAYMENTMETHOD_UPDATED'),
       paymentMethod: {
         id: paymentMethod._id,
         method_type: paymentMethod.method_type,
@@ -376,7 +376,7 @@ export const updatePaymentMethod = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to update payment method',
+      message: (req as any).__('FAILED_UPDATE_PAYMENTMETHOD'),
       error: error.message,
     });
   }
@@ -390,7 +390,7 @@ export const deletePaymentMethod = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -405,7 +405,7 @@ export const deletePaymentMethod = async (
     if (!paymentMethod) {
       res.status(404).json({
         success: false,
-        message: 'Payment method not found',
+        message: (req as any).__('PAYMENT_METHOD_NOT_FOUND'),
       });
       return;
     }
@@ -435,7 +435,7 @@ export const deletePaymentMethod = async (
 
     res.status(200).json({
       success: true,
-      message: 'Payment method deleted successfully',
+      message:(req as any).__('PAYMENTMETHOD_DELETED'),
     });
   } catch (error: any) {
     logger.error('Error deleting payment method:', {
@@ -446,7 +446,7 @@ export const deletePaymentMethod = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to delete payment method',
+      message: (req as any).__('FAILED_DELETE_PAYMENT'),
       error: error.message,
     });
   }
@@ -460,7 +460,7 @@ export const createPaymentIntent = async (
     if (!req.user?.id) {
       res
         .status(401)
-        .json({ success: false, error: 'Authentication required' });
+        .json({ success: false,  error: (req as any).__('AUTHENTICATION_REQUIRED') });
       return;
     }
 
@@ -470,7 +470,7 @@ export const createPaymentIntent = async (
     if (!amount || !currency) {
       res
         .status(400)
-        .json({ success: false, error: 'Amount and currency are required' });
+        .json({ success: false, error: (req as any).__('AMOUNT_CURR_REQUIRED') });
       return;
     }
 
@@ -478,13 +478,13 @@ export const createPaymentIntent = async (
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       res
         .status(400)
-        .json({ success: false, error: 'Amount must be a positive number' });
+        .json({ success: false, error: (req as any).__('AMOUNT_MUST_POS')  });
       return;
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      res.status(404).json({ success: false, message: 'Player not found' });
+      res.status(404).json({ success: false, message: (req as any).__('PLAYER_NOT_FOUND') });
       return;
     }
 
@@ -600,7 +600,7 @@ export const createPaymentIntent = async (
 
     res.status(statusCode).json({
       success: false,
-      message: 'Failed to create payment intent',
+      message:  (req as any).__('FAILED_PAYMENT_INTENT'),
       error: error.message,
       ...(error.code && { code: error.code }),
       ...(error.type && { type: error.type }),
@@ -962,7 +962,7 @@ export const getTransactionHistory = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -974,7 +974,7 @@ export const getTransactionHistory = async (
     if (isNaN(parsedLimit) || parsedLimit <= 0) {
       res.status(400).json({
         success: false,
-        error: 'Invalid limit parameter',
+        error: (req as any).__('INVALID_LIMIT_PARM'),
       });
       return;
     }
@@ -990,7 +990,7 @@ export const getTransactionHistory = async (
 
     res.status(200).json({
       success: true,
-      message: 'Transaction history retrieved successfully',
+      message:(req as any).__('TRANSACTION_HISTORY_FOUND'),
       transactions: transactions.map((tx) => ({
         id: tx._id,
         amount: tx.amount,
@@ -1009,7 +1009,7 @@ export const getTransactionHistory = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch transaction history',
+      message:(req as any).__('FAILED_FETCH_TRANSCATION_HISTORY'),
       error: error.message,
     });
   }
@@ -1023,7 +1023,7 @@ export const getTransactionDetail = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -1038,7 +1038,7 @@ export const getTransactionDetail = async (
     if (!transaction) {
       res.status(404).json({
         success: false,
-        message: 'Transaction not found',
+        message: (req as any).__('TRANSACTION_NOT_FOUND'),
       });
       return;
     }
@@ -1060,7 +1060,7 @@ export const getTransactionDetail = async (
 
     res.status(200).json({
       success: true,
-      message: 'Transaction retrieved successfully',
+      message: (req as any).__('TRANSACTION_FOUND'),
       transaction: {
         id: transaction._id,
         amount: transaction.amount,
@@ -1091,7 +1091,7 @@ export const getTransactionDetail = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch transaction detail',
+      message: (req as any).__('FAILED_FETCH_TRANSACTION'),
       error: error.message,
     });
   }
@@ -1105,7 +1105,7 @@ export const getPlayerBalance = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -1115,7 +1115,7 @@ export const getPlayerBalance = async (
     if (!player) {
       res.status(404).json({
         success: false,
-        message: 'Player not found',
+        message: (req as any).__('PLAYER_NOT_FOUND'),
       });
       return;
     }
@@ -1132,7 +1132,7 @@ export const getPlayerBalance = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch balance',
+      message: (req as any).__('FAILED_FETCH_BALANCE'),
       error: error.message,
     });
   }
@@ -1146,7 +1146,7 @@ export const getStripeConfig = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -1156,13 +1156,13 @@ export const getStripeConfig = async (
     if (!player) {
       res.status(404).json({
         success: false,
-        message: 'Player not found',
+        message:(req as any).__('PLAYER_NOT_FOUND'),
       });
       return;
     }
 
     if (!process.env.STRIPE_PUBLISHABLE_KEY) {
-      throw new Error('Stripe configuration missing');
+      throw new Error((req as any).__('STRIPE_CONFIG_MISSING'));
     }
 
     res.status(200).json({
@@ -1178,7 +1178,7 @@ export const getStripeConfig = async (
     });
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch Stripe config',
+      error: (req as any).__('FAILED_STRIPE_CONFIG'),
       details: error.message,
     });
   }
@@ -1192,7 +1192,7 @@ export const processWithdrawal = async (
     if (!req.user?.id) {
       res.status(401).json({
         success: false,
-        error: 'Authentication required',
+        error: (req as any).__('AUTHENTICATION_REQUIRED'),
       });
       return;
     }
@@ -1203,7 +1203,7 @@ export const processWithdrawal = async (
     if (!amount || !currency || !paymentMethodId) {
       res.status(400).json({
         success: false,
-        message: 'Amount, currency, and paymentMethodId are required',
+        message: (req as any).__('AMOUNT_CURRENCY_PAYMENT_METHODID_REQUIRED'),
       });
       return;
     }
@@ -1212,7 +1212,7 @@ export const processWithdrawal = async (
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       res.status(400).json({
         success: false,
-        message: 'Invalid amount',
+        message:  (req as any).__('INVALID_AMOUNT'),
       });
       return;
     }
@@ -1221,7 +1221,7 @@ export const processWithdrawal = async (
     if (!player) {
       res.status(404).json({
         success: false,
-        message: 'Player not found',
+        message: (req as any).__('PLAYER_NOT_FOUND'),
       });
       return;
     }
@@ -1229,7 +1229,7 @@ export const processWithdrawal = async (
     if ((player.balance || 0) < parsedAmount) {
       res.status(400).json({
         success: false,
-        message: 'Insufficient balance',
+        message: (req as any).__('INSUFF_BALANCE'),
         currentBalance: player.balance,
         requestedAmount: parsedAmount,
       });
@@ -1269,7 +1269,7 @@ export const processWithdrawal = async (
       if (!paymentMethod) {
         res.status(404).json({
           success: false,
-          message: 'Payment method not found',
+          message: (req as any).__('PAYMENT_METHOD_NOT_FOUND'),
         });
         return;
       }
@@ -1322,7 +1322,7 @@ export const processWithdrawal = async (
 
       res.status(200).json({
         success: true,
-        message: 'Withdrawal processed successfully',
+        message: (req as any).__('WITHDRAWAL_PROCESSED'),
         transaction: {
           id: transaction._id,
           amount: transaction.amount,
@@ -1353,7 +1353,7 @@ export const processWithdrawal = async (
     });
     res.status(500).json({
       success: false,
-      message: 'Failed to process withdrawal',
+      message: (req as any).__('FAILED_PROCESS_WITHDRAWAL'),
       error: error.message,
     });
   }
@@ -1403,14 +1403,14 @@ export const seedPaymentConfigs = async () => {
 export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const paymentConfigs = await PaymentConfig.find().select('-__v');
 
     res.status(200).json({
       success: true,
-      message: 'Payment configurations retrieved successfully',
+      message: (req as any).__('PAYMENT_CONFIGURATIONS_RETRIEVED_SUCCESSFULLY'),
       data: paymentConfigs.map((config) => ({
         id: config._id,
         paymentMethodId: config.paymentMethodId,
@@ -1426,7 +1426,7 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to retrieve payment configurations',
+        : (req as any).__('FAILED_TO_RETRIEVE_PAYMENT_CONFIGURATIONS'),
     );
   }
 };
@@ -1434,19 +1434,19 @@ export const getPaymentConfigs = async (req: CustomRequest, res: Response) => {
 export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
     const paymentConfig = await PaymentConfig.findById(id).select('-__v');
 
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration retrieved successfully',
+      message:  (req as any).__('PAYMENT_CONFIGURATIONS_RETRIEVED_SUCCESSFULLY'),
       data: {
         id: paymentConfig._id,
         paymentMethodId: paymentConfig.paymentMethodId,
@@ -1461,8 +1461,8 @@ export const getPaymentConfig = async (req: CustomRequest, res: Response) => {
       res,
       500,
       error instanceof Error
-        ? error.message
-        : 'Failed to retrieve payment configuration',
+        ? error.message 
+        :(req as any).__('FAILED_TO_RETRIEVE_PAYMENT_CONFIGURATIONS'),
     );
   }
 };
@@ -1473,7 +1473,7 @@ export const updatePaymentConfig = async (
 ) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+      return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
@@ -1481,7 +1481,7 @@ export const updatePaymentConfig = async (
 
     const paymentConfig = await PaymentConfig.findById(id);
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     if (config) paymentConfig.config = config;
@@ -1492,7 +1492,7 @@ export const updatePaymentConfig = async (
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration updated successfully',
+      message:  (req as any).__('PAYMENT_CONFIGURATION_UPDATED_SUCCESSFULLY'),
       data: {
         id: paymentConfig._id,
         paymentMethodId: paymentConfig.paymentMethodId,
@@ -1508,7 +1508,7 @@ export const updatePaymentConfig = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to update payment configuration',
+        :  (req as any).__('FAILED_TO_UPDATE_PAYMENT_CONFIGURATION'),
     );
   }
 };
@@ -1519,19 +1519,19 @@ export const deletePaymentConfig = async (
 ) => {
   try {
     if (!req.user || req.user.role !== 1) {
-      return sendErrorResponse(res, 403, 'Admin access required');
+       return sendErrorResponse(res, 403, (req as any).__('ADMIN_ACCESS_REQUIRED'));
     }
 
     const { id } = req.params;
     const paymentConfig = await PaymentConfig.findByIdAndDelete(id);
 
     if (!paymentConfig) {
-      return sendErrorResponse(res, 404, 'Payment configuration not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PAYMENT_CONFIGURATION_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Payment configuration deleted successfully',
+      message: (req as any).__('PAYMENT_CONFIGURATION_DELETED_SUCCESSFULLY'),
       data: { id },
     });
   } catch (error) {
@@ -1540,7 +1540,7 @@ export const deletePaymentConfig = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to delete payment configuration',
+        :  (req as any).__('FAILED_TO_DELETE_PAYMENT_CONFIGURATION'),
     );
   }
 };

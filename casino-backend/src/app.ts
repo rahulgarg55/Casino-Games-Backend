@@ -12,6 +12,14 @@ import winston, { format } from 'winston';
 import expressWinston from 'express-winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import dotenv from 'dotenv';
+import path from 'path'
+import { I18n } from  'i18n';
+
+const i18n = new I18n({
+  locales: ['en','mt',"pt","id","fil","vi"," ko","th"],
+  directory: path.join(__dirname, 'translation'),
+  defaultLocale:"en"
+})
 
 dotenv.config();
 
@@ -57,7 +65,11 @@ const logger = winston.createLogger({
     }),
   ],
 });
-
+app.use(i18n.init)
+app.use(function(req,res,next){
+  i18n.setLocale(req,req.headers['accept-language']);
+  next();
+})
 app.use(
   expressWinston.logger({
     winstonInstance: logger,

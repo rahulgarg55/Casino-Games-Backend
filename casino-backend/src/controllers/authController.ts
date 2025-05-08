@@ -37,6 +37,7 @@ import {
 } from '../services/authService';
 import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
+import Languages from '../models/languages';
 
 interface CustomRequest extends Request {
   user?: {
@@ -78,10 +79,11 @@ export const register = async (req: Request, res: Response) => {
   try {
     const { player, balance, token, expiresIn } = await authService.register(
       req.body,
+      req
     );
     res.status(201).json({
       success: true,
-      message: 'User registered successfully',
+      message: (req as any).__('USER_REGISTER'),
       data: {
         user: {
           id: player._id,
@@ -111,24 +113,24 @@ export const register = async (req: Request, res: Response) => {
     if (error instanceof Error) {
       if (error.message.includes('Username is already taken')) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: 'Username is already taken' },
+          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
         ]);
       } else if (error.message.includes('Email is already registered')) {
         sendErrorResponse(res, 409, [
-          { param: 'email', message: 'Email is already registered' },
+          { param: 'email', message: (req as any).__('EMIAL_ALREADY_REGISTER') },
         ]);
       } else if (error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
           {
             param: 'phone_number',
-            message: 'Phone number is already registered',
+            message:  (req as any).__('PHONE_ALREADY_REGISTER'),
           },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
       }
     } else {
-      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
+      sendErrorResponse(res, 400,  (req as any).__('INVALID_REQUEST'));
     }
   }
 };
@@ -157,7 +159,7 @@ export const affiliateRegister = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   try {
-    const { user, token } = await authService.login(req.body);
+        const { user, token } = await authService.login(req.body,req);
 
     if (user.requires2FA) {
       await authService.initiate2FA(String(user.id));
@@ -169,7 +171,7 @@ export const login = async (req: Request, res: Response) => {
     }
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: (req as any).__('LOGIN_SUCCESSFULLY'),
       data: {
         user: {
           ...user,
@@ -186,7 +188,7 @@ export const login = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid username or password',
+      error instanceof Error ? error.message : (req as any).__('INVALID_USERNAME_PASSWORD'),
     );
   }
 };
@@ -223,23 +225,24 @@ export const verify2FA = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
     if (!playerId || !otp) {
-      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+      return sendErrorResponse(res, 400, (req as any).__('PLAYERSID_OTP_REQUIRED'));
     }
     const { token, expiresIn, user } = await authService.verify2FA(
       playerId,
       otp,
+      req
     );
 
     res.status(200).json({
       success: true,
-      message: '2FA verification successful',
+      message: (req as any).__('2FA_VERIFIED'),
       data: { user, token, expiresIn },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid OTP',
+      error instanceof Error ? error.message : (req as any).__('INVALID_OTP'),
     );
   }
 };
@@ -247,14 +250,14 @@ export const verify2FA = async (req: Request, res: Response) => {
 export const toggle2FA = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
     const { enabled, method, password } = req.body;
     if (typeof enabled !== 'boolean' || !method || !password) {
       return sendErrorResponse(
         res,
         400,
-        'Enabled, method, and password are required',
+        (req as any).__('TOGGLE-2FA-REQUIRED-FIELD'),
       );
     }
     const result = await authService.toggle2FA(
@@ -262,6 +265,7 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
       enabled,
       method,
       password,
+      req
     );
 
     res.status(200).json({
@@ -273,7 +277,7 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to toggle 2FA',
+      error instanceof Error ? error.message : (req as any).__('FAILED_TOOGLE_2FA'),
     );
   }
 };
@@ -285,14 +289,14 @@ export const forgotPassword = async (req: Request, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'Please provide either email or phone number',
+        (req as any).__('PLEASE_PROVIDE_EMAIL_OR_PHONE')
       );
     }
-    await authService.forgotPassword({ email, phone_number });
+    await authService.forgotPassword({ email, phone_number},req);
 
     res.status(200).json({
       success: true,
-      message: 'Password reset link has been sent to your email',
+      message: (req as any).__('PASSWORD_LINK_SENT'),
     });
   } catch (error) {
     sendErrorResponse(
@@ -300,7 +304,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to process password reset',
+        : (req as any).__('FAILED_PASSWORD_LINK'),
     );
   }
 };
@@ -309,19 +313,18 @@ export const resetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
-      return sendErrorResponse(res, 400, 'Token and password are required');
+      return sendErrorResponse(res, 400,(req as any).__('TOKEN_PASSWORD_REQUIRED'));
     }
-    await resetPasswordService({ token, password });
-
+    await resetPasswordService({ token, password },req);
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message:(req as any).__('PASSWORD_UPDATED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Invalid or expired reset token',
+      error instanceof Error ? error.message : (req as any).__('INVALID_EXPRIRE_TOKEN'),
     );
   }
 };
@@ -329,7 +332,7 @@ export const resetPassword = async (req: Request, res: Response) => {
 export const viewProfile = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.user || !req.user.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const playerId = req.user.id;
@@ -347,14 +350,14 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     ]);
 
     if (!player) {
-      return sendErrorResponse(res, 404, 'User not found');
+      return sendErrorResponse(res, 404, (req as any).__('USER_NOT_FOUND'));
     }
 
     const balance = await PlayerBalance.findOne({ player_id: playerId });
 
     res.status(200).json({
       success: true,
-      message: 'User profile retrieved successfully',
+      message:(req as any).__('USER_PROFILE_FOUND'),
       data: {
         user: {
           ...player.toObject(),
@@ -369,7 +372,7 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to retrieve profile',
+      error instanceof Error ? error.message : (req as any).__('USER_PROFILE_FAILED'),
     );
   }
 };
@@ -407,14 +410,14 @@ export const getAllPlayers = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Players retrieved successfully',
+      message: (req as any).__('PLAYERS_LIST'),
       data: { players: playersWithBalance },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to retrieve players',
+      error instanceof Error ? error.message :(req as any).__('PLAYERS_FAILED'),
     );
   }
 };
@@ -424,7 +427,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return sendErrorResponse(res, 400, 'Invalid user ID format');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_ID'));
     }
 
     const player = (await Player.findById(userId)
@@ -443,7 +446,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       .lean()) as IPlayer | null;
 
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     const balance = (await PlayerBalance.findOne({
@@ -511,7 +514,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Player details retrieved successfully',
+      message: (req as any).__('PLAYERS_DETAILS'),
       data: { player: playerData },
     });
   } catch (error) {
@@ -521,7 +524,7 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? `Server error: ${error.message}`
-        : 'Failed to retrieve player details',
+        : (req as any).__('PLAYERS_DETAILS_FAILED'),
     );
   }
 };
@@ -715,19 +718,19 @@ export const updatePlayerStatus = async (req: Request, res: Response) => {
       { new: true },
     );
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Player status updated successfully',
+      message: (req as any).__('PLAYER_STATUS_UPDATED'),
       data: { id: player._id, status: player.status },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to update player status',
+      error instanceof Error ? error.message :  (req as any).__('PLAYER_STATUS_FAILED'),
     );
   }
 };
@@ -738,19 +741,19 @@ export const deletePlayer = async (req: Request, res: Response) => {
 
     const player = await Player.findByIdAndDelete(userId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     res.status(200).json({
       success: true,
-      message: 'Player deleted successfully',
+      message: (req as any).__('PLAYER_DELETED'),
       data: { id: player._id },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to delete player',
+      error instanceof Error ? error.message : (req as any).__('PLAYER_DELETED_FAILDED'),
     );
   }
 };
@@ -763,14 +766,14 @@ export const getAdminNotifications = async (req: Request, res: Response) => {
     const result = await getNotifications(page, limit);
     res.status(200).json({
       success: true,
-      message: 'Notifications retrieved successfully',
+      message: (req as any).__('NOTIFICATION_FOUND'),
       data: result,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to fetch notifications',
+      error instanceof Error ? error.message : (req as any).__('FAILED_NOTIFICATION'),
     );
   }
 };
@@ -829,8 +832,8 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
       success: true,
       message:
         updateData.email && updateData.email !== currentPlayer.email
-          ? 'Verification email sent to your new email address. Please verify to complete the update.'
-          : 'Profile updated successfully',
+          ? (req as any).__('VERIFICATION_EMAIL_SENT')
+          : (req as any).__('PROFILE_UPDATED'),
       data: {
         user: {
           ...updatedPlayer,
@@ -854,16 +857,16 @@ export const updateProfile = async (req: CustomRequest, res: Response) => {
 export const uploadPhoto = async (req: CustomRequest, res: Response) => {
   try {
     if (!req.file) {
-      return sendErrorResponse(res, 400, 'No photo provided');
+      return sendErrorResponse(res, 400,  (req as any).__('PHOTO_REQUIRED'));
     }
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401,  (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const playerId = req.user.id;
     const player = await Player.findById(playerId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'User not found');
+      return sendErrorResponse(res, 404,(req as any).__('USER_NOT_FOUND'));
     }
 
     const result = await cloudinary.uploader.upload(req.file.path, {
@@ -874,14 +877,14 @@ export const uploadPhoto = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Photo uploaded successfully',
+      message:(req as any).__('PHOTO_UPLOADED'),
       data: { photo: player.photo },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to upload photo',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PHOTO_UPLOAD'),
     );
   }
 };
@@ -938,7 +941,7 @@ export const facebookCallback = (req: Request, res: Response) => {
 export const verifyEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
   if (!token || typeof token !== 'string') {
-    return sendErrorResponse(res, 400, 'Invalid or missing token');
+    return sendErrorResponse(res, 400, (req as any).__('INVALID_MISSING_TOKEN'));
   }
 
   try {
@@ -956,7 +959,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
     });
 
     if (!player) {
-      return sendErrorResponse(res, 400, 'Invalid or expired token');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_EXPRIRE_TOKEN'));
     }
     if (player.new_email) {
       player.email = player.new_email;
@@ -973,14 +976,14 @@ export const verifyEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully. Please login with your new email.',
+      message: (req as any).__('EMAIL_VERIFIED'),
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to verify email',
+      error instanceof Error ? error.message : (req as any).__('FAILED_EMAIL_VERIFIED'),
     );
   }
 };
@@ -990,7 +993,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
 
   try {
     if (!email) {
-      return sendErrorResponse(res, 400, 'Email is required');
+      return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
     }
 
     // Log the incoming email for debugging
@@ -1005,13 +1008,13 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       return sendErrorResponse(
         res,
         404,
-        'No account found with this email address',
+        (req as any).__('NO_ACCOUNT_WITH_EMAIL'),
       );
     }
 
     // If email is already verified and no new_email is pending, no need to resend
     if (player.email_verified && !player.new_email) {
-      return sendErrorResponse(res, 400, 'Email is already verified');
+      return sendErrorResponse(res, 400,  (req as any).__('EMAIL_ALREADY_VERIFIED'));
     }
 
     // Generate new verification token
@@ -1027,7 +1030,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Verification email has been sent',
+      message: (req as any).__('EMAIL_VERIFICATION_LINK_SENT'),
       data: { verification_token: verificationToken },
     });
   } catch (error) {
@@ -1037,7 +1040,7 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to resend verification email',
+        : (req as any).__('FAILED_TO_RESEND_EMAIL_LINK'),
     );
   }
 };
@@ -1046,19 +1049,19 @@ export const verifyPhone = async (req: Request, res: Response) => {
   try {
     const { phone_number, code } = req.body;
     if (!phone_number || !code) {
-      return sendErrorResponse(res, 400, 'Phone number and code are required');
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
     }
 
-    await authService.verifyPhoneNumber(phone_number, code);
+    await authService.verifyPhoneNumber(phone_number, code,req);
     res.status(200).json({
       success: true,
-      message: 'Phone number verified successfully',
+      message: (req as any).__('PHONE_VERIFIED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Phone verification failed',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION'),
     );
   }
 };
@@ -1067,24 +1070,25 @@ export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
     if (!playerId || !otp) {
-      return sendErrorResponse(res, 400, 'Player ID and OTP are required');
+      return sendErrorResponse(res, 400,  (req as any).__('PLAYERSID_OTP_REQUIRED'));
     }
 
     const { token, expiresIn, user } = await authService.verifyOTP(
       playerId,
       otp,
+      req
     );
 
     res.status(200).json({
       success: true,
-      message: 'OTP verified successfully',
+      message:(req as any).__('OTP_VERIFIED'),
       data: { user, token, expiresIn },
     });
   } catch (error) {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid OTP',
+      error instanceof Error ? error.message : (req as any).__('INVALID_OTP'),
     );
   }
 };
@@ -1093,12 +1097,12 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
   try {
     const { playerId, consent } = req.body;
     if (!playerId || consent === undefined) {
-      return sendErrorResponse(res, 400, 'Player ID and consent are required');
+      return sendErrorResponse(res, 400, (req as any).__('PLAYERSID_CONSENT_REQUIRED'));
     }
 
     const player = await Player.findById(playerId);
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404,  (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     player.cookieConsent = consent;
@@ -1106,7 +1110,7 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Cookie consent updated successfully',
+      message:  (req as any).__('COIKIE_CONSENT_UPDATED'),
       data: { playerId: player._id, cookieConsent: player.cookieConsent },
     });
   } catch (error) {
@@ -1115,7 +1119,7 @@ export const updateCookieConsent = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to update cookie consent',
+        :  (req as any).__('FAILED_UPDATE_CONSENT'),
     );
   }
 };
@@ -1126,14 +1130,14 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
 
   try {
     if (!playerId) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     if (!currentPassword || !newPassword) {
       return sendErrorResponse(
         res,
         400,
-        'Both current and new passwords are required',
+        (req as any).__('CURRENT_PASSWORD_NEW_PASSWORD_REQUIRED'),
       );
     }
 
@@ -1141,18 +1145,18 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'Password must be at least 8 characters long and include a number',
+        (req as any).__('PASSWORD_MUST_LONG'),
       );
     }
 
     const player = await Player.findById(playerId).select('+password_hash');
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
-
+    
     const isMatch = await bcrypt.compare(currentPassword, player.password_hash);
     if (!isMatch) {
-      return sendErrorResponse(res, 400, 'Current password is incorrect');
+      return sendErrorResponse(res, 400,  (req as any).__('CURRENT_PASSWORD_INCORRECT'));
     }
 
     const isSamePassword = await bcrypt.compare(
@@ -1163,7 +1167,7 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(
         res,
         400,
-        'New password must be different from current password',
+        (req as any).__('NEW_PASSWORD_DIFFERENT'),
       );
     }
 
@@ -1173,14 +1177,14 @@ export const changePassword = async (req: CustomRequest, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Password changed successfully',
+      message: (req as any).__('PASSWORD_CHANGED'),
     });
   } catch (error) {
     console.error('Error changing password:', error);
     sendErrorResponse(
       res,
       500,
-      error instanceof Error ? error.message : 'Failed to change password',
+      error instanceof Error ? error.message : (req as any).__('FAILED_PASSWORD_CHANGED'),
     );
   }
 };
@@ -1192,19 +1196,19 @@ export const geStripeConfig = async (req: Request, res: Response) => {
     if (!existingConfig) {
       return res.status(404).json({
         success: false,
-        message: messages.stripeConfigNotFound,
+        message: (req as any).__('STRIPE_CONFIG_NOT_FOUND'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.stripeConfigFound,
+      message:(req as any).__('STRIPE_CONFIG_FOUND'),
       data: existingConfig,
     });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1219,7 +1223,7 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
     if (!existingConfig) {
       return res.status(404).json({
         success: false,
-        message: messages.stripeConfigNotFound,
+        message: (req as any).__('STRIPE_CONFIG_NOT_FOUND'),
       });
     }
 
@@ -1234,13 +1238,13 @@ export const updateStripeConfig = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: messages.stripeConfigUpdated,
+      message: (req as any).__('STRIPE_CONFIG_UPDATED'),
       data: updatedStripeConfig,
     });
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1256,13 +1260,13 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
     if (!affiliateUserList.length) {
       return res.status(404).json({
         success: false,
-        message: messages.dataNotFound,
+        message: (req as any).__('DATA_NOT_FOUND'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.affiliateUserList,
+      message:(req as any).__('AFFILIATE_USERS_LIST'),
       data: {
         total: totalAffiliates,
         data: affiliateUserList,
@@ -1271,7 +1275,7 @@ export const getAffliateUsers = async (req: Request, res: Response) => {
   } catch (error) {
     return res.status(400).json({
       success: false,
-      error: messages.error,
+      error:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1288,7 +1292,7 @@ export const updateAffliateUsersStatus = async (
     if (!status) {
       return res.status(400).json({
         success: false,
-        message: messages.statusRequired,
+        message: (req as any).__('STATUS_REQUIRED'),
       });
     }
 
@@ -1299,7 +1303,7 @@ export const updateAffliateUsersStatus = async (
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
 
@@ -1313,7 +1317,7 @@ export const updateAffliateUsersStatus = async (
     if (!updatedAffiliate) {
       return res.status(400).json({
         success: false,
-        message: messages.failedToUpdateAffiliateStatus,
+        message: (req as any).__('FAILDE_TO_UPDATE_AFFILIATE_STATUS'),
       });
     }
 
@@ -1333,14 +1337,14 @@ export const updateAffliateUsersStatus = async (
 
     return res.status(200).json({
       success: true,
-      message: messages.updateAffiliateUserStatus,
+      message:(req as any).__('UPDATE_AFFILIATE_STATUS'),
       data: {},
     });
   } catch (error) {
     console.error('Error updating affiliate status:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message:(req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1354,7 +1358,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
     const referredPlayers = await Player.find({
@@ -1369,7 +1373,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      message: messages.affiliateFound,
+      message:  (req as any).__('AFFILIATE_FOUND'),
       data: {
         affiliateUser,
         referredPlayers: referredPlayers || [],
@@ -1380,7 +1384,7 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
     console.error('Error get affiliate user details:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message: (req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1397,7 +1401,7 @@ export const updateAffliateUsersDetails = async (
     if (!affiliateUser) {
       return res.status(404).json({
         success: false,
-        message: messages.invalidAffiliateId,
+        message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
 
@@ -1432,20 +1436,20 @@ export const updateAffliateUsersDetails = async (
     if (!updatedAffiliate) {
       return res.status(400).json({
         success: false,
-        message: messages.failedToUpdateAffiliate,
+        message:  (req as any).__('FAILED_TO_UPDATE_AFFILIATE'),
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: messages.updateAffiliateUser,
+      message: (req as any).__('AFFILIATE_PROFILE_UPDATED'),
       data: {},
     });
   } catch (error) {
     console.error('Error updating affiliate:', error);
     return res.status(500).json({
       success: false,
-      message: messages.error,
+      message: (req as any).__('UNEXPECTED_ERR'),
     });
   }
 };
@@ -1453,11 +1457,11 @@ export const updateAffliateUsersDetails = async (
 export const affiliatelogin = async (req: Request, res: Response) => {
   console.log('i am here :>> ');
   try {
-    const { user, token } = await authService.loginAffiliate(req.body);
+    const { user, token } = await authService.loginAffiliate(req.body,req);
 
     res.status(200).json({
       success: true,
-      message: messages.login,
+      message: (req as any).__('LOGIN_SUCCESSFULLY'),
       data: {
         user,
         token,
@@ -1468,7 +1472,7 @@ export const affiliatelogin = async (req: Request, res: Response) => {
     sendErrorResponse(
       res,
       401,
-      error instanceof Error ? error.message : 'Invalid username or password',
+      error instanceof Error ? error.message : (req as any).__('INVALID_USERNAME_PASSWORD'),
     );
   }
 };
@@ -1479,14 +1483,14 @@ export const startSumsubVerification = async (
 ) => {
   try {
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401,(req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const tokenResponse = await initiateSumsubVerification(req.user.id);
 
     res.status(200).json({
       success: true,
-      message: 'Sumsub verification initiated successfully',
+      message: (req as any).__('SUB_VERIFICATION'),
       data: {
         accessToken: tokenResponse.token,
         externalUserId: tokenResponse.userId,
@@ -1498,8 +1502,8 @@ export const startSumsubVerification = async (
       res,
       400,
       error instanceof Error
-        ? error.message
-        : 'Failed to initiate Sumsub verification',
+        ? error.message 
+        :  (req as any).__('FAILED_SUB_VERIFICATION'),
     );
   }
 };
@@ -1508,21 +1512,21 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
   try {
     const signature = req.headers['x-payload-signature'] as string;
     if (!signature) {
-      return sendErrorResponse(res, 400, 'Missing webhook signature');
+      return sendErrorResponse(res, 400, (req as any).__('MISSING_WEBHOOK_SIGNATURE'));
     }
 
     if (!validateWebhookSignature(req.body, signature)) {
-      return sendErrorResponse(res, 401, 'Invalid webhook signature');
+      return sendErrorResponse(res, 401,  (req as any).__('INVALID_WEBHOOK_SIGNATURE'));
     }
 
     const { applicantId, reviewStatus, reviewResult } = req.body;
     if (!applicantId || !reviewStatus) {
-      return sendErrorResponse(res, 400, 'Invalid webhook payload');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_WEBHOOK_PAYLOAD'));
     }
 
     const player = await Player.findOne({ sumsub_id: applicantId });
     if (!player) {
-      return sendErrorResponse(res, 404, 'Player not found');
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
     const status =
@@ -1533,7 +1537,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Webhook processed successfully',
+      message:  (req as any).__('WEBOOK_PROCESSED'),
     });
   } catch (error) {
     console.error('Webhook error:', error);
@@ -1542,7 +1546,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to process Sumsub webhook',
+        : (req as any).__('FAILED_WEBHOOK'),
     );
   }
 };
@@ -1550,34 +1554,34 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
 export const addAffliateUsers = async (req: Request, res: Response) => {
   console.log('i am here :>> ');
   try {
-    const AffiliateUserData = await authService.registerAffiliate(req.body);
+    const AffiliateUserData = await authService.registerAffiliate(req.body,req);
     res.status(200).json({
       success: true,
-      message: messages.registerAffiliate,
+      message:  (req as any).__('REGISTER_AFFILIATE'),
       data: AffiliateUserData || {},
     });
   } catch (error) {
     if (error instanceof Error) {
       if (error.message.includes('Username is already taken')) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: 'Username is already taken' },
+          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
         ]);
       } else if (error.message.includes('Email is already registered')) {
         sendErrorResponse(res, 409, [
-          { param: 'email', message: 'Email is already registered' },
+          { param: 'email',message: (req as any).__('EMIAL_ALREADY_REGISTER')},
         ]);
       } else if (error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
           {
             param: 'phone_number',
-            message: 'Phone number is already registered',
+            message:  (req as any).__('PHONE_ALREADY_REGISTER'),
           },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
       }
     } else {
-      sendErrorResponse(res, 400, 'Invalid request. Please check your input');
+      sendErrorResponse(res, 400, (req as any).__('INVALID_REQUEST'));
     }
   }
 };
@@ -1585,7 +1589,7 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
 export const verifyAffiliateEmail = async (req: Request, res: Response) => {
   const { token } = req.query;
   if (!token || typeof token !== 'string') {
-    return sendErrorResponse(res, 400, 'Invalid or missing token');
+    return sendErrorResponse(res, 400, (req as any).__('INVALID_MISSING_TOKEN'));
   }
 
   try {
@@ -1595,7 +1599,7 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
     });
 
     if (!affiliate) {
-      return sendErrorResponse(res, 400, 'Invalid or expired token');
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_EXPRIRE_TOKEN'));
     }
 
     affiliate.status = STATUS.ACTIVE;
@@ -1606,14 +1610,14 @@ export const verifyAffiliateEmail = async (req: Request, res: Response) => {
 
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully. Please login with your new email.',
+      message: (req as any).__('EMAIL_VERIFIED'),
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Failed to verify email',
+      error instanceof Error ? error.message : (req as any).__('FAILED_EMAIL_VERIFIED'),
     );
   }
 };
@@ -1626,7 +1630,7 @@ export const resendVerificationEmailAffiliate = async (
 
   try {
     if (!email) {
-      return sendErrorResponse(res, 400, 'Email is required');
+      return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
     }
 
     const affiliate = await Affiliate.findOne({ email });
@@ -1634,12 +1638,12 @@ export const resendVerificationEmailAffiliate = async (
       return sendErrorResponse(
         res,
         404,
-        'No account found with this email address',
+        (req as any).__('NO_ACCOUNT_WITH_EMAIL'),
       );
     }
 
     if (affiliate.status === STATUS.ACTIVE)
-      return sendErrorResponse(res, 400, 'Email is already verified');
+    return sendErrorResponse(res, 400,  (req as any).__('EMAIL_ALREADY_VERIFIED'));
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     affiliate.verification_token = verificationToken;
@@ -1650,7 +1654,7 @@ export const resendVerificationEmailAffiliate = async (
 
     res.status(200).json({
       success: true,
-      message: 'Verification email has been sent',
+      message: (req as any).__('EMAIL_VERIFICATION_LINK_SENT'),
       data: { verification_token: verificationToken },
     });
   } catch (error) {
@@ -1659,7 +1663,7 @@ export const resendVerificationEmailAffiliate = async (
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to resend verification email',
+        : (req as any).__('FAILED_TO_RESEND_EMAIL_LINK'),
     );
   }
 };
@@ -1668,11 +1672,11 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
 
-    await authService.affiliateforgotPassword({ email });
+    await authService.affiliateforgotPassword({ email },req);
 
     res.status(200).json({
       success: true,
-      message: 'Password reset link has been sent to your email',
+      message: (req as any).__('PASSWORD_LINK_SENT'),
     });
   } catch (error) {
     sendErrorResponse(
@@ -1680,7 +1684,7 @@ export const affiliateForgotPassword = async (req: Request, res: Response) => {
       400,
       error instanceof Error
         ? error.message
-        : 'Failed to process password reset',
+        : (req as any).__('FAILED_PASSWORD_LINK'),
     );
   }
 };
@@ -1689,19 +1693,19 @@ export const affiliateResetPassword = async (req: Request, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
-      return sendErrorResponse(res, 400, 'Token and password are required');
+      return sendErrorResponse(res, 400,(req as any).__('TOKEN_PASSWORD_REQUIRED'));
     }
-    await authService.affiliateResetPassword({ token, password });
+    await authService.affiliateResetPassword({ token, password },req);
 
     res.status(200).json({
       success: true,
-      message: 'Password updated successfully',
+      message:(req as any).__('PASSWORD_UPDATED'),
     });
   } catch (error) {
     sendErrorResponse(
       res,
       400,
-      error instanceof Error ? error.message : 'Invalid or expired reset token',
+      error instanceof Error ? error.message : (req as any).__('INVALID_EXPRIRE_TOKEN'),
     );
   }
 };
@@ -1711,7 +1715,7 @@ export const getAffiliateEarnings = async (
 ) => {
   try {
     if (!req.user?.id) {
-      return sendErrorResponse(res, 401, 'Authentication required');
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
     const affiliateId = req.user.id;
@@ -1725,7 +1729,7 @@ export const getAffiliateEarnings = async (
     if (!referredPlayers.length) {
       return res.status(200).json({
         success: true,
-        message: 'No referred players found',
+        message: (req as any).__('NO_REFERRED'),
         data: { earnings: [], totalEarnings: 0 },
       });
     }
@@ -1768,7 +1772,7 @@ export const getAffiliateEarnings = async (
 
     res.status(200).json({
       success: true,
-      message: 'Affiliate earnings retrieved successfully',
+      message: (req as any).__('AFFILIATE_EARNINGS_FOUND'),
       data: {
         earnings: earningsData,
         totalEarnings,
@@ -1781,7 +1785,7 @@ export const getAffiliateEarnings = async (
       500,
       error instanceof Error
         ? error.message
-        : 'Failed to fetch affiliate earnings',
+        : (req as any).__('FAILED_AFFILIATE_EARNINGS'),
     );
   }
 };
@@ -1796,7 +1800,7 @@ export const getAffiliateDashboard = async (
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message:(req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     const startDate = req.query.startDate
@@ -1932,8 +1936,8 @@ export const trackReferralClick = async (req: Request, res: Response) => {
     const { trackingId, ipAddress, userAgent, referrer } = req.body;
 
     const referralLink = await ReferralLink.findOne({ trackingId });
-    if (!referralLink) {
-      return res.status(404).json({ message: 'Invalid tracking ID' });
+    if (!referralLink) {     
+      return res.status(404).json({ message:  (req as any).__('INVALID_TRACKID') });
     }
 
     const click = new Click({
@@ -1970,14 +1974,14 @@ export const requestPayout = async (req: CustomRequest, res: Response) => {
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message:(req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     const availableEarnings = affiliate.pendingEarnings || 0;
     if (amount > availableEarnings) {
       return res
         .status(400)
-        .json({ message: 'Requested amount exceeds available earnings' });
+        .json({ message: (req as any).__('REQUEST_AMOUNT_EXCEEDS') });
     }
 
     const payout = new Payout({
@@ -2065,7 +2069,7 @@ export const updatePayoutStatus = async (req: CustomRequest, res: Response) => {
 
     const payout = await Payout.findById(payoutId).populate('affiliateId');
     if (!payout) {
-      return res.status(404).json({ message: 'Payout not found' });
+      return res.status(404).json({ message: (req as any).__('PAYOUT_NOT_FOUND') });
     }
 
     const affiliate = payout.affiliateId as any;
@@ -2180,7 +2184,7 @@ export const createCommissionTier = async (
 
     const existingTier = await CommissionTier.findOne({ tierName });
     if (existingTier) {
-      return res.status(400).json({ message: 'Tier name already exists' });
+      return res.status(400).json({ message: (req as any).__('TIER_ALREADY_EXIST') });
     }
 
     const tier = new CommissionTier({
@@ -2215,7 +2219,7 @@ export const updateCommissionTier = async (
 
     const tier = await CommissionTier.findById(tierId);
     if (!tier) {
-      return res.status(404).json({ message: 'Commission tier not found' });
+      return res.status(404).json({ message: (req as any).__('TIER_NOT_FOUND') });
     }
 
     if (tierName) tier.tierName = tierName;
@@ -2370,7 +2374,7 @@ export const uploadPromoMaterial = async (
     const file = req.file;
 
     if (!file) {
-      return res.status(400).json({ message: 'File is required' });
+      return res.status(400).json({ message: (req as any).__('FILE_REQUIRED') });
     }
 
     const result = await cloudinary.uploader.upload(file.path, {
@@ -2517,7 +2521,7 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
 
     const affiliate = await Affiliate.findById(affiliateId);
     if (!affiliate) {
-      return res.status(404).json({ message: 'Affiliate not found' });
+      return res.status(404).json({ message: (req as any).__('AFFILIATE_NOT_FOUND') });
     }
 
     if (marketingEmailsOptIn !== undefined) {
@@ -2548,6 +2552,18 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
     res
       .status(500)
       .json({ message: 'Server error', error: (error as Error).message });
+  }
+};
+
+
+export const getLanguages = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const languages = await Languages.find({}, { name: 1, shortName: 1, _id: 0 });
+    res.status(200).json({ success: true, data: languages });
+  } catch (error) {
+    res
+    .status(500)
+    .json({ message: 'Server error', error: (error as Error).message });
   }
 };
 export const saveBannerConfig = async (req: CustomRequest, res: Response) => {

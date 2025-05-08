@@ -25,6 +25,17 @@ export const validateStripeConfig = [
 export const validateAffiliate = [
   body('firstname').notEmpty().withMessage('First name is required'),
   body('lastname').notEmpty().withMessage('Last name is required'),
+  body('password')
+  .notEmpty()
+  .withMessage('Password is required')
+  .isLength({ min: 8 })
+  .withMessage('Password must be at least 8 characters')
+  .matches(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
+  )
+  .withMessage(
+    'Password must contain uppercase, lowercase, number, and special character',
+  ),
   body('email')
     .isEmail()
     .normalizeEmail()
