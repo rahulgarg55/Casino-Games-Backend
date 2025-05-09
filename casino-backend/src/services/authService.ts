@@ -80,7 +80,7 @@ interface UpdateProfileData {
   country?: string;
 }
 
-export const register = async (data: RegistrationData,req:any) => {
+export const register = async (data: RegistrationData, req: any) => {
   const {
     username,
     email,
@@ -133,27 +133,30 @@ export const register = async (data: RegistrationData,req:any) => {
   const hashedPassword = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-  // console.log('verificationToken', verificationToken);
+
   const playerData: any = {
-    email: email || null,
-    phone_number: phone_number || null,
+    email: email || undefined,
     fullname,
     password_hash: hashedPassword,
-    role_id: role_id || 0, // Default to User
+    role_id: role_id || 0,
     currency,
     language,
     status: STATUS.ACTIVE,
     is_verified: VERIFICATION.UNVERIFIED,
     verification_token: verificationToken,
     verification_token_expires: new Date(Date.now() + 3600000),
-    sms_code: phone_number ? smsCode : undefined,
-    sms_code_expires: phone_number ? new Date(Date.now() + 600000) : undefined, // 10 minutes
     is_2fa_enabled: TWO_FA.DISABLED,
-    two_factor_method: 'email', // Default to email
+    two_factor_method: 'email',
     city,
     country,
     gender,
   };
+
+  if (phone_number) {
+    playerData.phone_number = phone_number;
+    playerData.sms_code = smsCode;
+    playerData.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
+  }
 
   if (username) {
     playerData.username = username;
@@ -165,29 +168,22 @@ export const register = async (data: RegistrationData,req:any) => {
     playerData.patronymic = patronymic;
   }
 
-  /** Handle Referral Code **/
   if (referralCode) {
     const referringAffiliate = await Affiliate.findOne({
       referralCode,
     });
     if (!referringAffiliate) {
-      throw new Error(
-        (req as any).__('INVALID_REFERRAL')
-      );
+      throw new Error((req as any).__('INVALID_REFERRAL'));
     }
 
-    if(referringAffiliate.status!=STATUS.ACTIVE){
-      throw new Error(
-        (req as any).__('AFFILIATE_NOT_VERFIFIED_YET')
-      );
+    if (referringAffiliate.status != STATUS.ACTIVE) {
+      throw new Error((req as any).__('AFFILIATE_NOT_VERFIFIED_YET'));
     }
 
     playerData.referredBy = referringAffiliate._id;
     playerData.referredByName = `${referringAffiliate.firstname} ${referringAffiliate.lastname}`;
   }
 
-  // const session = await mongoose.startSession();
-  // session.startTransaction();
   try {
     const player = new Player(playerData);
     await player.save();
@@ -220,7 +216,6 @@ export const register = async (data: RegistrationData,req:any) => {
       await sendSmsVerification(phone_number, smsCode);
     }
 
-    // await session.commitTransaction();
     const tokenData = generateTokenResponse(player);
     return {
       player,
@@ -229,11 +224,9 @@ export const register = async (data: RegistrationData,req:any) => {
       expiresIn: tokenData.expiresIn,
     };
   } catch (error) {
-    // await session.abortTransaction();
     throw error;
   }
 };
-
 export const affiliateRegister = async (data: RegistrationData) => {
   const { email, password, username, phone_number, fullname } = data;
 

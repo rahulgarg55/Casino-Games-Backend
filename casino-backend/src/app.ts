@@ -24,6 +24,7 @@ const i18n = new I18n({
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 
 const logLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
 const logger = winston.createLogger({
