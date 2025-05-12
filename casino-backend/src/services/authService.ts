@@ -555,8 +555,11 @@ export const toggle2FA = async (
   }
 
   player.is_2fa_enabled = enabled ? TWO_FA.ENABLED : TWO_FA.DISABLED;
-  if (method) player.two_factor_method = method;
-  await player.save();
+ if (enabled && method) {
+    player.two_factor_method = method;
+  } else if (!enabled) {
+    player.two_factor_method = undefined;
+  }  await player.save();
 
   return {
     is_2fa_enabled: player.is_2fa_enabled,

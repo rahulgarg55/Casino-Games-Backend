@@ -50,6 +50,7 @@ export interface IPlayer extends Document {
   sumsub_status?: 'pending' | 'approved' | 'rejected' | null;
   sumsub_verification_date?: Date;
   new_email?: string;
+  full_phone_number?: string;
 }
 
 const playerSchema: Schema = new Schema(

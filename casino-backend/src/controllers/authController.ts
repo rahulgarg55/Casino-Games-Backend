@@ -253,7 +253,7 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
     const { enabled, method, password } = req.body;
-    if (typeof enabled !== 'boolean' || !method || !password) {
+    if (typeof enabled !== 'boolean' || !password || (enabled && !method)) {
       return sendErrorResponse(
         res,
         400,
