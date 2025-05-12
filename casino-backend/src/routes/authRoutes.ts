@@ -815,4 +815,21 @@ router.get('/banner', verifyToken, verifyAdmin, authController.getBannerConfig);
 router.post('/admin/commission', verifyToken, verifyAdmin, setGlobalCommission);
 router.get('/admin/commission', verifyToken, verifyAdmin, getGlobalCommission); 
 
+router.get(
+  '/apple',
+  passport.authenticate('apple', { scope: ['name', 'email'] }),
+);
+
+router.get(
+  '/apple/callback',
+  passport.authenticate('apple', {
+    failureRedirect: '/login',
+    session: false,
+  }),
+  (req, res) => {
+    const tokenResponse = generateTokenResponse(req.user as IPlayer);
+    res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
+  },
+);
+
 export default router;
