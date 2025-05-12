@@ -4,6 +4,54 @@ import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
 import { IPlayer } from '../models/player';
 import Player from '../models/player';
+import AppleStrategy from 'passport-apple';
+import { Strategy as AppleStrategyType, Profile } from 'passport-apple';
+
+passport.use(
+  new AppleStrategy(
+    {
+      clientID: process.env.APPLE_CLIENT_ID!,
+      teamID: process.env.APPLE_TEAM_ID!,
+      keyID: process.env.APPLE_KEY_ID!,
+      privateKeyString: process.env.APPLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+      callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
+      passReqToCallback: false,
+    },
+    async (accessToken, refreshToken, idToken, profile: Profile, done) => {
+      try {
+        const email = profile.email;
+        const displayName =
+          profile.name?.firstName && profile.name?.lastName
+            ? `${profile.name.firstName} ${profile.name.lastName}`
+            : 'Apple User';
+
+        let player = await Player.findOne({ email });
+
+        if (!player) {
+          player = new Player({
+            email,
+            fullname: displayName,
+            is_verified: 1,
+            status: 1,
+            currency: 0, // Default to USD
+            role_id: 0, // Default to User
+            registration_date: new Date(),
+            last_login: new Date(),
+            profile_picture: '', 
+          });
+          await player.save();
+        } else {
+          await player.save();
+        }
+
+        done(null, player);
+      } catch (error) {
+        done(error, undefined);
+      }
+    }
+  )
+);
+
 
 passport.use(
   new GoogleStrategy(

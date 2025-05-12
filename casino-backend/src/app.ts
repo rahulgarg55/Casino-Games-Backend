@@ -15,9 +15,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { I18n } from 'i18n';
 
+const translationPath = path.resolve(process.cwd(), 'src/translation');
+
 const i18n = new I18n({
   locales: ['en', 'mt', 'pt', 'id', 'fil', 'vi', 'ko', 'th'],
-  directory: path.join(__dirname, 'translation'),
+  directory: translationPath,
   defaultLocale: 'en',
 });
 
