@@ -20,8 +20,8 @@ import { I18n } from 'i18n';
 //   directory: path.join(__dirname, 'translation'),
 //   defaultLocale: 'en',
 // });
-const translationPath = path.join(__dirname, 'translation');
-console.log('Translation directory:=========================', translationPath); // ✅ Confirm directory
+const translationPath = path.resolve(process.cwd(), 'src/translation');
+console.log('Translation directory:=========================', translationPath); 
 
 const i18n = new I18n({
   locales: ['en', 'mt', 'pt', 'id', 'fil', 'vi', 'ko', 'th'],
