@@ -9,6 +9,10 @@ import sumsubRouter from './sumsubRoutes';
 
 const router = Router();
 
+router.get('/api', (req, res) => {
+  res.status(200).json({ message: 'Welcome to the API!' });
+});
+
 router.use('/api/auth', authRouter);
 router.use('/api/roles', roleRouter);
 router.use('/api/games', gameRoutes);
