@@ -827,7 +827,9 @@ router.post(
     session: false,
   }),
   (req, res) => {
+    console.log("=======apple callback====")
     const tokenResponse = generateTokenResponse(req.user as IPlayer);
+    console.log("=====tokenResponse======",tokenResponse)
     res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
   },
 );
