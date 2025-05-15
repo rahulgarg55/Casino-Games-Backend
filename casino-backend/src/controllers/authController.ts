@@ -912,6 +912,31 @@ export const googleCallback = (req: Request, res: Response) => {
   })(req, res);
 };
 
+export const appleLogin = passport.authenticate('apple', {
+  scope: ['name', 'email'],
+});
+
+
+export const appleCallback = (req: Request, res: Response) => {
+  passport.authenticate('apple', { session: false }, (err: any, user: any) => {
+    if (err || !user) {
+      let errorMessage = err?.message || 'Apple authentication failed';
+      console.error('Apple Callback Authentication Error:', err || user);
+      if (err?.code) {
+        errorMessage += ` (Error Code: ${err.code})`;
+      }
+      return res.redirect(
+        `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`,
+      );
+    }
+    
+    res.redirect(
+      `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
+    );
+  })(req, res);
+};
+
+
 export const facebookLogin = passport.authenticate('facebook', {
   scope: ['email'],
 });
