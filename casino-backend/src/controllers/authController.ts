@@ -1575,6 +1575,35 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
     );
   }
 };
+export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
+    }
+
+    const player = await Player.findById(req.user.id);
+    if (!player) {
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('STATUS_RETRIEVED'),
+      data: {
+        status: player.sumsub_status,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching Sumsub status:', error);
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error
+        ? error.message
+        : (req as any).__('FAILED_TO_FETCH_STATUS')
+    );
+  }
+};
 
 export const addAffliateUsers = async (req: Request, res: Response) => {
   console.log('i am here :>> ');
@@ -2185,6 +2214,7 @@ export const getAllPayouts = async (req: CustomRequest, res: Response) => {
         currency: payout.currency,
         status: payout.status,
         requestedAt: payout.createdAt,
+        transactionId: payout.transactionId,
       })),
       pagination: {
         total,

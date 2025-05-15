@@ -2,6 +2,7 @@ import passport from 'passport';
 import bcrypt from 'bcrypt';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as FacebookStrategy } from 'passport-facebook';
+import { Strategy as JwtStrategy, ExtractJwt } from 'passport-jwt';
 import { IPlayer } from '../models/player';
 import Player from '../models/player';
 import AppleStrategy from 'passport-apple';
@@ -16,6 +17,36 @@ const privateKeyString = fs.readFileSync(
 );
 
 console.log("-------privateKeyString---------",privateKeyString)
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
+
+const jwtOptions = {
+  jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+  secretOrKey: JWT_SECRET,
+};
+
+passport.use(
+  new JwtStrategy(jwtOptions, async (payload, done) => {
+    try {
+      const player = await Player.findById(payload.id);
+
+      if (!player) {
+        return done(null, false);
+      }
+
+      if (player.status !== 1) {
+        return done(null, false);
+      }
+
+      return done(null, {
+        id: player._id,
+        role: player.role_id,
+      });
+    } catch (error) {
+      return done(error, false);
+    }
+  })
+);
 
 passport.use(
   new AppleStrategy(

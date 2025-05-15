@@ -19,9 +19,6 @@ export interface SumsubError {
   message: string;
 }
 
-/**
- * Generates a signature for Sumsub API requests.
- */
 const generateSignature = (
   method: string,
   path: string,
@@ -34,13 +31,6 @@ const generateSignature = (
     .digest('hex');
 };
 
-/**
- * Generates a Sumsub access token for the SDK.
- * @param playerId - Internal player ID
- * @param externalUserId - Unique identifier for Sumsub (e.g., playerId)
- * @param levelName - Verification level name (default: "basic-kyc")
- * @throws {SumsubError} If token generation fails
- */
 export const generateSumsubAccessToken = async (
   playerId: string,
   externalUserId: string,
@@ -85,13 +75,7 @@ export const generateSumsubAccessToken = async (
     );
   }
 };
-/**
- * Creates a new Sumsub applicant.
- * @param playerId - Internal player ID
- * @param email - Player's email
- * @param phone - Player's phone number (optional)
- * @throws {SumsubError} If applicant creation fails
- */
+
 export const createSumsubApplicant = async (
   playerId: string,
   email: string,
@@ -136,12 +120,7 @@ export const createSumsubApplicant = async (
     );
   }
 };
-/**
- * Validates Sumsub webhook signature.
- * @param body - Webhook payload
- * @param signature - Signature from 'x-payload-signature' header
- * @returns Boolean indicating if the signature is valid
- */
+
 export const validateWebhookSignature = (
   body: any,
   signature: string,

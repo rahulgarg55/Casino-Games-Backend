@@ -170,5 +170,7 @@
   "FAILED_TO_DELETE_PAYMENT_CONFIGURATION": "Failed to delete payment configuration",
   "AFFILIATE_NOT_VERFIFIED_YET":"Affiliate is not verified yet. Please ask the affiliate to verify their account via email.",
   "VERIFICATION_EMAIL_SENT":"Verification email sent to your new email address. Please verify to complete the update.",
-  "PROFILE_UPDATED":"Profile updated successfully"
+  "PROFILE_UPDATED":"Profile updated successfully",
+  "STATUS_RETRIEVED": "Verification status retrieved successfully",
+  "FAILED_TO_FETCH_STATUS": "Failed to fetch verification status"
 }
