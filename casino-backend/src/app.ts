@@ -143,6 +143,7 @@ app.use(
 );
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  console.log("======err====",err)
   logger.error(err.message, { stack: err.stack });
   res.status(500).json({ error: 'Something went wrong!' });
 });

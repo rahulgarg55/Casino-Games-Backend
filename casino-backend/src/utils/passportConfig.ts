@@ -39,6 +39,7 @@ passport.use(
             last_login: new Date(),
             profile_picture: '', 
           });
+          console.log("=====player========",player)
           await player.save();
         } else {
           await player.save();
@@ -46,6 +47,7 @@ passport.use(
 
         done(null, player);
       } catch (error) {
+        console.log("=====error=",error)
         done(error, undefined);
       }
     }
