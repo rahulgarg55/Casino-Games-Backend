@@ -6,6 +6,15 @@ import { IPlayer } from '../models/player';
 import Player from '../models/player';
 import AppleStrategy from 'passport-apple';
 import { Strategy as AppleStrategyType, Profile } from 'passport-apple';
+import fs from 'fs';
+import path from 'path';
+
+const privateKeyString = fs.readFileSync(
+  path.join(__dirname, '../private.key'),
+  'utf8'
+);
+
+console.log("-------privateKeyString---------",privateKeyString)
 
 passport.use(
   new AppleStrategy(
@@ -13,7 +22,7 @@ passport.use(
       clientID: process.env.APPLE_CLIENT_ID!,
       teamID: process.env.APPLE_TEAM_ID!,
       keyID: process.env.APPLE_KEY_ID!,
-      privateKeyString: process.env.APPLE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+     privateKey: privateKeyString,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
       passReqToCallback: false,
     },

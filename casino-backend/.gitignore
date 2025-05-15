@@ -18,6 +18,8 @@ build/
 
 # Environment variables
 .env
+/src/private.key
+
 
 # IDEs and editors
 .idea/
