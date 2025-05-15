@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 
 const privateKeyString = fs.readFileSync(
-  path.join(__dirname, '../private.key'),
+  path.resolve(process.cwd(), 'src/private.key'),
   'utf8'
 );
 
