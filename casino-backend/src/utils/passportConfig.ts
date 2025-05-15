@@ -8,6 +8,7 @@ import AppleStrategy from 'passport-apple';
 import { Strategy as AppleStrategyType, Profile } from 'passport-apple';
 import fs from 'fs';
 import path from 'path';
+import jwt from 'jsonwebtoken';
 
 const privateKeyString = fs.readFileSync(
   path.resolve(process.cwd(), 'src/private.key'),
@@ -24,40 +25,49 @@ passport.use(
       keyID: process.env.APPLE_KEY_ID!,
      privateKey: privateKeyString,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
-      passReqToCallback: false,
     },
-    async (accessToken, refreshToken, idToken, profile: Profile, done) => {
+    async (accessToken, refreshToken, idToken, profile, done:any) => {
       try {
-        const email = profile.email;
-        const displayName =
-          profile.name?.firstName && profile.name?.lastName
-            ? `${profile.name.firstName} ${profile.name.lastName}`
-            : 'Apple User';
+        console.log("=====profile=",profile)
+        const decoded: any = jwt.decode(idToken);
+        console.log("decoded==========",decoded)
+
+        if (!decoded?.email) {
+          throw new Error('Email not found in Apple ID token');
+        }
+
+        const email = decoded.email;
+        const displayName = decoded.name || 'Apple User';
 
         let player = await Player.findOne({ email });
 
         if (!player) {
+          const randomPassword = Math.random().toString(36).slice(-12);
+          const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
           player = new Player({
             email,
             fullname: displayName,
+            password_hash: hashedPassword,
             is_verified: 1,
             status: 1,
-            currency: 0, // Default to USD
-            role_id: 0, // Default to User
+            currency: 0,
+            role_id: 0,
             registration_date: new Date(),
             last_login: new Date(),
             profile_picture: '', 
           });
-          console.log("=====player========",player)
+
           await player.save();
         } else {
+          player.last_login = new Date();
           await player.save();
         }
 
         done(null, player);
       } catch (error) {
-        console.log("=====error=",error)
-        done(error, undefined);
+        console.error('Apple login error:', error);
+        done(error, null);
       }
     }
   )
