@@ -19,9 +19,10 @@ import {
   affiliateloginValidation,
 } from '../validation/authValidation';
 import {
-  startSumsubVerification,
+  startSumsubVerification,  
   sumsubWebhook,
-} from '../controllers/authController';
+  getSumsubStatus,
+} from '../controllers/sumsubController';
 
 const router = Router();
 const authLimiter = rateLimit({
@@ -571,6 +572,12 @@ router.post(
   startSumsubVerification,
 );
 router.post('/sumsub/webhook', sumsubWebhook);
+
+router.get(
+  '/sumsub/status',
+  passport.authenticate('jwt', { session: false }),
+  getSumsubStatus
+);
 
 //Payment Configuration Routes
 

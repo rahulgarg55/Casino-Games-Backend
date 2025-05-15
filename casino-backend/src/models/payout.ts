@@ -8,6 +8,7 @@ export interface IPayout extends Document {
   status: 'pending' | 'approved' | 'rejected' | 'paid';
   adminNotes?: string;
   stripePayoutId?: string;
+  transactionId: string; // Add this field
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,9 +30,17 @@ const PayoutSchema: Schema = new Schema(
     },
     adminNotes: { type: String },
     stripePayoutId: { type: String },
+    transactionId: { type: String, required: true, unique: true },
   },
   { timestamps: true },
 );
+
+PayoutSchema.pre('save', async function (next) {
+  if (this.isNew && !this.transactionId) {
+    this.transactionId = `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`; // Example: TXN-A1B2C3D4
+  }
+  next();
+});
 
 PayoutSchema.index({ affiliateId: 1, createdAt: -1 });
 PayoutSchema.index({ status: 1 });
