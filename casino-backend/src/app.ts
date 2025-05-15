@@ -51,7 +51,7 @@ const logger = winston.createLogger({
         };
       }) => {
         if (meta?.req) {
-          return `${timestamp} ${level}: ${message} - ${meta.req.method} ${meta.req.url} - Status: ${meta.res.statusCode} - ${meta.responseTime}ms`;
+          return `${timestamp} ${level}: ${message} - ${meta.req.method} ${meta.req.url} - Status: ${meta?.res?.statusCode ?? 0} - ${meta.responseTime}ms`;
         }
         return `${timestamp} ${level}: ${message}`;
       },
@@ -143,7 +143,7 @@ app.use(
 );
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.log("======err====",err)
+  console.log('======err====', err);
   logger.error(err.message, { stack: err.stack });
   res.status(500).json({ error: 'Something went wrong!' });
 });
