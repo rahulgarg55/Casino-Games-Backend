@@ -820,7 +820,7 @@ router.get(
   passport.authenticate('apple', { scope: ['name', 'email'] }),
 );
 
-router.get(
+router.post(
   '/apple/callback',
   passport.authenticate('apple', {
     failureRedirect: '/login',
