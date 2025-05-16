@@ -1386,11 +1386,10 @@ export const getAffliateUsersDetails = async (req: Request, res: Response) => {
         message:  (req as any).__('INVALID_AFFILIATE_ID'),
       });
     }
-    const referredPlayers = await Player.find({
-      referredBy: affiliateUser._id,
-      is_verified: 1,
-      status: STATUS.ACTIVE,
-    }).sort({ created_at: -1 });
+      const referredPlayers = await Player.find(
+      { referredBy: affiliateUser._id },
+      '_id username fullname email country_code phone_number referredBy referredByName is_verified status',
+    ).sort({ created_at: -1 });
 
     const referredPlayersCount = await Player.countDocuments({
       referredBy: affiliateUser._id,
