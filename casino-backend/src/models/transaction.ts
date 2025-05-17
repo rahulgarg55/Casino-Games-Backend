@@ -69,7 +69,6 @@ const transactionSchema: Schema = new Schema(
     },
     payment_intent_id: {
       type: String,
-      sparse: true,
       trim: true,
     },
     dispute_id: {

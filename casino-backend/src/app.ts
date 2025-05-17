@@ -4,6 +4,7 @@ import cors from 'cors';
 import router from './routes';
 import { connectDB } from './utils/db';
 import session from 'express-session';
+import MongoStore from 'connect-mongo';
 import * as paymentController from './controllers/paymentController';
 import { seedPaymentConfigs } from './controllers/paymentController';
 import passport from 'passport';
@@ -112,9 +113,16 @@ app.use(
     secret: process.env.SESSION_SECRET!,
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGODB_URI,
+      ttl: 24 * 60 * 60, // 1 day
+      autoRemove: 'native',
+    }),
     cookie: {
       secure: process.env.NODE_ENV === 'production',
       maxAge: 24 * 60 * 60 * 1000,
+      httpOnly: true,
+      sameSite: 'strict'
     },
   }),
 );
