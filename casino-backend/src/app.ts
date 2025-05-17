@@ -85,6 +85,11 @@ app.use(
   }),
 );
 
+app.use((req, res, next) => {
+  console.log('Authorization header:', req.headers.authorization);
+  next();
+});
+
 // Stripe webhook endpoint
 app.post(
   '/auth/stripe/webhook',

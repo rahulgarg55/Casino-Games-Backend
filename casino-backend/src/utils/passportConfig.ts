@@ -28,21 +28,26 @@ const jwtOptions = {
 passport.use(
   new JwtStrategy(jwtOptions, async (payload, done) => {
     try {
-      const player = await Player.findById(payload.id);
+      console.log('JWT payload received:', payload);
+      const player = await Player.findById(payload.sub);
 
       if (!player) {
+        console.log('No player found for id:', payload.sub);
         return done(null, false);
       }
 
       if (player.status !== 1) {
+        console.log('Player found but status is not active:', player.status);
         return done(null, false);
       }
 
+      console.log('Player authenticated:', player._id);
       return done(null, {
         id: player._id,
         role: player.role_id,
       });
     } catch (error) {
+      console.log('Error in JWT strategy:', error);
       return done(error, false);
     }
   })
