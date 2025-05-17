@@ -19,7 +19,7 @@ const ReferralLinkSchema: Schema = new Schema(
       ref: 'Affiliate',
       required: true,
     },
-    trackingId: { type: String, required: true, unique: true },
+    trackingId: { type: String, required: true },
     campaignName: { type: String, required: true },
     destinationUrl: { type: String, required: true },
     clicks: { type: Number, default: 0 },
