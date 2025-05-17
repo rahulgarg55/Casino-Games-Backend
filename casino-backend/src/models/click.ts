@@ -25,6 +25,5 @@ const ClickSchema: Schema = new Schema(
 );
 
 ClickSchema.index({ affiliateId: 1, createdAt: -1 });
-ClickSchema.index({ trackingId: 1 });
 
 export default mongoose.model<IClick>('Click', ClickSchema);

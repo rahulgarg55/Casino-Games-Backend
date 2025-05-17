@@ -17,7 +17,6 @@ const playerBalanceSchema: Schema = new Schema(
       type: Schema.Types.ObjectId,
       ref: 'Player',
       required: true,
-      unique: true,
     },
     balance: {
       type: Number,

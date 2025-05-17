@@ -11,7 +11,7 @@ export interface ICommissionTier extends Document {
 
 const CommissionTierSchema: Schema = new Schema(
   {
-    tierName: { type: String, required: true, unique: true },
+    tierName: { type: String, required: true },
     minReferrals: { type: Number, required: true, min: 0 },
     commissionRate: { type: Number, required: true, min: 0, max: 100 },
     currency: { type: String, required: true },

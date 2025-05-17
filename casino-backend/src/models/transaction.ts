@@ -74,7 +74,6 @@ const transactionSchema: Schema = new Schema(
     },
     dispute_id: {
       type: String,
-      index: true,
       sparse: true,
       trim: true,
     },
