@@ -30,13 +30,17 @@ export const initiateSumsubVerification = async (playerId: string) => {
     throw new Error('Player email is required for Sumsub verification');
   }
 
+  // Use playerId as externalUserId for consistency
+  const externalUserId = playerId;
+
+  // Check if we already have a sumsub_id
   if (!player.sumsub_id) {
     try {
       const applicantId = await createSumsubApplicant(
         playerId,
         player.email,
-        playerId, // Use playerId as externalUserId for consistency
-        player.phone_number,
+        externalUserId,
+        player.phone_number
       );
       player.sumsub_id = applicantId;
       player.sumsub_status = 'pending';
@@ -50,8 +54,7 @@ export const initiateSumsubVerification = async (playerId: string) => {
         await player.save();
         logger.info('Sumsub applicant already exists, updated player', { playerId, sumsubId: match[1] });
       } else {
-        logger.error('Sumsub applicant creation error:', error);
-        console.error('Sumsub applicant creation error:', error);
+        logger.error('Sumsub applicant creation error', { playerId, error: error.message });
         throw error;
       }
     }
@@ -60,20 +63,22 @@ export const initiateSumsubVerification = async (playerId: string) => {
   // Reload the player to ensure sumsub_id is up-to-date
   player = await Player.findById(playerId);
   if (!player?.sumsub_id) {
-    logger.error('Sumsub applicantId could not be determined for player:', { playerId });
-    console.error('Sumsub applicantId could not be determined for player:', playerId);
+    logger.error('Sumsub applicantId could not be determined for player', { playerId });
     throw new Error('Sumsub applicantId could not be determined');
   }
 
-  // Log for debugging
-  logger.info('About to generate access token with sumsub_id:', { sumsubId: player.sumsub_id });
-  console.log('About to generate access token with sumsub_id:', player.sumsub_id);
+  logger.info('Generating Sumsub access token', {
+    playerId,
+    sumsubId: player.sumsub_id,
+    email: player.email,
+    externalUserId,
+  });
 
   return generateSumsubAccessToken(
     playerId,
     player.sumsub_id,
-    player.email, // Pass the correct email
-    'id-and-liveness'
+    player.email,
+    'id-only'
   );
 };
 
@@ -99,6 +104,7 @@ export const updateSumsubStatus = async (
   await player.save();
   logger.info('Player Sumsub status updated', { playerId, status });
 
+  // Create notification
   const notification = new Notification({
     type: NotificationType.KYC_UPDATE,
     message: `KYC status updated to ${status} for user ${player.username || player.email}`,
@@ -106,7 +112,6 @@ export const updateSumsubStatus = async (
     metadata: { sumsub_id: player.sumsub_id, status },
   });
   await notification.save();
-  logger.info('Notification created for Sumsub status update', { playerId, status });
 
   return player;
 };

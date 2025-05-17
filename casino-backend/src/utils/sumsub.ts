@@ -1,4 +1,4 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig } from 'axios';
 import crypto from 'crypto';
 import winston from 'winston';
 
@@ -6,12 +6,12 @@ import winston from 'winston';
 const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || 'https://api.sumsub.com';
 const SUMSUB_API_KEY = process.env.SUMSUB_API_KEY;
 const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY;
+const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET;
 
 if (!SUMSUB_API_KEY || !SUMSUB_SECRET_KEY) {
-  throw new Error('Sumsub API credentials (SUMSUB_API_KEY and SUMSUB_SECRET_KEY) are not configured');
+  throw new Error('Sumsub API credentials are not configured');
 }
 
-// Logger configuration
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -24,60 +24,46 @@ const logger = winston.createLogger({
   ]
 });
 
-// Interfaces for type safety
 export interface SumsubTokenResponse {
   token: string;
   userId: string;
 }
 
-export interface SumsubError {
-  code: number;
-  message: string;
-  correlationId?: string;
+interface SumsubErrorResponse {
+  code?: number;
   description?: string;
+  errorCode?: number;
+  correlationId?: string;
 }
 
-export interface SumsubApplicantResponse {
-  id: string;
-  externalUserId: string;
-}
-
-// Utility to validate email
 const validateEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
 
-// Utility to delay execution
-const delay = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
-
-// Generate HMAC signature for Sumsub API requests
 const generateSignature = (
   method: string,
   path: string,
   body: string,
   timestamp: number,
 ): string => {
-  const signatureData = `${timestamp}${method}${path}${body}`;
-  logger.debug('Signature generation data', { signatureData });
+  const signatureData = `${timestamp}${method.toUpperCase()}${path}${body}`;
   return crypto
     .createHmac('sha256', SUMSUB_SECRET_KEY)
     .update(signatureData)
     .digest('hex');
 };
 
-// Generate Sumsub access token with retry logic
 export const generateSumsubAccessToken = async (
   playerId: string,
-  externalUserId: string,
+  applicantId: string,
   email: string,
-  levelName: string = 'id-and-liveness',
-  retries: number = 2,
-  delayMs: number = 2000,
+  levelName: string = 'id-only',
+  retries: number = 3,
+  delayMs: number = 1000,
 ): Promise<SumsubTokenResponse> => {
-  // Validate email
   if (!validateEmail(email)) {
-    logger.error('Invalid email provided for Sumsub applicant creation', { playerId, email });
+    logger.error('Invalid email provided', { playerId, email });
     throw new Error('Invalid email address provided');
   }
 
@@ -85,114 +71,106 @@ export const generateSumsubAccessToken = async (
   const method = 'POST';
   const path = '/resources/accessTokens';
 
-  // Helper function to attempt token generation
-  const attemptTokenGeneration = async (bodyObj: { applicantId?: string; userId?: string; ttlInSecs: number; levelName: string }): Promise<SumsubTokenResponse> => {
+  const attemptTokenGeneration = async (
+    bodyObj: any,
+    attemptDescription: string,
+  ): Promise<SumsubTokenResponse> => {
     const body = JSON.stringify(bodyObj);
     const signature = generateSignature(method, path, body, timestamp);
 
-    logger.info('Sumsub access token request body', { playerId, externalUserId, requestBody: bodyObj });
-    console.log('Sumsub access token request body:', bodyObj);
+    const config: AxiosRequestConfig = {
+      headers: {
+        'X-App-Token': SUMSUB_API_KEY!,
+        'X-App-Access-Sig': signature,
+        'X-App-Access-Ts': timestamp.toString(),
+        'Content-Type': 'application/json',
+      },
+      timeout: 10000,
+    };
+
+    logger.info(`Attempting token generation (${attemptDescription})`, {
+      playerId,
+      applicantId,
+      bodyObj,
+      config: {
+        url: `${SUMSUB_BASE_URL}${path}`,
+        method,
+        headers: config.headers,
+      },
+    });
 
     try {
       const response = await axios.post(
         `${SUMSUB_BASE_URL}${path}`,
         bodyObj,
-        {
-          headers: {
-            'X-App-Token': SUMSUB_API_KEY,
-            'X-App-Access-Sig': signature,
-            'X-App-Access-Ts': timestamp.toString(),
-            'Content-Type': 'application/json',
-          },
-        },
+        config,
       );
-      logger.info('Sumsub access token generated successfully', { playerId, externalUserId, response: response.data });
-      console.log('Sumsub access token response:', response.data);
+
+      logger.info('Sumsub access token generated', { playerId, applicantId, token: response.data.token });
       return {
         token: response.data.token,
-        userId: externalUserId,
+        userId: bodyObj.userId,
       };
     } catch (error) {
+      const axiosError = error as AxiosError<SumsubErrorResponse>;
+      logger.error(`Token generation attempt failed (${attemptDescription})`, {
+        playerId,
+        applicantId,
+        error: axiosError.message,
+        response: axiosError.response?.data,
+      });
       throw error;
     }
   };
 
-  logger.info('Generating Sumsub access token', { playerId, externalUserId, email, levelName, timestamp });
+  const externalUserId = playerId;
 
-  // Try with applicantId first
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      return await attemptTokenGeneration({
-        applicantId: externalUserId.toString(),
-        ttlInSecs: 3600,
-        levelName,
-      });
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      const errorData = axiosError.response?.data as SumsubError;
-      logger.error(`Sumsub access token attempt ${attempt} with applicantId failed`, {
-        playerId,
-        externalUserId,
-        error: errorData?.description || axiosError.message,
-        correlationId: errorData?.correlationId,
-      });
-      console.error(`Sumsub access token attempt ${attempt} with applicantId failed:`, error);
+      // Try with both userId and applicantId
+      logger.info('Trying with both userId and applicantId', { attempt });
+      return await attemptTokenGeneration(
+        {
+          userId: externalUserId,
+          applicantId,
+          ttlInSecs: 3600,
+          levelName,
+        },
+        'both userId and applicantId',
+      );
+    } catch (error: any) {
+      if (attempt === retries) {
+        logger.error('All attempts with both userId and applicantId failed', { playerId, applicantId });
 
-      // If the error indicates a missing applicant, create one and retry
-      if (errorData?.description?.includes("'userId' or 'applicantId' parameter must be provided")) {
-        logger.info('Applicant not found, attempting to create new applicant', { playerId, externalUserId });
+        // Fallback: Try with only userId and a different levelName
         try {
-          const applicantId = await createSumsubApplicant(playerId, email, externalUserId);
-          logger.info('Waiting for Sumsub to propagate applicant creation', { playerId, applicantId });
-          await delay(delayMs); // Wait for Sumsub to process the new applicant
-          logger.info('Retrying token generation with new applicantId', { playerId, applicantId });
-
-          // Retry with the new applicantId
-          return await attemptTokenGeneration({
-            applicantId,
-            ttlInSecs: 3600,
-            levelName,
-          });
-        } catch (createError) {
-          logger.error('Failed to create applicant and generate token', { playerId, externalUserId, error: createError });
-          throw new Error(`Sumsub token generation failed after applicant creation: ${createError.message}`);
-        }
-      }
-
-      // Try with userId as fallback if retries remain
-      if (attempt < retries) {
-        logger.info(`Attempt ${attempt} failed, retrying with userId`, { playerId, externalUserId });
-        await delay(delayMs);
-        try {
-          return await attemptTokenGeneration({
-            userId: externalUserId.toString(),
-            ttlInSecs: 3600,
-            levelName,
-          });
-        } catch (error2) {
-          const axiosError2 = error2 as AxiosError;
-          const errorData2 = axiosError2.response?.data as SumsubError;
-          logger.error(`Sumsub token generation attempt ${attempt} with userId failed`, {
+          logger.info('Falling back to userId only with levelName "basic-kyc"', { attempt });
+          return await attemptTokenGeneration(
+            {
+              userId: externalUserId,
+              ttlInSecs: 3600,
+              levelName: 'basic-kyc', // Fallback to a common levelName
+            },
+            'userId only with basic-kyc',
+          );
+        } catch (fallbackError: any) {
+          logger.error('Fallback attempt with userId only failed', {
             playerId,
-            externalUserId,
-            error: errorData2?.description || axiosError2.message,
-            correlationId: errorData2?.correlationId,
+            applicantId,
+            error: fallbackError.message,
+            response: (fallbackError as AxiosError<SumsubErrorResponse>).response?.data,
           });
-          console.error(`Sumsub access token attempt ${attempt} with userId failed:`, error2);
-          if (attempt === retries) {
-            throw new Error(`Sumsub token generation failed after ${retries} attempts: ${errorData2?.description || axiosError2.message}`);
-          }
+          throw new Error(`Sumsub token generation failed after all attempts: ${fallbackError.message}`);
         }
-      } else {
-        throw new Error(`Sumsub token generation failed after ${retries} attempts: ${errorData?.description || axiosError.message}`);
       }
+      const delay = Math.min(delayMs * Math.pow(2, attempt - 1), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
   throw new Error('Sumsub token generation failed: maximum retries reached');
 };
 
-// Create Sumsub applicant
 export const createSumsubApplicant = async (
   playerId: string,
   email: string,
@@ -201,21 +179,25 @@ export const createSumsubApplicant = async (
 ): Promise<string> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
-  const levelName = 'id-and-liveness';
+  const levelName = 'id-only';
   const path = `/resources/applicants?levelName=${encodeURIComponent(levelName)}`;
 
   const bodyObj = {
     externalUserId,
     email,
     phone: phone || undefined,
+    requiredIdDocs: {
+      docSets: [{
+        idDocSetType: 'IDENTITY',
+        types: ['PASSPORT', 'ID_CARD', 'DRIVERS', 'RESIDENCE_PERMIT'],
+      }],
+    },
   };
+
   const body = JSON.stringify(bodyObj);
-
-  logger.info('Sumsub applicant creation request body', { playerId, externalUserId, email, phone });
-  console.log('Sumsub applicant creation request body:', bodyObj);
-
   const signature = generateSignature(method, path, body, timestamp);
-  logger.info('Creating Sumsub applicant', { playerId, email, phone, timestamp });
+
+  logger.info('Creating Sumsub applicant', { playerId, externalUserId, email });
 
   try {
     const response = await axios.post(
@@ -223,50 +205,47 @@ export const createSumsubApplicant = async (
       bodyObj,
       {
         headers: {
-          'X-App-Token': SUMSUB_API_KEY,
+          'X-App-Token': SUMSUB_API_KEY!,
           'X-App-Access-Sig': signature,
           'X-App-Access-Ts': timestamp.toString(),
           'Content-Type': 'application/json',
         },
+        timeout: 10000,
       },
     );
-    logger.info('Sumsub applicant created successfully', { playerId, applicantId: response.data.id, response: response.data });
-    console.log('Sumsub applicant creation response:', response.data);
+
+    logger.info('Sumsub applicant created', { playerId, applicantId: response.data.id });
     return response.data.id;
-  } catch (error) {
-    const axiosError = error as AxiosError;
-    const errorData = axiosError.response?.data as SumsubError;
-    // Handle 'already exists' error
-    const match = /already exists: ([a-z0-9]+)/i.exec(errorData?.description || '');
+  } catch (error: any) {
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    const errorDescription = axiosError.response?.data?.description || '';
+    const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
     if (match) {
-      const existingApplicantId = match[1];
-      logger.warn('Sumsub applicant already exists, using existing applicantId', { playerId, existingApplicantId });
-      return existingApplicantId;
+      logger.warn('Applicant already exists', { playerId, existingId: match[1] });
+      return match[1];
     }
-    logger.error('Sumsub applicant creation failed', {
+
+    logger.error('Applicant creation failed', {
       playerId,
-      email,
-      externalUserId,
-      error: errorData?.description || axiosError.message,
-      correlationId: errorData?.correlationId,
-      fullError: error,
+      error: axiosError.response?.data || axiosError.message,
     });
-    console.error('Sumsub applicant creation failed:', error);
-    throw new Error(
-      `Sumsub applicant creation failed: ${errorData?.description || axiosError.message}`,
-    );
+    throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
   }
 };
 
-// Validate Sumsub webhook signature
 export const validateWebhookSignature = (
   body: any,
   signature: string,
 ): boolean => {
+  if (!SUMSUB_WEBHOOK_SECRET) {
+    logger.error('Webhook secret not configured');
+    return false;
+  }
+
   const computedSignature = crypto
-    .createHmac('sha256', process.env.SUMSUB_WEBHOOK_SECRET || '')
+    .createHmac('sha256', SUMSUB_WEBHOOK_SECRET)
     .update(JSON.stringify(body))
     .digest('hex');
-  logger.info('Validating Sumsub webhook signature', { signature, computedSignature });
+
   return computedSignature === signature;
 };

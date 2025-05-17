@@ -98,7 +98,17 @@ app.post(
   paymentController.handleStripeWebhook,
 );
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", 'https://static.sumsub.com', "'unsafe-inline'"], // Allow Sumsub SDK
+      frameSrc: ["'self'", 'https://api.sumsub.com'], // Allow Sumsub iframes
+      connectSrc: ["'self'", 'https://api.sumsub.com'], // Allow Sumsub API
+      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Sumsub
+    },
+  },
+}));
 app.use(
   cors({
     origin: true, // Allow all origins
