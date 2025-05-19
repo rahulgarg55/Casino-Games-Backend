@@ -19,6 +19,7 @@ build/
 # Environment variables
 .env
 /src/private.key
+/src/AuthKey_Q863TAJ9VC.p8
 
 
 # IDEs and editors
