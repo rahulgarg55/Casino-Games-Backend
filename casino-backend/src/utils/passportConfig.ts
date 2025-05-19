@@ -11,15 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 
-const privateKeyPath = path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8');
-
-const privateKeyString = fs.readFileSync(privateKeyPath, 'utf8')
-  .replace(/\r\n/g, '\n') 
-  .trim();
-
-if (!privateKeyString || privateKeyString.length < 100) {
-  throw new Error('Invalid private key loaded');
-}
+const privateKeyString = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/private.key'),
+  'utf8'
+);
 
 console.log("-------privateKeyString---------",privateKeyString)
 
