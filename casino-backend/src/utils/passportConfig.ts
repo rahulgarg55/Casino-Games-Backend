@@ -67,9 +67,11 @@ passport.use(
       keyID: process.env.APPLE_KEY_ID!,
      privateKey: privateKeyString,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
+       passReqToCallback: true
     },
-    async (accessToken, refreshToken, idToken, profile, done:any) => {
+    async (req,accessToken, refreshToken, idToken, profile, done:any) => {
       try {
+        console.log("=====req==",req)
         console.log("=====profile=",profile)
         const decoded: any = jwt.decode(idToken);
         console.log("decoded==========",decoded)

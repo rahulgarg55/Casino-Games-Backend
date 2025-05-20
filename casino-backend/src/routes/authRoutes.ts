@@ -846,7 +846,7 @@ router.post(
 
       res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
     } catch (error) {
-      console.error("Apple callback error:", error);
+      console.log("Apple callback error:", error);
       res.status(500).json({ message: "Apple login failed", error: (error as Error).message });
     }
   },
