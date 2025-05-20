@@ -11,12 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 
-const privateKeyString = fs.readFileSync(
+const privateKeyString: string = fs.readFileSync(
   path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8'),
   'utf8'
-).replace(/\r\n/g, '\n').trim();
-
-console.log("-------privateKeyString---------",privateKeyString)
+);
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
