@@ -12,7 +12,7 @@ import path from 'path';
 import jwt from 'jsonwebtoken';
 
 const privateKeyString = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/private.key'),
+  path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8'),
   'utf8'
 ).replace(/\r\n/g, '\n').trim();
 
