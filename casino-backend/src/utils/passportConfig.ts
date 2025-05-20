@@ -14,7 +14,7 @@ import jwt from 'jsonwebtoken';
 const privateKeyString = fs.readFileSync(
   path.resolve(process.cwd(), 'src/private.key'),
   'utf8'
-);
+).replace(/\r\n/g, '\n').trim();
 
 console.log("-------privateKeyString---------",privateKeyString)
 
@@ -52,6 +52,12 @@ passport.use(
     }
   })
 );
+
+console.log("======config==",{ clientID: process.env.APPLE_CLIENT_ID!,
+      teamID: process.env.APPLE_TEAM_ID!,
+      keyID: process.env.APPLE_KEY_ID!,
+     privateKey: privateKeyString,
+      callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`})
 
 passport.use(
   new AppleStrategy(
