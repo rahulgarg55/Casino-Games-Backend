@@ -11,12 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 
-const privateKeyString = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/private.key'),
+const privateKey: string = fs.readFileSync(
+  path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8'),
   'utf8'
 );
-
-console.log("-------privateKeyString---------",privateKeyString)
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -53,17 +51,25 @@ passport.use(
   })
 );
 
+console.log("======config==",{ clientID: process.env.APPLE_CLIENT_ID!,
+      teamID: process.env.APPLE_TEAM_ID!,
+      keyID: process.env.APPLE_KEY_ID!,
+     privateKey,
+      callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`})
+
 passport.use(
   new AppleStrategy(
     {
       clientID: process.env.APPLE_CLIENT_ID!,
       teamID: process.env.APPLE_TEAM_ID!,
       keyID: process.env.APPLE_KEY_ID!,
-     privateKey: privateKeyString,
+     privateKey,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
+       passReqToCallback: true
     },
-    async (accessToken, refreshToken, idToken, profile, done:any) => {
+    async (req,accessToken, refreshToken, idToken, profile, done:any) => {
       try {
+        console.log("=====req==",req)
         console.log("=====profile=",profile)
         const decoded: any = jwt.decode(idToken);
         console.log("decoded==========",decoded)

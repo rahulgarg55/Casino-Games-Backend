@@ -850,10 +850,21 @@ router.post(
     session: false,
   }),
   (req, res) => {
-    console.log("=======apple callback====")
-    const tokenResponse = generateTokenResponse(req.user as IPlayer);
-    console.log("=====tokenResponse======",tokenResponse)
-    res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
+     try {
+      console.log("=======apple callback====");
+
+      if (!req.user) {
+        throw new Error("Apple authentication failed — no user returned");
+      }
+
+      const tokenResponse = generateTokenResponse(req.user as IPlayer);
+      console.log("=====tokenResponse======", tokenResponse);
+
+      res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
+    } catch (error) {
+      console.log("Apple callback error:", error);
+      res.status(500).json({ message: "Apple login failed", error: (error as Error).message });
+    }
   },
 );
 
