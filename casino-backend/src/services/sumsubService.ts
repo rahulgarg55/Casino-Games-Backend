@@ -30,10 +30,8 @@ export const initiateSumsubVerification = async (playerId: string) => {
     throw new Error('Player email is required for Sumsub verification');
   }
 
-  // Use playerId as externalUserId for consistency
   const externalUserId = playerId;
 
-  // Check if we already have a sumsub_id
   if (!player.sumsub_id) {
     try {
       const applicantId = await createSumsubApplicant(
@@ -60,7 +58,6 @@ export const initiateSumsubVerification = async (playerId: string) => {
     }
   }
 
-  // Reload the player to ensure sumsub_id is up-to-date
   player = await Player.findById(playerId);
   if (!player?.sumsub_id) {
     logger.error('Sumsub applicantId could not be determined for player', { playerId });
@@ -104,7 +101,6 @@ export const updateSumsubStatus = async (
   await player.save();
   logger.info('Player Sumsub status updated', { playerId, status });
 
-  // Create notification
   const notification = new Notification({
     type: NotificationType.KYC_UPDATE,
     message: `KYC status updated to ${status} for user ${player.username || player.email}`,

@@ -8,10 +8,6 @@ const SUMSUB_API_KEY = process.env.SUMSUB_API_KEY;
 const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY;
 const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET;
 
-if (!SUMSUB_API_KEY || !SUMSUB_SECRET_KEY) {
-  throw new Error('Sumsub API credentials are not configured');
-}
-
 const logger = winston.createLogger({
   level: 'info',
   format: winston.format.combine(
@@ -23,6 +19,18 @@ const logger = winston.createLogger({
     new winston.transports.Console()
   ]
 });
+
+if (!SUMSUB_API_KEY || !SUMSUB_SECRET_KEY || !SUMSUB_WEBHOOK_SECRET) {
+  throw new Error('Sumsub API credentials are not configured');
+}
+
+// Validate API key format
+if (!SUMSUB_API_KEY.startsWith('sbx:')) {
+  logger.warn('API key does not start with "sbx:" prefix. Make sure you are using sandbox credentials.');
+}
+
+// Log the current base URL for debugging
+logger.info('Using Sumsub base URL', { baseUrl: SUMSUB_BASE_URL });
 
 export interface SumsubTokenResponse {
   token: string;
@@ -47,11 +55,75 @@ const generateSignature = (
   body: string,
   timestamp: number,
 ): string => {
-  const signatureData = `${timestamp}${method.toUpperCase()}${path}${body}`;
-  return crypto
-    .createHmac('sha256', SUMSUB_SECRET_KEY)
+  // Remove any trailing slashes from path
+  const cleanPath = path.replace(/\/+$/, '');
+  
+  // Ensure body is properly formatted
+  const cleanBody = body ? body.trim() : '';
+  
+  // Construct signature data exactly as Sumsub expects
+  // Format: timestamp + method + path + body (no spaces, no separators)
+  const signatureData = `${timestamp}${method.toUpperCase()}${cleanPath}${cleanBody}`;
+  
+  // Log the exact components used in signature generation
+  logger.debug('Signature generation details', { 
+    components: {
+      timestamp: {
+        value: timestamp,
+        type: typeof timestamp,
+        length: timestamp.toString().length
+      },
+      method: {
+        value: method.toUpperCase(),
+        type: typeof method,
+        length: method.length
+      },
+      path: {
+        value: cleanPath,
+        type: typeof cleanPath,
+        length: cleanPath.length
+      },
+      body: {
+        value: cleanBody,
+        type: typeof cleanBody,
+        length: cleanBody.length
+      }
+    },
+    finalSignatureData: signatureData,
+    signatureDataLength: signatureData.length
+  });
+  
+  if (!SUMSUB_SECRET_KEY) {
+    throw new Error('SUMSUB_SECRET_KEY is not configured');
+  }
+
+  // Ensure the secret key is properly formatted
+  const secretKey = SUMSUB_SECRET_KEY.trim();
+  if (!secretKey) {
+    throw new Error('SUMSUB_SECRET_KEY is empty after trimming');
+  }
+
+  // Generate signature using SHA-256
+  const signature = crypto
+    .createHmac('sha256', secretKey)
     .update(signatureData)
     .digest('hex');
+
+  // Log the generated signature and its components
+  logger.debug('Generated signature', { 
+    signature,
+    signatureLength: signature.length,
+    components: {
+      timestamp,
+      method: method.toUpperCase(),
+      path: cleanPath,
+      body: cleanBody
+    },
+    signatureData,
+    secretKeyPrefix: secretKey.substring(0, 10) + '...' // Log first 10 chars of secret key for debugging
+  });
+  
+  return signature;
 };
 
 export const generateSumsubAccessToken = async (
@@ -127,7 +199,6 @@ export const generateSumsubAccessToken = async (
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      // Try with both userId and applicantId
       logger.info('Trying with both userId and applicantId', { attempt });
       return await attemptTokenGeneration(
         {
@@ -142,14 +213,13 @@ export const generateSumsubAccessToken = async (
       if (attempt === retries) {
         logger.error('All attempts with both userId and applicantId failed', { playerId, applicantId });
 
-        // Fallback: Try with only userId and a different levelName
         try {
           logger.info('Falling back to userId only with levelName "basic-kyc"', { attempt });
           return await attemptTokenGeneration(
             {
               userId: externalUserId,
               ttlInSecs: 3600,
-              levelName: 'basic-kyc', // Fallback to a common levelName
+              levelName: 'basic-kyc',
             },
             'userId only with basic-kyc',
           );
@@ -180,8 +250,9 @@ export const createSumsubApplicant = async (
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
   const levelName = 'id-only';
-  const path = `/resources/applicants?levelName=${encodeURIComponent(levelName)}`;
+  const path = `/resources/applicants?levelName=${levelName}`;
 
+  // Ensure all required fields are present and properly formatted
   const bodyObj = {
     externalUserId,
     email,
@@ -194,47 +265,92 @@ export const createSumsubApplicant = async (
     },
   };
 
+  // Convert body to string and ensure it's not empty
   const body = JSON.stringify(bodyObj);
+  if (!body) {
+    throw new Error('Request body cannot be empty');
+  }
+
+  // Generate signature with the exact body string
   const signature = generateSignature(method, path, body, timestamp);
 
-  logger.info('Creating Sumsub applicant', { playerId, externalUserId, email });
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY!,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+
+  logger.info('Creating Sumsub applicant', { 
+    playerId, 
+    externalUserId, 
+    email, 
+    signature,
+    timestamp,
+    path,
+    bodyObj,
+    bodyString: body,
+    headers,
+    apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...' // Log first 10 chars of API key for debugging
+  });
 
   try {
+    // Send the request with the raw body string
     const response = await axios.post(
       `${SUMSUB_BASE_URL}${path}`,
-      bodyObj,
-      {
-        headers: {
-          'X-App-Token': SUMSUB_API_KEY!,
-          'X-App-Access-Sig': signature,
-          'X-App-Access-Ts': timestamp.toString(),
-          'Content-Type': 'application/json',
-        },
+      body, // Send the raw body string instead of bodyObj
+      { 
+        headers, 
         timeout: 10000,
-      },
+        transformRequest: [(data) => data], // Prevent axios from transforming the body
+        validateStatus: (status) => status < 500 // Accept all responses for better error handling
+      }
     );
 
-    logger.info('Sumsub applicant created', { playerId, applicantId: response.data.id });
+    if (response.status >= 400) {
+      throw new Error(`Sumsub API error: ${response.status} - ${JSON.stringify(response.data)}`);
+    }
+
+    logger.info('Sumsub applicant created', { 
+      playerId, 
+      applicantId: response.data.id,
+      responseData: response.data 
+    });
     return response.data.id;
   } catch (error: any) {
     const axiosError = error as AxiosError<SumsubErrorResponse>;
     const errorDescription = axiosError.response?.data?.description || '';
+    const errorCode = axiosError.response?.data?.errorCode;
+    const correlationId = axiosError.response?.data?.correlationId;
+
+    logger.error('Applicant creation failed', {
+      playerId,
+      error: axiosError.response?.data || axiosError.message,
+      errorCode,
+      correlationId,
+      status: axiosError.response?.status,
+      headers: axiosError.response?.headers,
+      requestBody: bodyObj,
+      signature,
+      timestamp,
+      signatureData: `${timestamp}${method.toUpperCase()}${path}${body}`,
+      requestHeaders: headers,
+      apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...'
+    });
+
     const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
     if (match) {
       logger.warn('Applicant already exists', { playerId, existingId: match[1] });
       return match[1];
     }
 
-    logger.error('Applicant creation failed', {
-      playerId,
-      error: axiosError.response?.data || axiosError.message,
-    });
     throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
   }
 };
 
 export const validateWebhookSignature = (
-  body: any,
+  body: Buffer | string,
   signature: string,
 ): boolean => {
   if (!SUMSUB_WEBHOOK_SECRET) {
@@ -242,10 +358,17 @@ export const validateWebhookSignature = (
     return false;
   }
 
+  const rawBody = Buffer.isBuffer(body) ? body : Buffer.from(JSON.stringify(body));
   const computedSignature = crypto
     .createHmac('sha256', SUMSUB_WEBHOOK_SECRET)
-    .update(JSON.stringify(body))
+    .update(rawBody)
     .digest('hex');
+
+  logger.debug('Webhook signature validation', {
+    receivedSignature: signature,
+    computedSignature,
+    body: rawBody.toString(),
+  });
 
   return computedSignature === signature;
 };

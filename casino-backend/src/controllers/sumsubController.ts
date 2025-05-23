@@ -69,26 +69,40 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
   try {
     const signature = req.headers['x-payload-signature'] as string;
     if (!signature) {
-      logger.warn('Missing webhook signature');
-      return sendErrorResponse(res, 400, (req as any).__('MISSING_WEBHOOK_SIGNATURE'));
+      logger.warn('Missing webhook signature', { headers: req.headers });
+      return res.status(400).json({
+        success: false,
+        error: (req as any).__('MISSING_WEBHOOK_SIGNATURE'),
+      });
     }
 
+    // Validate signature using raw body
     if (!validateWebhookSignature(req.body, signature)) {
-      logger.warn('Invalid webhook signature');
-      return sendErrorResponse(res, 401, (req as any).__('INVALID_WEBHOOK_SIGNATURE'));
+      logger.warn('Invalid webhook signature', { signature, body: req.body.toString() });
+      return res.status(401).json({
+        success: false,
+        error: (req as any).__('INVALID_WEBHOOK_SIGNATURE'),
+      });
     }
 
     const { applicantId, type, reviewResult } = req.body;
+    logger.debug('Webhook payload', { applicantId, type, reviewResult });
 
     if (!applicantId || !type) {
       logger.warn('Invalid webhook payload', { applicantId, type });
-      return sendErrorResponse(res, 400, (req as any).__('INVALID_WEBHOOK_PAYLOAD'));
+      return res.status(400).json({
+        success: false,
+        error: (req as any).__('INVALID_WEBHOOK_PAYLOAD'),
+      });
     }
 
     const player = await Player.findOne({ sumsub_id: applicantId });
     if (!player) {
       logger.warn('Player not found', { applicantId });
-      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+      return res.status(404).json({
+        success: false,
+        error: (req as any).__('PLAYER_NOT_FOUND'),
+      });
     }
 
     let status: 'pending' | 'approved' | 'rejected';
@@ -117,14 +131,14 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Webhook processing error', {
       error: error instanceof Error ? error.message : 'Unknown error',
+      body: req.body.toString(),
     });
-    sendErrorResponse(
-      res,
-      500,
-      error instanceof Error
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error
         ? error.message
-        : (req as any).__('FAILED_WEBHOOK')
-    );
+        : (req as any).__('FAILED_WEBHOOK'),
+    });
   }
 };
 
@@ -159,6 +173,48 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
       error instanceof Error
         ? error.message
         : (req as any).__('FAILED_TO_FETCH_STATUS')
+    );
+  }
+};
+
+export const uploadDocument = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      logger.error('Authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
+    }
+
+    if (!req.file) {
+      logger.warn('No file uploaded', { userId: req.user.id });
+      return sendErrorResponse(res, 400, (req as any).__('NO_FILE_UPLOADED'));
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(req.file.mimetype)) {
+      logger.warn('Invalid file type', { userId: req.user.id, mimetype: req.file.mimetype });
+      return sendErrorResponse(res, 400, (req as any).__('INVALID_FILE_TYPE'));
+    }
+
+    // Store file temporarily (in a real app, save to a storage service like S3)
+    const filePath = `/uploads/documents/${req.user.id}/${req.file.originalname}`;
+    logger.info('Document uploaded', { userId: req.user.id, filePath });
+
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('DOCUMENT_UPLOADED'),
+      data: { filePath },
+    });
+  } catch (error) {
+    logger.error('Document upload error', {
+      userId: req.user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    sendErrorResponse(
+      res,
+      500,
+      error instanceof Error
+        ? error.message
+        : (req as any).__('FAILED_DOCUMENT_UPLOAD')
     );
   }
 };

@@ -6,7 +6,6 @@ import { connectDB } from './utils/db';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
 import * as paymentController from './controllers/paymentController';
-import { seedPaymentConfigs } from './controllers/paymentController';
 import passport from 'passport';
 import './utils/passportConfig';
 import winston, { format } from 'winston';
@@ -102,18 +101,18 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", 'https://static.sumsub.com', "'unsafe-inline'"], // Allow Sumsub SDK
-      frameSrc: ["'self'", 'https://api.sumsub.com'], // Allow Sumsub iframes
-      connectSrc: ["'self'", 'https://api.sumsub.com'], // Allow Sumsub API
-      styleSrc: ["'self'", "'unsafe-inline'"], // Allow inline styles for Sumsub
+      scriptSrc: ["'self'", 'https://static.sumsub.com', "'unsafe-inline'"],
+      frameSrc: ["'self'", 'https://api.sumsub.com'],
+      connectSrc: ["'self'", 'https://api.sumsub.com'],
+      styleSrc: ["'self'", "'unsafe-inline'"],
     },
   },
 }));
 app.use(
   cors({
-    origin: true, // Allow all origins
+    origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature', 'x-payload-signature'],
     credentials: true,
   }),
 );
@@ -125,7 +124,7 @@ app.use(
     saveUninitialized: false,
     store: MongoStore.create({
       mongoUrl: process.env.MONGODB_URI,
-      ttl: 24 * 60 * 60, // 1 day
+      ttl: 24 * 60 * 60,
       autoRemove: 'native',
     }),
     cookie: {
@@ -137,8 +136,8 @@ app.use(
   }),
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 app.use(passport.initialize());
 app.use(passport.session());

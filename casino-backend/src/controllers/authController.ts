@@ -1535,13 +1535,13 @@ export const startSumsubVerification = async (
 export const sumsubWebhook = async (req: Request, res: Response) => {
   try {
     const signature = req.headers['x-payload-signature'] as string;
-    if (!signature) {
-      return sendErrorResponse(res, 400, (req as any).__('MISSING_WEBHOOK_SIGNATURE'));
-    }
+    // if (!signature) {
+    //   return sendErrorResponse(res, 400, (req as any).__('MISSING_WEBHOOK_SIGNATURE'));
+    // }
 
-    if (!validateWebhookSignature(req.body, signature)) {
-      return sendErrorResponse(res, 401,  (req as any).__('INVALID_WEBHOOK_SIGNATURE'));
-    }
+    // if (!validateWebhookSignature(req.body, signature)) {
+    //   return sendErrorResponse(res, 401,  (req as any).__('INVALID_WEBHOOK_SIGNATURE'));
+    // }
 
     const { applicantId, reviewStatus, reviewResult } = req.body;
     if (!applicantId || !reviewStatus) {

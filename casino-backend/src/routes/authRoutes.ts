@@ -1,6 +1,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
+import multer from 'multer';
 import * as authController from '../controllers/authController';
+import documentUpload from '../middlewares/documentUploadMiddleware';
 import * as paymentController from '../controllers/paymentController';
 import { setGlobalCommission,getGlobalCommission } from '../controllers/commissionController';
 import { body, oneOf, query } from 'express-validator';
@@ -22,9 +24,13 @@ import {
   startSumsubVerification,  
   sumsubWebhook,
   getSumsubStatus,
+  uploadDocument,
 } from '../controllers/sumsubController';
 
 const router = Router();
+
+// const documentUpload = multer({ dest: 'uploads/documents/' });
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -566,17 +572,27 @@ router.get(
 );
 /* SumSub Apis */
 
+
 router.post(
   '/sumsub/start',
   passport.authenticate('jwt', { session: false }),
-  startSumsubVerification,
+  startSumsubVerification
 );
-router.post('/sumsub/webhook', sumsubWebhook);
-
+router.post(
+  '/sumsub/webhook',
+  express.raw({ type: 'application/json' }),
+  sumsubWebhook
+);
 router.get(
   '/sumsub/status',
   passport.authenticate('jwt', { session: false }),
   getSumsubStatus
+);
+router.post(
+  '/sumsub/upload',
+  passport.authenticate('jwt', { session: false }),
+  documentUpload.single('document'),
+  uploadDocument
 );
 
 //Payment Configuration Routes
