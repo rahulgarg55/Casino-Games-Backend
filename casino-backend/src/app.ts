@@ -6,6 +6,7 @@ import { connectDB } from './utils/db';
 import session from 'express-session';
 import MongoStore from 'connect-mongo';
 import * as paymentController from './controllers/paymentController';
+import { sumsubWebhook } from './controllers/authController';
 import passport from 'passport';
 import './utils/passportConfig';
 import winston, { format } from 'winston';
@@ -97,6 +98,13 @@ app.post(
   paymentController.handleStripeWebhook,
 );
 
+// Sumsub webhook endpoint
+app.post(
+  '/api/auth/sumsub/webhook',
+  express.raw({ type: 'application/json' }),
+  sumsubWebhook,
+);
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -112,7 +120,7 @@ app.use(
   cors({
     origin: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature', 'x-payload-signature'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature', 'x-sumsub-signature'],
     credentials: true,
   }),
 );

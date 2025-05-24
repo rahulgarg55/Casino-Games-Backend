@@ -158,6 +158,7 @@ export const generateSumsubAccessToken = async (
         'Content-Type': 'application/json',
       },
       timeout: 10000,
+      transformRequest: [(data) => data], // Prevent axios from modifying the body
     };
 
     logger.info(`Attempting token generation (${attemptDescription})`, {
@@ -174,7 +175,7 @@ export const generateSumsubAccessToken = async (
     try {
       const response = await axios.post(
         `${SUMSUB_BASE_URL}${path}`,
-        bodyObj,
+        body, // Send the raw JSON string
         config,
       );
 
@@ -195,50 +196,40 @@ export const generateSumsubAccessToken = async (
     }
   };
 
-  const externalUserId = playerId;
+  // First try with applicantId only
+  try {
+    logger.info('Trying with applicantId only', { attempt: 1 });
+    return await attemptTokenGeneration(
+      {
+        applicantId,
+        ttlInSecs: 3600,
+        levelName,
+      },
+      'applicantId only',
+    );
+  } catch (error: any) {
+    logger.error('Attempt with applicantId only failed', { playerId, applicantId });
 
-  for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      logger.info('Trying with both userId and applicantId', { attempt });
+      logger.info('Trying with userId only', { attempt: 2 });
       return await attemptTokenGeneration(
         {
-          userId: externalUserId,
-          applicantId,
+          userId: playerId,
           ttlInSecs: 3600,
           levelName,
         },
-        'both userId and applicantId',
+        'userId only',
       );
-    } catch (error: any) {
-      if (attempt === retries) {
-        logger.error('All attempts with both userId and applicantId failed', { playerId, applicantId });
-
-        try {
-          logger.info('Falling back to userId only with levelName "basic-kyc"', { attempt });
-          return await attemptTokenGeneration(
-            {
-              userId: externalUserId,
-              ttlInSecs: 3600,
-              levelName: 'basic-kyc',
-            },
-            'userId only with basic-kyc',
-          );
-        } catch (fallbackError: any) {
-          logger.error('Fallback attempt with userId only failed', {
-            playerId,
-            applicantId,
-            error: fallbackError.message,
-            response: (fallbackError as AxiosError<SumsubErrorResponse>).response?.data,
-          });
-          throw new Error(`Sumsub token generation failed after all attempts: ${fallbackError.message}`);
-        }
-      }
-      const delay = Math.min(delayMs * Math.pow(2, attempt - 1), 5000);
-      await new Promise(resolve => setTimeout(resolve, delay));
+    } catch (fallbackError: any) {
+      logger.error('Fallback attempt with userId only failed', {
+        playerId,
+        applicantId,
+        error: fallbackError.message,
+        response: (fallbackError as AxiosError<SumsubErrorResponse>).response?.data,
+      });
+      throw new Error(`Sumsub token generation failed after all attempts: ${fallbackError.message}`);
     }
   }
-
-  throw new Error('Sumsub token generation failed: maximum retries reached');
 };
 
 export const createSumsubApplicant = async (
@@ -252,7 +243,8 @@ export const createSumsubApplicant = async (
   const levelName = 'id-only';
   const path = `/resources/applicants?levelName=${levelName}`;
 
-  // Ensure all required fields are present and properly formatted
+
+
   const bodyObj = {
     externalUserId,
     email,
@@ -265,6 +257,9 @@ export const createSumsubApplicant = async (
     },
   };
 
+  console.log('bodyObj :>> ', bodyObj);
+  
+
   // Convert body to string and ensure it's not empty
   const body = JSON.stringify(bodyObj);
   if (!body) {
@@ -273,6 +268,8 @@ export const createSumsubApplicant = async (
 
   // Generate signature with the exact body string
   const signature = generateSignature(method, path, body, timestamp);
+
+  console.log('signature :>> ', signature);
 
   const headers = {
     'X-App-Token': SUMSUB_API_KEY!,
@@ -308,6 +305,10 @@ export const createSumsubApplicant = async (
       }
     );
 
+    console.log('response.data :>> ', response.data);
+
+    console.log('response.status :>> ', response.status);
+
     if (response.status >= 400) {
       throw new Error(`Sumsub API error: ${response.status} - ${JSON.stringify(response.data)}`);
     }
@@ -339,13 +340,13 @@ export const createSumsubApplicant = async (
       apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...'
     });
 
-    const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
-    if (match) {
-      logger.warn('Applicant already exists', { playerId, existingId: match[1] });
-      return match[1];
-    }
+    // const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
+    // if (match) {
+    //   logger.warn('Applicant already exists', { playerId, existingId: match[1] });
+    //   return match[1];
+    // }
 
-    throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
+    // throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
   }
 };
 

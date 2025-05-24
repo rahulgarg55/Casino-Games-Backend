@@ -67,7 +67,7 @@ export const startSumsubVerification = async (
 
 export const sumsubWebhook = async (req: Request, res: Response) => {
   try {
-    const signature = req.headers['x-payload-signature'] as string;
+    const signature = req.headers['x-sumsub-signature'] as string;
     if (!signature) {
       logger.warn('Missing webhook signature', { headers: req.headers });
       return res.status(400).json({

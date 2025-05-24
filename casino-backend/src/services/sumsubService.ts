@@ -31,6 +31,7 @@ export const initiateSumsubVerification = async (playerId: string) => {
   }
 
   const externalUserId = playerId;
+  console.log('externalUserId :>> ', externalUserId);
 
   if (!player.sumsub_id) {
     try {
@@ -41,6 +42,7 @@ export const initiateSumsubVerification = async (playerId: string) => {
         player.phone_number
       );
       player.sumsub_id = applicantId;
+      console.log('applicantId :>> ', applicantId);
       player.sumsub_status = 'pending';
       await player.save();
       logger.info('Sumsub applicant created and player updated', { playerId, applicantId });
@@ -71,12 +73,21 @@ export const initiateSumsubVerification = async (playerId: string) => {
     externalUserId,
   });
 
-  return generateSumsubAccessToken(
-    playerId,
-    player.sumsub_id,
-    player.email,
-    'id-only'
-  );
+  try {
+    return await generateSumsubAccessToken(
+      playerId,
+      player.sumsub_id,
+      player.email,
+      'id-only'
+    );
+  } catch (error: any) {
+    logger.error('Failed to generate access token', {
+      playerId,
+      sumsubId: player.sumsub_id,
+      error: error.message
+    });
+    throw error;
+  }
 };
 
 export const updateSumsubStatus = async (
