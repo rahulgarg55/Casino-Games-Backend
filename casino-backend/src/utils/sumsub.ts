@@ -143,12 +143,12 @@ export const generateSumsubAccessToken = async (
 
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
-  const path = '/resources/accessTokens';
+  const path = '/resources/accessTokens/sdk'; // Correct endpoint for SDK tokens
   const url = `${SUMSUB_BASE_URL}${path}`;
 
-  // Use applicantId as the userId for Sumsub access token generation
+  // Request body for SDK access token, using internal playerId as userId
   const bodyObj = {
-    userId: applicantId,
+    userId: playerId, // Your internal player ID (externalUserId in Sumsub)
     ttlInSecs: 3600,
     levelName,
   };
@@ -172,7 +172,7 @@ export const generateSumsubAccessToken = async (
     transformRequest: [(data) => data], // Prevent axios from modifying the body
   };
 
-  logger.info('Attempting to generate Sumsub access token', {
+  logger.info('Attempting to generate Sumsub access token for SDK', {
     playerId,
     applicantId,
     url,
@@ -189,7 +189,7 @@ export const generateSumsubAccessToken = async (
     try {
       const response = await axios.post(url, body, config);
       
-      logger.info('Sumsub access token generated successfully', { 
+      logger.info('Sumsub access token for SDK generated successfully', { 
         playerId, 
         applicantId, 
         token: response.data.token.substring(0, 10) + '...' 
@@ -197,7 +197,7 @@ export const generateSumsubAccessToken = async (
 
       return {
         token: response.data.token,
-        userId: applicantId,
+        userId: playerId, // Return internal userId as per function signature
       };
     } catch (error: any) {
       lastError = error;
@@ -236,8 +236,6 @@ export const createSumsubApplicant = async (
   const levelName = 'id-only';
   const path = `/resources/applicants?levelName=${levelName}`;
 
-
-
   const bodyObj = {
     externalUserId,
     email,
@@ -252,7 +250,6 @@ export const createSumsubApplicant = async (
 
   console.log('bodyObj :>> ', bodyObj);
   
-
   // Convert body to string and ensure it's not empty
   const body = JSON.stringify(bodyObj);
   if (!body) {
