@@ -1,11 +1,13 @@
 import {
   generateSumsubAccessToken,
   createSumsubApplicant,
+  uploadDocumentToSumsub as uploadToSumsub,
 } from '../utils/sumsub';
 import Player from '../models/player';
 import { VERIFICATION } from '../constants';
 import Notification, { NotificationType } from '../models/notification';
 import winston from 'winston';
+import { Express } from 'express';
 
 const logger = winston.createLogger({
   level: 'info',
@@ -121,4 +123,42 @@ export const updateSumsubStatus = async (
   await notification.save();
 
   return player;
+};
+
+export const uploadDocumentToSumsub = async (
+  applicantId: string,
+  file: Express.Multer.File,
+  documentType: string = 'IDENTITY',
+  documentSide: string = 'FRONT'
+) => {
+  try {
+    logger.info('Uploading document to Sumsub', {
+      applicantId,
+      documentType,
+      documentSide,
+      fileName: file.originalname
+    });
+
+    const result = await uploadToSumsub(
+      applicantId,
+      file.buffer,
+      file.originalname,
+      documentType,
+      documentSide
+    );
+
+    logger.info('Document uploaded successfully', {
+      applicantId,
+      documentId: result.idDocId,
+      status: result.status
+    });
+
+    return result;
+  } catch (error) {
+    logger.error('Failed to upload document to Sumsub', {
+      applicantId,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+    throw error;
+  }
 };

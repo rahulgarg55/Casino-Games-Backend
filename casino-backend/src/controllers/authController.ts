@@ -377,47 +377,110 @@ export const viewProfile = async (req: CustomRequest, res: Response) => {
   }
 };
 
+// Define an interface for the aggregated transaction stats
+interface IAggregatedTransactionStats {
+  _id: mongoose.Types.ObjectId; // Represents the player_id
+  total_deposits: number;
+  total_withdrawals: number;
+  last_deposit_date: Date | null;
+  last_withdrawal_date: Date | null;
+}
+
 export const getAllPlayers = async (req: Request, res: Response) => {
   try {
-    const players = await Player.find({ role_id: 0 }) // Only get non-admin users
-      .select('-password_hash -verification_token -reset_password_token')
-      .sort({ created_at: -1 });
+    // Fetch players excluding admins, selecting all necessary fields including Sumsub data
+    const players = await Player.find({
+      role_id: { $ne: 1 }, // Exclude admins (assuming 1 is admin role)
+    }).select(
+      'username fullname patronymic photo dob gender email phone_number registration_date last_login status is_verified is_2fa_enabled currency language country city role_id created_at updated_at referredBy referredByName sumsub_id sumsub_status'
+    ).lean(); // Use .lean() for plain JavaScript objects for easier manipulation
 
-    const playersWithBalance = await Promise.all(
-      players.map(async (player) => {
-        const balance = await PlayerBalance.findOne({ player_id: player._id });
-        return {
-          id: player._id,
-          username: player.username,
-          fullname: player.fullname,
-          email: player.email,
-          currency: player.currency,
-          phone_number: player.phone_number,
-          role_id: player.role_id,
-          status: player.status,
-          is_verified: player.is_verified,
-          created_at: player.created_at,
-          gender: player.gender,
-          language: player.language,
-          country: player.country,
-          city: player.city,
-          is_2fa_enabled: player.is_2fa_enabled,
-          balance: balance?.balance || 0,
-          referredByName: player.referredByName,
-        };
-      }),
-    );
+    const playerIds = players.map(player => player._id);
+
+    // Fetch balances for all fetched players in parallel
+    const balances = await PlayerBalance.find({ player_id: { $in: playerIds } }).lean();
+    const balanceMap = balances.reduce((map, balance) => {
+      map[balance.player_id.toString()] = balance;
+      return map;
+    }, {} as { [key: string]: IPlayerBalance });
+
+    // Aggregate transaction data for all players in parallel
+    const transactionStats = await Transaction.aggregate<IAggregatedTransactionStats>([
+      {
+        $match: {
+          player_id: { $in: playerIds },
+          status: 'completed',
+          transaction_type: { $in: ['topup', 'withdrawal'] },
+        },
+      },
+      {
+        $group: {
+          _id: '$player_id',
+          total_deposits: { $sum: { $cond: [{$eq: ['$transaction_type', 'topup']}, '$amount', 0]} },
+          total_withdrawals: { $sum: { $cond: [{$eq: ['$transaction_type', 'withdrawal']}, '$amount', 0]} },
+          last_deposit_date: { $max: { $cond: [{$eq: ['$transaction_type', 'topup']}, '$created_at', null]} },
+          last_withdrawal_date: { $max: { $cond: [{$eq: ['$transaction_type', 'withdrawal']}, '$created_at', null]} },
+        },
+      },
+    ]);
+
+    // Create a map for quick transaction stats lookup by player ID
+    const transactionStatsMap = transactionStats.reduce((map, stats) => {
+      map[stats._id.toString()] = stats;
+      return map;
+    }, {} as { [key: string]: IAggregatedTransactionStats });
+
+    // Format players data to match frontend UserProps interface
+    const formattedPlayers = players.map((player) => {
+      const balanceInfo = balanceMap[player._id.toString()];
+      const statsInfo = transactionStatsMap[player._id.toString()];
+
+      return {
+        id: player._id.toString(),
+        username: player.username || '-',
+        fullname: player.fullname || '-',
+        patronymic: player.patronymic || '-',
+        photo: player.photo || '',
+        dob: player.dob || null,
+        gender: player.gender || '-',
+        email: player.email || '-',
+        phone_number: player.phone_number || '-',
+        registration_date: player.registration_date || null,
+        last_login: player.last_login || null,
+        status: player.status || 0,
+        is_verified: player.is_verified || 0,
+        is_2fa: player.is_2fa_enabled || 0,
+        currency: player.currency || 0,
+        language: player.language || '-',
+        country: player.country || '-',
+        city: player.city || '-',
+        role_id: player.role_id || 0,
+        created_at: player.created_at || null,
+        updated_at: player.updated_at || null,
+        balance: balanceInfo?.balance || 0,
+        bonus_balance: balanceInfo?.bonus_balance || 0,
+        total_deposits: statsInfo?.total_deposits || 0,
+        total_withdrawals: statsInfo?.total_withdrawals || 0,
+        last_deposit_date: statsInfo?.last_deposit_date || null,
+        last_withdrawal_date: statsInfo?.last_withdrawal_date || null,
+        referredByName: player.referredByName || 'N/A',
+        verification_status: player.sumsub_status || 'not_started',
+        sumsub_id: player.sumsub_id || null,
+      };
+    });
 
     res.status(200).json({
       success: true,
-      message: (req as any).__('PLAYERS_LIST'),
-      data: { players: playersWithBalance },
+      data: {
+        players: formattedPlayers,
+      },
     });
   } catch (error) {
+    console.error('Error fetching all players:', error);
     sendErrorResponse(
       res,
-      400,
-      error instanceof Error ? error.message :(req as any).__('PLAYERS_FAILED'),
+      500,
+      error instanceof Error ? error.message : 'Failed to fetch players',
     );
   }
 };
@@ -1605,7 +1668,6 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
 };
 
 export const addAffliateUsers = async (req: Request, res: Response) => {
-  console.log('i am here :>> ');
   try {
     const AffiliateUserData = await authService.registerAffiliate(req.body,req);
     res.status(200).json({
@@ -2584,7 +2646,7 @@ export const updatePreferences = async (req: CustomRequest, res: Response) => {
         await sendEmail(
           affiliate.email,
           'Welcome to Our Newsletter',
-          'You’ve subscribed to our marketing emails. Stay tuned for exclusive updates and offers!',
+          'You\'ve subscribed to our marketing emails. Stay tuned for exclusive updates and offers!',
           `${affiliate.firstname} ${affiliate.lastname}`,
         );
       }

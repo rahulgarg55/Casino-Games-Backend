@@ -11,10 +11,10 @@ import fs from 'fs';
 import path from 'path';
 import jwt from 'jsonwebtoken';
 
-const privateKey: string = fs.readFileSync(
-  path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8'),
-  'utf8'
-);
+// const privateKey: string = fs.readFileSync(
+//   path.resolve(process.cwd(), 'src/AuthKey_Q863TAJ9VC.p8'),
+//   'utf8'
+// );
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -54,7 +54,6 @@ passport.use(
 console.log("======config==",{ clientID: process.env.APPLE_CLIENT_ID!,
       teamID: process.env.APPLE_TEAM_ID!,
       keyID: process.env.APPLE_KEY_ID!,
-     privateKey,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`})
 
 passport.use(
@@ -63,7 +62,6 @@ passport.use(
       clientID: process.env.APPLE_CLIENT_ID!,
       teamID: process.env.APPLE_TEAM_ID!,
       keyID: process.env.APPLE_KEY_ID!,
-     privateKey,
       callbackURL: `${process.env.AUTH_CALLBACK_URL}/api/auth/apple/callback`,
        passReqToCallback: true
     },

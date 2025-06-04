@@ -4,6 +4,7 @@ import { sendErrorResponse } from './authController';
 import {
   initiateSumsubVerification,
   updateSumsubStatus,
+  uploadDocumentToSumsub,
 } from '../services/sumsubService';
 import Player from '../models/player';
 import winston from 'winston';
@@ -14,6 +15,7 @@ interface CustomRequest extends Request {
     role: number;
     email?: string;
   };
+  file?: Express.Multer.File;
 }
 
 const logger = winston.createLogger({
@@ -195,19 +197,49 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 400, (req as any).__('INVALID_FILE_TYPE'));
     }
 
-    // Store file temporarily (in a real app, save to a storage service like S3)
-    const filePath = `/uploads/documents/${req.user.id}/${req.file.originalname}`;
-    logger.info('Document uploaded', { userId: req.user.id, filePath });
+    const player = await Player.findById(req.user.id);
+    if (!player) {
+      logger.warn('Player not found', { userId: req.user.id });
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    if (!player.sumsub_id) {
+      logger.warn('Player has no Sumsub ID', { userId: req.user.id });
+      return sendErrorResponse(res, 400, (req as any).__('SUMSUB_ID_NOT_FOUND'));
+    }
+
+    // Upload document to Sumsub
+    const documentType = req.body.documentType || 'IDENTITY'; // Default to ID document
+    const documentSide = req.body.documentSide || 'FRONT'; // Default to front side
+
+    const uploadResult = await uploadDocumentToSumsub(
+      player.sumsub_id,
+      req.file,
+      documentType,
+      documentSide
+    );
+
+    logger.info('Document uploaded to Sumsub', {
+      userId: req.user.id,
+      documentType,
+      documentSide,
+      sumsubId: player.sumsub_id
+    });
 
     res.status(200).json({
       success: true,
       message: (req as any).__('DOCUMENT_UPLOADED'),
-      data: { filePath },
+      data: {
+        documentId: uploadResult.idDocId,
+        documentType,
+        documentSide,
+        status: uploadResult.status
+      }
     });
   } catch (error) {
     logger.error('Document upload error', {
       userId: req.user?.id,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
     sendErrorResponse(
       res,

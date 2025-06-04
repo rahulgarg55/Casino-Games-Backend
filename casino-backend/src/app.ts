@@ -15,6 +15,7 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 import dotenv from 'dotenv';
 import path from 'path';
 import { I18n } from 'i18n';
+import adminKycRoutes from './routes/adminKycRoutes';
 
 const translationPath = path.resolve(process.cwd(), 'src/translation');
 
@@ -91,6 +92,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// Apply body parsers early
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Apply CORS middleware after body parsers but before routes
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       // Allow requests with no origin (like mobile apps or curl requests)
+//       if (!origin) return callback(null, true);
+//       // For production, you should check if origin is allowed
+//       // Example: if (allowedOrigins.includes(origin)) return callback(null, true);
+//       // For now, we allow all origins dynamically (necessary with credentials)
+//       return callback(null, true);
+//     },
+//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+//     allowedHeaders: ['Content-Type', 'Authorization', 'Stripe-Signature', 'x-sumsub-signature'],
+//     credentials: true,
+//   }),
+// );
+
+// // Handle preflight requests (OPTIONS method)
+// // This middleware will be hit after CORS, ensuring headers are set by CORS
+// app.options('*', cors()); // Respond to OPTIONS requests for all routes
+
 // Stripe webhook endpoint
 app.post(
   '/auth/stripe/webhook',
@@ -104,6 +130,9 @@ app.post(
   express.raw({ type: 'application/json' }),
   sumsubWebhook,
 );
+
+// Admin KYC routes
+app.use('/api/auth/admin/kyc', adminKycRoutes);
 
 app.use(helmet({
   contentSecurityPolicy: {

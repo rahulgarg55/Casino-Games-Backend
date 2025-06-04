@@ -42,7 +42,7 @@ const AffiliateSchema: Schema = new Schema(
     phonenumber: { type: String },
     country: { type: String, required: true },
     password: { type: String },
-    referralCode: { type: String, required: true, unique: true },
+    referralCode: { type: String, unique: true, sparse: true },
     promotionMethod: { type: [String] },
     hearAboutUs: { type: String, required: true },
     status: {

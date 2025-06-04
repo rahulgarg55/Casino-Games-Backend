@@ -176,5 +176,7 @@
 	"NO_FILE_UPLOADED": "No file uploaded. Please select a file.",
 	"INVALID_FILE_TYPE": "Invalid file type. Only JPEG, PNG, and PDF files are allowed.",
 	"FILE_TOO_LARGE": "File size exceeds 5MB. Please upload a smaller file.",
-	"DOCUMENT_UPLOADED": "DOCUMENT_UPLOADED"
+	"DOCUMENT_UPLOADED": "DOCUMENT_UPLOADED",
+	"SUMSUB_ID_NOT_FOUND": "SUMSUB_ID_NOT_FOUND",
+	"EMIAL_ALREADY_REGISTER": "EMIAL_ALREADY_REGISTER"
 }
