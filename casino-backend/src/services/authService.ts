@@ -111,9 +111,6 @@ export const register = async (data: RegistrationData, req: any) => {
 
   const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
-    throw new Error((req as any).__('USER_ALREADY_EXIST'));
-  }
-  if (existingUser) {
     if (existingUser.username === username) {
       throw new Error('Username is already taken');
     }
@@ -168,20 +165,29 @@ export const register = async (data: RegistrationData, req: any) => {
     playerData.patronymic = patronymic;
   }
 
-  if (referralCode) {
+  // Handle referral code from body or query params
+  let finalReferralCode = referralCode || req.query.ref;
+  if (finalReferralCode) {
     const referringAffiliate = await Affiliate.findOne({
-      referralCode,
+      referralCode: finalReferralCode,
     });
     if (!referringAffiliate) {
       throw new Error((req as any).__('INVALID_REFERRAL'));
     }
 
-    if (referringAffiliate.status != STATUS.ACTIVE) {
+    if (referringAffiliate.status !== STATUS.ACTIVE) {
       throw new Error((req as any).__('AFFILIATE_NOT_VERFIFIED_YET'));
     }
 
     playerData.referredBy = referringAffiliate._id;
     playerData.referredByName = `${referringAffiliate.firstname} ${referringAffiliate.lastname}`;
+    
+    // Increment totalClicks for the affiliate
+    await Affiliate.findByIdAndUpdate(
+      referringAffiliate._id,
+      { $inc: { totalClicks: 1 } },
+      { new: true }
+    );
   }
 
   try {
@@ -196,6 +202,15 @@ export const register = async (data: RegistrationData, req: any) => {
     });
     await playerBalance.save();
 
+    // Increment totalSignups if referred
+    if (finalReferralCode && playerData.referredBy) {
+      await Affiliate.findByIdAndUpdate(
+        playerData.referredBy,
+        { $inc: { totalSignups: 1 } },
+        { new: true }
+      );
+    }
+
     const notification = new Notification({
       type: NotificationType.USER_REGISTERED,
       message: `New user ${username || email || phone_number} has registered`,
@@ -206,6 +221,7 @@ export const register = async (data: RegistrationData, req: any) => {
         phone_number,
         country,
         registration_date: new Date(),
+        referralCode: finalReferralCode || null,
       },
     });
     await notification.save();
