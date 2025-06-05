@@ -510,3 +510,96 @@ export const rejectSumsubApplicant = async (applicantId: string) => {
     throw new Error(error.response?.data?.description || 'Failed to reject applicant');
   }
 };
+
+export const generateSumsubWebSDKLink = async (
+  playerId: string,
+  email: string,
+  phone?: string,
+  levelName: string = 'id-only',
+  ttlInSecs: number = 1800,
+  retries: number = 3,
+  delayMs: number = 1000,
+): Promise<{ url: string }> => {
+  if (!validateEmail(email)) {
+    logger.error('Invalid email provided', { playerId, email });
+    throw new Error('Invalid email address provided');
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'POST';
+  const path = '/resources/sdkIntegrations/levels/-/websdkLink';
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const bodyObj = {
+    levelName,
+    userId: playerId,
+    applicantIdentifiers: {
+      email,
+      ...(phone && { phone })
+    },
+    ttlInSecs
+  };
+
+  const body = JSON.stringify(bodyObj);
+  const signature = generateSignature(method, path, body, timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY!,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  };
+
+  const config: AxiosRequestConfig = {
+    headers: headers,
+    timeout: 10000,
+    transformRequest: [(data) => data],
+  };
+
+  logger.info('Attempting to generate Sumsub WebSDK link', {
+    playerId,
+    url,
+    method,
+    requestHeaders: headers,
+    requestBody: bodyObj,
+    requestBodyString: body,
+    signature,
+    timestamp
+  });
+
+  let lastError: any;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.post(url, body, config);
+      
+      logger.info('Sumsub WebSDK link generated successfully', { 
+        playerId,
+        url: response.data.url
+      });
+
+      return response.data;
+    } catch (error: any) {
+      lastError = error;
+      const axiosError = error as AxiosError<SumsubErrorResponse>;
+      
+      logger.error('Sumsub WebSDK link generation failed', {
+        attempt,
+        playerId,
+        error: axiosError.message,
+        responseStatus: axiosError.response?.status,
+        responseData: axiosError.response?.data,
+        requestUrl: url,
+        requestHeaders: headers,
+        requestBodyString: body,
+        generatedSignature: signature
+      });
+
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw new Error(`Failed to generate Sumsub WebSDK link after ${retries} attempts: ${lastError?.message}`);
+};

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { validateWebhookSignature } from '../utils/sumsub';
+import { validateWebhookSignature, generateSumsubWebSDKLink } from '../utils/sumsub';
 import { sendErrorResponse } from './authController';
 import {
   initiateSumsubVerification,
@@ -247,6 +247,61 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       error instanceof Error
         ? error.message
         : (req as any).__('FAILED_DOCUMENT_UPLOAD')
+    );
+  }
+};
+
+export const startSumsubVerificationWithLink = async (
+  req: CustomRequest,
+  res: Response,
+) => {
+  try {
+    if (!req.user?.id) {
+      logger.error('Authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
+    }
+
+    logger.info('Initiating Sumsub verification with WebSDK link', { userId: req.user.id });
+    
+    const player = await Player.findById(req.user.id);
+    if (!player) {
+      logger.error('Player not found', { userId: req.user.id });
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    if (!player.email) {
+      logger.error('Player email is required for Sumsub verification', { userId: req.user.id });
+      return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
+    }
+
+    // Generate WebSDK link
+    const { url } = await generateSumsubWebSDKLink(
+      req.user.id,
+      player.email,
+      player.phone_number
+    );
+
+    logger.info('Verification link generated', { userId: req.user.id, url });
+    
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('SUB_VERIFICATION'),
+      data: {
+        verificationUrl: url,
+        externalUserId: req.user.id,
+      },
+    });
+  } catch (error) {
+    logger.error('Verification link generation error', {
+      userId: req.user?.id,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error
+        ? error.message
+        : (req as any).__('FAILED_SUB_VERIFICATION')
     );
   }
 };
