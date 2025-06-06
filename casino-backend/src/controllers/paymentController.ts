@@ -488,6 +488,16 @@ export const createPaymentIntent = async (
       return;
     }
 
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!player.email || !emailRegex.test(player.email)) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid email format. Please update your email address before making a payment.' 
+      });
+      return;
+    }
+
     let customerId = player.stripeCustomerId;
     if (!customerId) {
       const customer = await createStripeCustomer(player);
