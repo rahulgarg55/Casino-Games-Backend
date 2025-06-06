@@ -5,10 +5,10 @@ import { config } from '../config';
 import FormData from 'form-data';
 
 // Environment variables
-const SUMSUB_BASE_URL = process.env.SUMSUB_BASE_URL || 'https://api.sumsub.com';
-const SUMSUB_API_KEY = process.env.SUMSUB_API_KEY;
-const SUMSUB_SECRET_KEY = process.env.SUMSUB_SECRET_KEY;
-const SUMSUB_WEBHOOK_SECRET = process.env.SUMSUB_WEBHOOK_SECRET;
+const SUMSUB_BASE_URL = config.sumsub.baseUrl || 'https://api.sumsub.com';
+const SUMSUB_API_KEY = config.sumsub.appToken;
+const SUMSUB_SECRET_KEY = config.sumsub.secretKey;
+const SUMSUB_WEBHOOK_SECRET = config.sumsub.webhookSecret;
 
 const logger = winston.createLogger({
   level: 'info',
@@ -28,7 +28,7 @@ if (!SUMSUB_API_KEY || !SUMSUB_SECRET_KEY || !SUMSUB_WEBHOOK_SECRET) {
 
 // Validate API key format
 if (!SUMSUB_API_KEY.startsWith('sbx:')) {
-  logger.warn('API key does not start with "sbx:" prefix. Make sure you are using sandbox credentials.');
+  logger.warn('API key does not start with "sbx:" prefix. Ensure sandbox credentials are used.');
 }
 
 // Log the current base URL for debugging
@@ -51,45 +51,26 @@ const validateEmail = (email: string): boolean => {
   return emailRegex.test(email);
 };
 
-const generateSignature = (
+export const generateSignature = (
   method: string,
   path: string,
   body: string,
   timestamp: number,
 ): string => {
-  // Remove any trailing slashes from path
+  // Remove trailing slashes from path
   const cleanPath = path.replace(/\/+$/, '');
-  
   // Ensure body is properly formatted
   const cleanBody = body ? body.trim() : '';
   
-  // Construct signature data exactly as Sumsub expects
-  // Format: timestamp + method + path + body (no spaces, no separators)
+  // Construct signature data: timestamp + method + path + body (no spaces)
   const signatureData = `${timestamp}${method.toUpperCase()}${cleanPath}${cleanBody}`;
   
-  // Log the exact components used in signature generation
-  logger.debug('Signature generation details', { 
+  logger.debug('Signature generation details', {
     components: {
-      timestamp: {
-        value: timestamp,
-        type: typeof timestamp,
-        length: timestamp.toString().length
-      },
-      method: {
-        value: method.toUpperCase(),
-        type: typeof method,
-        length: method.length
-      },
-      path: {
-        value: cleanPath,
-        type: typeof cleanPath,
-        length: cleanPath.length
-      },
-      body: {
-        value: cleanBody,
-        type: typeof cleanBody,
-        length: cleanBody.length
-      }
+      timestamp: { value: timestamp, type: typeof timestamp, length: timestamp.toString().length },
+      method: { value: method.toUpperCase(), type: typeof method, length: method.length },
+      path: { value: cleanPath, type: typeof cleanPath, length: cleanPath.length },
+      body: { value: cleanBody, type: typeof cleanBody, length: cleanBody.length }
     },
     finalSignatureData: signatureData,
     signatureDataLength: signatureData.length
@@ -99,7 +80,6 @@ const generateSignature = (
     throw new Error('SUMSUB_SECRET_KEY is not configured');
   }
 
-  // Ensure the secret key is properly formatted
   const secretKey = SUMSUB_SECRET_KEY.trim();
   if (!secretKey) {
     throw new Error('SUMSUB_SECRET_KEY is empty after trimming');
@@ -111,18 +91,12 @@ const generateSignature = (
     .update(signatureData)
     .digest('hex');
 
-  // Log the generated signature and its components
-  logger.debug('Generated signature', { 
+  logger.debug('Generated signature', {
     signature,
     signatureLength: signature.length,
-    components: {
-      timestamp,
-      method: method.toUpperCase(),
-      path: cleanPath,
-      body: cleanBody
-    },
+    components: { timestamp, method: method.toUpperCase(), path: cleanPath, body: cleanBody },
     signatureData,
-    secretKeyPrefix: secretKey.substring(0, 10) + '...' // Log first 10 chars of secret key for debugging
+    secretKeyPrefix: secretKey.substring(0, 10) + '...'
   });
   
   return signature;
@@ -143,23 +117,19 @@ export const generateSumsubAccessToken = async (
 
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
-  const path = '/resources/accessTokens/sdk'; // Correct endpoint for SDK tokens
+  const path = '/resources/accessTokens/sdk';
   const url = `${SUMSUB_BASE_URL}${path}`;
 
-  // Request body for SDK access token, using internal playerId as userId
   const bodyObj = {
-    userId: playerId, // Your internal player ID (externalUserId in Sumsub)
+    userId: playerId,
     ttlInSecs: 3600,
     levelName,
   };
-
-  // Generate the body string once and use it for both signature and request
   const body = JSON.stringify(bodyObj);
-
   const signature = generateSignature(method, path, body, timestamp);
 
   const headers = {
-    'X-App-Token': SUMSUB_API_KEY!,
+    'X-App-Token': SUMSUB_API_KEY,
     'X-App-Access-Sig': signature,
     'X-App-Access-Ts': timestamp.toString(),
     'Content-Type': 'application/json',
@@ -167,9 +137,9 @@ export const generateSumsubAccessToken = async (
   };
 
   const config: AxiosRequestConfig = {
-    headers: headers,
+    headers,
     timeout: 10000,
-    transformRequest: [(data) => data], // Prevent axios from modifying the body
+    transformRequest: [(data) => data],
   };
 
   logger.info('Attempting to generate Sumsub access token for SDK', {
@@ -188,21 +158,18 @@ export const generateSumsubAccessToken = async (
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await axios.post(url, body, config);
-      
-      logger.info('Sumsub access token for SDK generated successfully', { 
-        playerId, 
-        applicantId, 
-        token: response.data.token.substring(0, 10) + '...' 
+      logger.info('Sumsub access token for SDK generated successfully', {
+        playerId,
+        applicantId,
+        token: response.data.token.substring(0, 10) + '...'
       });
-
       return {
         token: response.data.token,
-        userId: playerId, // Return internal userId as per function signature
+        userId: playerId,
       };
     } catch (error: any) {
       lastError = error;
       const axiosError = error as AxiosError<SumsubErrorResponse>;
-      
       logger.error('Sumsub access token generation failed', {
         attempt,
         playerId,
@@ -215,13 +182,11 @@ export const generateSumsubAccessToken = async (
         requestBodyString: body,
         generatedSignature: signature
       });
-
       if (attempt < retries) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
   }
-
   throw new Error(`Failed to generate Sumsub access token after ${retries} attempts: ${lastError?.message}`);
 };
 
@@ -231,10 +196,16 @@ export const createSumsubApplicant = async (
   externalUserId: string,
   phone?: string,
 ): Promise<string> => {
+  if (!validateEmail(email)) {
+    logger.error('Invalid email provided', { playerId, email });
+    throw new Error('Invalid email address provided');
+  }
+
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
   const levelName = 'id-only';
   const path = `/resources/applicants?levelName=${levelName}`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
 
   const bodyObj = {
     externalUserId,
@@ -248,65 +219,50 @@ export const createSumsubApplicant = async (
     },
   };
 
-  console.log('bodyObj :>> ', bodyObj);
-  
-  // Convert body to string and ensure it's not empty
   const body = JSON.stringify(bodyObj);
   if (!body) {
     throw new Error('Request body cannot be empty');
   }
 
-  // Generate signature with the exact body string
   const signature = generateSignature(method, path, body, timestamp);
 
-  console.log('signature :>> ', signature);
-
   const headers = {
-    'X-App-Token': SUMSUB_API_KEY!,
+    'X-App-Token': SUMSUB_API_KEY,
     'X-App-Access-Sig': signature,
     'X-App-Access-Ts': timestamp.toString(),
     'Content-Type': 'application/json',
     'Accept': 'application/json'
   };
 
-  logger.info('Creating Sumsub applicant', { 
-    playerId, 
-    externalUserId, 
-    email, 
+  logger.info('Creating Sumsub applicant', {
+    playerId,
+    externalUserId,
+    email,
     signature,
     timestamp,
     path,
     bodyObj,
     bodyString: body,
     headers,
-    apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...' // Log first 10 chars of API key for debugging
+    apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...'
   });
 
   try {
-    // Send the request with the raw body string
-    const response = await axios.post(
-      `${SUMSUB_BASE_URL}${path}`,
-      body, // Send the raw body string instead of bodyObj
-      { 
-        headers, 
-        timeout: 10000,
-        transformRequest: [(data) => data], // Prevent axios from transforming the body
-        validateStatus: (status) => status < 500 // Accept all responses for better error handling
-      }
-    );
-
-    console.log('response.data :>> ', response.data);
-
-    console.log('response.status :>> ', response.status);
+    const response = await axios.post(url, body, {
+      headers,
+      timeout: 10000,
+      transformRequest: [(data) => data],
+      validateStatus: (status) => status < 500
+    });
 
     if (response.status >= 400) {
       throw new Error(`Sumsub API error: ${response.status} - ${JSON.stringify(response.data)}`);
     }
 
-    logger.info('Sumsub applicant created', { 
-      playerId, 
+    logger.info('Sumsub applicant created', {
+      playerId,
       applicantId: response.data.id,
-      responseData: response.data 
+      responseData: response.data
     });
     return response.data.id;
   } catch (error: any) {
@@ -330,13 +286,13 @@ export const createSumsubApplicant = async (
       apiKeyPrefix: SUMSUB_API_KEY?.substring(0, 10) + '...'
     });
 
-    // const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
-    // if (match) {
-    //   logger.warn('Applicant already exists', { playerId, existingId: match[1] });
-    //   return match[1];
-    // }
+    const match = /already exists: ([a-z0-9]+)/i.exec(errorDescription);
+    if (match) {
+      logger.warn('Applicant already exists', { playerId, existingId: match[1] });
+      return match[1];
+    }
 
-    // throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
+    throw new Error(`Sumsub applicant creation failed: ${errorDescription || axiosError.message}`);
   }
 };
 
@@ -371,143 +327,188 @@ export const uploadDocumentToSumsub = async (
   documentType: string = 'IDENTITY',
   documentSide: string = 'FRONT'
 ) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'POST';
+  const path = `/resources/applicants/${applicantId}/info/idDoc`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  // Generate signature without body (Sumsub expects no body hash for multipart/form-data)
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const form = new FormData();
+  form.append('file', fileBuffer, {
+    filename: fileName,
+    contentType: 'application/octet-stream'
+  } as FormData.AppendOptions);
+  form.append('type', documentType);
+  form.append('side', documentSide);
+
+  const formHeaders = form.getHeaders();
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json',
+    ...formHeaders
+  };
+
+  logger.info('Uploading document to Sumsub', {
+    applicantId,
+    documentType,
+    documentSide,
+    fileName,
+    signature,
+    timestamp,
+    headers
+  });
+
   try {
-    const token = await generateSumsubAccessToken(
-      applicantId,  // playerId
-      applicantId,  // applicantId
-      'upload@sumsub.com',  // email
-      'id-only'  // levelName
-    );
-    const timestamp = Math.floor(Date.now() / 1000);
-    const signature = crypto
-      .createHmac('sha256', config.sumsub.secretKey)
-      .update(`${config.sumsub.appToken}${timestamp}`)
-      .digest('hex');
+    const response = await axios.post(url, form, {
+      headers,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity
+    });
 
-    const form = new FormData();
-    form.append('file', fileBuffer, {
-      filename: fileName,
-      contentType: 'application/octet-stream'
-    } as FormData.AppendOptions);
-    form.append('type', documentType);
-    form.append('side', documentSide);
-
-    const formHeaders = form.getHeaders();
-    const response = await axios.post(
-      `${config.sumsub.baseUrl}/resources/applicants/${applicantId}/info/idDoc`,
-      form,
-      {
-        headers: {
-          'Accept': 'application/json',
-          'X-App-Token': config.sumsub.appToken,
-          'X-App-Access-Sig': signature,
-          'X-App-Access-Ts': timestamp.toString(),
-          'Authorization': `Bearer ${token}`,
-          ...formHeaders
-        },
-        maxBodyLength: Infinity,
-        maxContentLength: Infinity
-      }
-    );
+    logger.info('Document uploaded successfully to Sumsub', {
+      applicantId,
+      documentId: response.data.idDocId,
+      status: response.data.status
+    });
 
     return response.data;
-  } catch (error) {
-    console.error('Error uploading document to Sumsub:', error);
-    throw error;
+  } catch (error: any) {
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error uploading document to Sumsub', {
+      applicantId,
+      error: axiosError.response?.data || axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to upload document to Sumsub');
   }
 };
 
 export const getSumsubApplicantDocuments = async (applicantId: string) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/applicants/${applicantId}/documents`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  logger.info('Fetching Sumsub applicant documents', { applicantId, path, signature, timestamp });
+
   try {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const method = 'GET';
-    const path = `/resources/applicants/${applicantId}/documents`;
-    const url = `${SUMSUB_BASE_URL}${path}`;
-
-    const signature = generateSignature(method, path, '', timestamp);
-
-    const headers = {
-      'X-App-Token': SUMSUB_API_KEY!,
-      'X-App-Access-Sig': signature,
-      'X-App-Access-Ts': timestamp.toString(),
-      'Accept': 'application/json'
-    };
-
     const response = await axios.get(url, { headers });
 
     if (response.status !== 200) {
       throw new Error(`Failed to fetch documents: ${response.status}`);
     }
 
-    return response.data.documents.map((doc: any) => ({
+    const documents = response.data.documents.map((doc: any) => ({
       id: doc.id,
-      type: doc.type,
-      side: doc.side,
-      status: doc.status,
-      url: doc.url,
+      type: doc.idDocType,
+      side: doc.idDocSubType,
+      status: doc.reviewStatus || 'unknown',
+      url: doc.downloadLink || undefined,
       createdAt: doc.createdAt,
     }));
+
+    logger.info('Sumsub applicant documents fetched', { 
+      applicantId, 
+      documentCount: documents.length, 
+      documentIds: documents.map((d: any) => d.id) 
+    });
+    return documents;
   } catch (error: any) {
-    logger.error('Error fetching Sumsub documents:', error);
-    throw new Error(error.response?.data?.description || 'Failed to fetch documents');
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error fetching Sumsub documents', {
+      applicantId,
+      error: axiosError.response?.data || axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to fetch documents');
   }
 };
 
 export const approveSumsubApplicant = async (applicantId: string) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'POST';
+  const path = `/resources/applicants/${applicantId}/status/approved`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  logger.info('Approving Sumsub applicant', { applicantId, path, signature, timestamp });
+
   try {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const method = 'POST';
-    const path = `/resources/applicants/${applicantId}/status/approved`;
-    const url = `${SUMSUB_BASE_URL}${path}`;
-
-    const signature = generateSignature(method, path, '', timestamp);
-
-    const headers = {
-      'X-App-Token': SUMSUB_API_KEY!,
-      'X-App-Access-Sig': signature,
-      'X-App-Access-Ts': timestamp.toString(),
-      'Accept': 'application/json'
-    };
-
     const response = await axios.post(url, {}, { headers });
 
     if (response.status !== 200) {
       throw new Error(`Failed to approve applicant: ${response.status}`);
     }
 
+    logger.info('Sumsub applicant approved', { applicantId, responseData: response.data });
     return response.data;
   } catch (error: any) {
-    logger.error('Error approving Sumsub applicant:', error);
-    throw new Error(error.response?.data?.description || 'Failed to approve applicant');
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error approving Sumsub applicant', {
+      applicantId,
+      error: axiosError.response?.data || axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to approve applicant');
   }
 };
 
 export const rejectSumsubApplicant = async (applicantId: string) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'POST';
+  const path = `/resources/applicants/${applicantId}/status/rejected`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  logger.info('Rejecting Sumsub applicant', { applicantId, path, signature, timestamp });
+
   try {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const method = 'POST';
-    const path = `/resources/applicants/${applicantId}/status/rejected`;
-    const url = `${SUMSUB_BASE_URL}${path}`;
-
-    const signature = generateSignature(method, path, '', timestamp);
-
-    const headers = {
-      'X-App-Token': SUMSUB_API_KEY!,
-      'X-App-Access-Sig': signature,
-      'X-App-Access-Ts': timestamp.toString(),
-      'Accept': 'application/json'
-    };
-
     const response = await axios.post(url, {}, { headers });
 
     if (response.status !== 200) {
       throw new Error(`Failed to reject applicant: ${response.status}`);
     }
 
+    logger.info('Sumsub applicant rejected', { applicantId, responseData: response.data });
     return response.data;
   } catch (error: any) {
-    logger.error('Error rejecting Sumsub applicant:', error);
-    throw new Error(error.response?.data?.description || 'Failed to reject applicant');
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error rejecting Sumsub applicant', {
+      applicantId,
+      error: axiosError.response?.data || axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to reject applicant');
   }
 };
 
@@ -544,7 +545,7 @@ export const generateSumsubWebSDKLink = async (
   const signature = generateSignature(method, path, body, timestamp);
 
   const headers = {
-    'X-App-Token': SUMSUB_API_KEY!,
+    'X-App-Token': SUMSUB_API_KEY,
     'X-App-Access-Sig': signature,
     'X-App-Access-Ts': timestamp.toString(),
     'Content-Type': 'application/json',
@@ -552,7 +553,7 @@ export const generateSumsubWebSDKLink = async (
   };
 
   const config: AxiosRequestConfig = {
-    headers: headers,
+    headers,
     timeout: 10000,
     transformRequest: [(data) => data],
   };
@@ -572,17 +573,14 @@ export const generateSumsubWebSDKLink = async (
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await axios.post(url, body, config);
-      
-      logger.info('Sumsub WebSDK link generated successfully', { 
+      logger.info('Sumsub WebSDK link generated successfully', {
         playerId,
         url: response.data.url
       });
-
       return response.data;
     } catch (error: any) {
       lastError = error;
       const axiosError = error as AxiosError<SumsubErrorResponse>;
-      
       logger.error('Sumsub WebSDK link generation failed', {
         attempt,
         playerId,
@@ -594,12 +592,10 @@ export const generateSumsubWebSDKLink = async (
         requestBodyString: body,
         generatedSignature: signature
       });
-
       if (attempt < retries) {
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
   }
-
   throw new Error(`Failed to generate Sumsub WebSDK link after ${retries} attempts: ${lastError?.message}`);
 };

@@ -30,7 +30,7 @@ const notificationSchema = new Schema({
   },
   user_id: {
     type: Schema.Types.ObjectId,
-    ref: 'Affiliate',
+    ref: 'Player', // Changed to reference 'Player' instead of 'Affiliate'
     default: null,
   },
   metadata: {
@@ -44,8 +44,5 @@ const notificationSchema = new Schema({
 });
 
 notificationSchema.index({ created_at: -1 });
-const Notification = mongoose.model<INotification>(
-  'Notification',
-  notificationSchema,
-);
+const Notification = mongoose.model<INotification>('Notification', notificationSchema);
 export default Notification;
