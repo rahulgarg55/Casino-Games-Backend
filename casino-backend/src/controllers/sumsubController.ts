@@ -1,9 +1,10 @@
 import { Request, Response } from 'express';
-import { validateWebhookSignature, generateSumsubWebSDKLink } from '../utils/sumsub';
+import { validateWebhookSignature, generateSumsubWebSDKLink, getSumsubApplicantDocuments } from '../utils/sumsub';
 import { sendErrorResponse } from './authController';
 import {
   initiateSumsubVerification,
   updateSumsubStatus,
+  updateAdminStatus,
   uploadDocumentToSumsub,
   getSumsubApplicantStatus,
 } from '../services/sumsubService';
@@ -157,24 +158,23 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
       });
     }
 
-    let status: 'pending' | 'approved' | 'rejected' | 'duplicate_documents';
-    let details: { reason?: string; documents?: string[]; nextSteps?: string[] } = {};
+    let sumsubStatus: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub';
+    let sumsubNotes: string | undefined;
+    let details: { documents?: string[]; nextSteps?: string[] } = {};
 
     switch (type) {
       case 'applicantPending':
-        status = 'pending';
+        sumsubStatus = 'in_review';
         break;
       case 'applicantReviewed':
-        status = reviewResult?.reviewAnswer === 'GREEN' ? 'approved' : 'rejected';
+        sumsubStatus = reviewResult?.reviewAnswer === 'GREEN' ? 'approved_sumsub' : 'rejected_sumsub';
         if (reviewResult?.reviewAnswer !== 'GREEN') {
-          details = {
-            reason: reviewResult?.rejectLabels?.join(', ') || 'Review failed',
-            nextSteps: [
-              'Review the rejection reasons',
-              'Correct any issues with your documents',
-              'Resubmit your verification'
-            ]
-          };
+          sumsubNotes = reviewResult?.rejectLabels?.join(', ') || 'Review failed';
+          details.nextSteps = [
+            'Review the rejection reasons',
+            'Correct any issues with your documents',
+            'Resubmit your verification'
+          ];
         }
         break;
       default:
@@ -185,8 +185,8 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
         });
     }
 
-    await updateSumsubStatus(player._id.toString(), status, details);
-    logger.info('Status updated', { playerId: player._id, status, details });
+    await updateSumsubStatus(player._id.toString(), sumsubStatus, sumsubNotes, details);
+    logger.info('Status updated', { playerId: player._id, sumsubStatus, sumsubNotes, details });
 
     res.status(200).json({
       success: true,
@@ -217,23 +217,23 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
 
-    let status: 'not_started' | 'pending' | 'approved' | 'rejected' | 'duplicate_documents' = player.sumsub_status || 'not_started';
-    let message: string | undefined = undefined;
-    let lastUpdated: Date | undefined = player.sumsub_verification_date;
-    let details: { reason?: string; documents?: string[]; nextSteps?: string[] } = {};
+    let sumsubStatus = player.sumsub_status || 'not_started';
+    let sumsubNotes = player.sumsub_notes;
+    let adminStatus = player.admin_status;
+    let adminNotes = player.admin_notes;
+    let lastUpdated = player.sumsub_verification_date;
+    let details = player.sumsub_details || {};
 
-    // If player has a sumsub_id, fetch detailed status from Sumsub
     if (player.sumsub_id) {
       try {
-        const sumsubStatus = await getSumsubApplicantStatus(player.sumsub_id);
-        status = sumsubStatus.status;
-        message = sumsubStatus.message;
-        details = sumsubStatus.details || {};
-        lastUpdated = sumsubStatus.lastUpdated || player.sumsub_verification_date;
+        const sumsubData = await getSumsubApplicantStatus(player.sumsub_id);
+        sumsubStatus = sumsubData.sumsubStatus;
+        sumsubNotes = sumsubData.sumsubNotes;
+        details = sumsubData.details || {};
+        lastUpdated = sumsubData.lastUpdated || player.sumsub_verification_date;
 
-        // Update player record if status has changed
-        if (player.sumsub_status !== status && status !== 'not_started') {
-          await updateSumsubStatus(player._id.toString(), status, details);
+        if (player.sumsub_status !== sumsubStatus && sumsubStatus !== 'not_started') {
+          await updateSumsubStatus(player._id.toString(), sumsubStatus, sumsubNotes, details);
         }
       } catch (error: any) {
         logger.warn('Failed to fetch detailed status from Sumsub, falling back to stored status', {
@@ -241,20 +241,20 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
           sumsubId: player.sumsub_id,
           error: error.message
         });
-        // Fallback to stored status
-        status = player.sumsub_status || 'not_started';
-        message = undefined;
-        details = {};
-        lastUpdated = player.sumsub_verification_date;
       }
     }
+
+    const displayStatus = adminStatus || (sumsubStatus === 'not_started' ? 'not_started' : 'in_review');
 
     res.status(200).json({
       success: true,
       message: (req as any).__('STATUS_RETRIEVED'),
       data: {
-        status,
-        message,
+        status: displayStatus,
+        sumsubStatus,
+        sumsubNotes,
+        adminStatus,
+        adminNotes,
         lastUpdated: lastUpdated?.toISOString(),
         details
       },
@@ -311,6 +311,10 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       documentSide
     );
 
+    await updateSumsubStatus(player._id.toString(), 'in_review', null, {
+      documents: [uploadResult.idDocId]
+    });
+
     logger.info('Document uploaded to Sumsub', {
       userId: req.user.id,
       documentType,
@@ -337,6 +341,109 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       res,
       500,
       error.message || (req as any).__('FAILED_DOCUMENT_UPLOAD')
+    );
+  }
+};
+
+export const approvePlayerKYC = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id || req.user?.role !== 1) {
+      logger.error('Admin authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
+    }
+
+    const { playerId } = req.params;
+    const { adminNotes } = req.body;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      logger.warn('Player not found', { playerId });
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    if (!player.sumsub_id) {
+      logger.warn('Player has no Sumsub ID', { playerId });
+      return sendErrorResponse(res, 400, (req as any).__('SUMSUB_ID_NOT_FOUND'));
+    }
+
+    await updateAdminStatus(player._id.toString(), 'approved', adminNotes || 'Approved by admin', {
+      documents: player.sumsub_details?.documents || []
+    });
+
+    logger.info('Player KYC approved by admin', { playerId, adminId: req.user.id, adminNotes });
+
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('KYC_APPROVED'),
+      data: {
+        playerId,
+        status: 'approved',
+        adminNotes
+      }
+    });
+  } catch (error: any) {
+    logger.error('KYC approval error', {
+      playerId: req.params.playerId,
+      adminId: req.user?.id,
+      error: error.message
+    });
+    sendErrorResponse(
+      res,
+      500,
+      error.message || (req as any).__('FAILED_KYC_APPROVAL')
+    );
+  }
+};
+
+export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id || req.user?.role !== 1) {
+      logger.error('Admin authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
+    }
+
+    const { playerId } = req.params;
+    const { adminNotes } = req.body;
+    const player = await Player.findById(playerId);
+    if (!player) {
+      logger.warn('Player not found', { playerId });
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    if (!player.sumsub_id) {
+      logger.warn('Player has no Sumsub ID', { playerId });
+      return sendErrorResponse(res, 400, (req as any).__('SUMSUB_ID_NOT_FOUND'));
+    }
+
+    await updateAdminStatus(player._id.toString(), 'rejected', adminNotes || 'Rejected by admin', {
+      documents: player.sumsub_details?.documents || [],
+      nextSteps: [
+        'Review the rejection reason',
+        'Correct any issues with your documents',
+        'Resubmit your verification'
+      ]
+    });
+
+    logger.info('Player KYC rejected by admin', { playerId, adminId: req.user.id, adminNotes });
+
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('KYC_REJECTED'),
+      data: {
+        playerId,
+        status: 'rejected',
+        adminNotes
+      }
+    });
+  } catch (error: any) {
+    logger.error('KYC rejection error', {
+      playerId: req.params.playerId,
+      adminId: req.user?.id,
+      error: error.message
+    });
+    sendErrorResponse(
+      res,
+      500,
+      error.message || (req as any).__('FAILED_KYC_REJECTION')
     );
   }
 };

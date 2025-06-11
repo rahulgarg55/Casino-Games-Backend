@@ -756,7 +756,7 @@ const sendOTPByEmail = async (to: string, otp: string) => {
                 color: #b0b0b0;
               "
             >
-              If you didn’t request this, please ignore this email.
+              If you didn't request this, please ignore this email.
             </div>
           </div>
         </div>
@@ -1053,7 +1053,7 @@ export const initiateSumsubVerification = async (
       player.phone_number,
     );
     player.sumsub_id = applicantId;
-    player.sumsub_status = 'pending';
+    player.sumsub_status = 'not_started';
     await player.save();
   }
 
@@ -1063,13 +1063,13 @@ export const initiateSumsubVerification = async (
 /**
  * Updates player Sumsub verification status based on webhook data.
  * @param playerId - Internal player ID
- * @param status - New status ('approved' or 'rejected')
+ * @param status - New status ('approved_sumsub' or 'rejected_sumsub')
  * @returns Updated player object
  * @throws {Error} If player not found or update fails
  */
 export const updateSumsubStatus = async (
   playerId: string,
-  status: 'approved' | 'rejected',
+  status: 'approved_sumsub' | 'rejected_sumsub',
 ) => {
   const player = await Player.findById(playerId);
   if (!player) {
@@ -1078,9 +1078,9 @@ export const updateSumsubStatus = async (
 
   player.sumsub_status = status;
   player.sumsub_verification_date = new Date();
-  if (status === 'approved') {
+  if (status === 'approved_sumsub') {
     player.is_verified = VERIFICATION.VERIFIED;
-  } else if (status === 'rejected') {
+  } else if (status === 'rejected_sumsub') {
     player.is_verified = VERIFICATION.UNVERIFIED;
   }
   await player.save();

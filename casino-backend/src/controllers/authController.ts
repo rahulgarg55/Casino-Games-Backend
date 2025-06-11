@@ -1618,8 +1618,8 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
 
     const status =
       reviewStatus === 'completed' && reviewResult?.reviewAnswer === 'GREEN'
-        ? 'approved'
-        : 'rejected';
+        ? 'approved_sumsub'
+        : 'rejected_sumsub';
     await updateSumsubStatus(player._id.toString(), status);
 
     res.status(200).json({

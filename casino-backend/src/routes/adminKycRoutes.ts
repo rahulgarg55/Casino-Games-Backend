@@ -4,6 +4,7 @@ import {
   getApplicantDocuments,
   approveApplicant,
   rejectApplicant,
+  getDocumentDownload,
 } from '../controllers/adminKycController';
 
 const router = express.Router();
@@ -20,4 +21,7 @@ router.post('/:sumsubId/approve', approveApplicant);
 // Reject applicant
 router.post('/:sumsubId/reject', rejectApplicant);
 
-export default router; 
+// Download document
+router.get('/:sumsubId/documents/:documentId/download', getDocumentDownload);
+
+export default router;

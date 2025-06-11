@@ -48,14 +48,14 @@ export const initiateSumsubVerification = async (playerId: string) => {
         player.phone_number
       );
       player.sumsub_id = applicantId;
-      player.sumsub_status = 'pending';
+      player.sumsub_status = 'not_started';
       await player.save();
       logger.info('Sumsub applicant created and player updated', { playerId, applicantId });
     } catch (error: any) {
       const match = /already exists: ([a-z0-9]+)/i.exec(error.message);
       if (match) {
         player.sumsub_id = match[1];
-        player.sumsub_status = 'pending';
+        player.sumsub_status = 'not_started';
         await player.save();
         logger.info('Sumsub applicant already exists, updated player', { playerId, sumsubId: match[1] });
       } else {
@@ -97,8 +97,9 @@ export const initiateSumsubVerification = async (playerId: string) => {
 
 export const updateSumsubStatus = async (
   playerId: string,
-  status: 'pending' | 'approved' | 'rejected' | 'duplicate_documents',
-  details: { reason?: string; documents?: string[]; nextSteps?: string[] } = {}
+  sumsubStatus: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub',
+  sumsubNotes?: string,
+  details: { documents?: string[]; nextSteps?: string[] } = {}
 ) => {
   const player = await Player.findById(playerId);
   if (!player) {
@@ -106,27 +107,56 @@ export const updateSumsubStatus = async (
     throw new Error('Player not found');
   }
 
-  player.sumsub_status = status;
+  player.sumsub_status = sumsubStatus;
+  player.sumsub_notes = sumsubNotes || player.sumsub_notes;
   player.sumsub_verification_date = new Date();
-
-  if (status === 'approved') {
-    player.is_verified = VERIFICATION.VERIFIED;
-  } else if (status === 'rejected' || status === 'duplicate_documents') {
-    player.is_verified = VERIFICATION.UNVERIFIED;
-  }
+  player.sumsub_details = { ...player.sumsub_details, ...details };
 
   await player.save();
-  logger.info('Player Sumsub status updated', { playerId, status, details });
+  logger.info('Player Sumsub status updated', { playerId, sumsubStatus, sumsubNotes, details });
 
   const notification = new Notification({
     type: NotificationType.KYC_UPDATE,
-    message: `KYC status updated to ${status} for user ${player.username || player.email}`,
-    user_id: player._id,
-    metadata: { sumsub_id: player.sumsub_id, status, ...details },
+    message: `KYC documents submitted by user ${player.username || player.email} are under review`,
+    user_id: null, // Admin notification, no specific user
+    metadata: { sumsub_id: player.sumsub_id, sumsubStatus, sumsubNotes, ...details },
   });
   await notification.save();
 
-  logger.info('Notification created for KYC status update', { playerId, status, details });
+  logger.info('Admin notification created for KYC submission', { playerId, sumsubStatus });
+  return player;
+};
+
+export const updateAdminStatus = async (
+  playerId: string,
+  adminStatus: 'approved' | 'rejected',
+  adminNotes: string,
+  details: { documents?: string[]; nextSteps?: string[] } = {}
+) => {
+  const player = await Player.findById(playerId);
+  if (!player) {
+    logger.error('Player not found for admin status update', { playerId });
+    throw new Error('Player not found');
+  }
+
+  player.admin_status = adminStatus;
+  player.admin_notes = adminNotes;
+  player.sumsub_verification_date = new Date();
+  player.is_verified = adminStatus === 'approved' ? VERIFICATION.VERIFIED : VERIFICATION.UNVERIFIED;
+  player.sumsub_details = { ...player.sumsub_details, ...details };
+
+  await player.save();
+  logger.info('Player admin status updated', { playerId, adminStatus, adminNotes, details });
+
+  const notification = new Notification({
+    type: NotificationType.KYC_UPDATE,
+    message: `KYC status updated to ${adminStatus} for user ${player.username || player.email}`,
+    user_id: player._id,
+    metadata: { sumsub_id: player.sumsub_id, adminStatus, adminNotes, ...details },
+  });
+  await notification.save();
+
+  logger.info('Player notification created for KYC status update', { playerId, adminStatus });
   return player;
 };
 
@@ -193,57 +223,32 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
     }
 
     const { reviewStatus, reviewResult } = response.data;
-    let status: 'not_started' | 'pending' | 'approved' | 'rejected' | 'duplicate_documents';
-    let message: string | undefined;
-    let details: { reason?: string; documents?: string[]; nextSteps?: string[] } = {};
+    let sumsubStatus: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub';
+    let sumsubNotes: string | undefined;
+    let details: { documents?: string[]; nextSteps?: string[] } = {};
 
     switch (reviewStatus) {
       case 'init':
-        status = 'not_started';
-        message = 'Verification not started';
+        sumsubStatus = 'not_started';
         break;
       case 'pending':
-        status = 'pending';
-        message = 'Verification is under review';
+        sumsubStatus = 'in_review';
         break;
       case 'completed':
-        status = reviewResult?.reviewAnswer === 'GREEN' ? 'approved' : 'rejected';
-        message = reviewResult?.reviewAnswer === 'GREEN' 
-          ? 'Verification approved'
-          : 'Verification rejected';
+        sumsubStatus = reviewResult?.reviewAnswer === 'GREEN' ? 'approved_sumsub' : 'rejected_sumsub';
         if (reviewResult?.reviewAnswer !== 'GREEN') {
-          details = {
-            reason: reviewResult?.rejectLabels?.join(', ') || 'Review failed',
-            nextSteps: [
-              'Review the rejection reasons',
-              'Correct any issues with your documents',
-              'Resubmit your verification'
-            ]
-          };
+          sumsubNotes = reviewResult?.rejectLabels?.join(', ') || 'Review failed';
+          details.nextSteps = [
+            'Review the rejection reasons',
+            'Correct any issues with your documents',
+            'Resubmit your verification'
+          ];
         }
         break;
       default:
-        status = 'not_started';
-        message = 'Unknown verification status';
+        sumsubStatus = 'not_started';
     }
 
-    // Check for duplicate documents in rejection reasons
-    if (reviewResult?.rejectLabels?.some((label: string) => 
-      label.toLowerCase().includes('duplicate') || label.toLowerCase().includes('already submitted')
-    )) {
-      status = 'duplicate_documents';
-      message = 'Documents have been submitted on another profile';
-      details = {
-        reason: 'Duplicate documents detected',
-        nextSteps: [
-          'Verify your account details',
-          'Contact support if you believe this is an error',
-          'Submit unique, valid documents'
-        ]
-      };
-    }
-
-    // Fetch document details if available
     try {
       const documents = await getSumsubApplicantDocuments(applicantId);
       details.documents = documents.map((doc: any) => doc.id);
@@ -251,11 +256,11 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
       logger.warn('Failed to fetch document details', { applicantId, error: error.message });
     }
 
-    logger.info('Sumsub applicant status fetched', { applicantId, status, message, details });
+    logger.info('Sumsub applicant status fetched', { applicantId, sumsubStatus, sumsubNotes, details });
 
     return {
-      status,
-      message,
+      sumsubStatus,
+      sumsubNotes,
       details,
       lastUpdated: response.data.createdAt ? new Date(response.data.createdAt) : undefined
     };

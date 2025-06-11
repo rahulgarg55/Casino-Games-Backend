@@ -47,11 +47,12 @@ export interface IPlayer extends Document {
   referredBy?: mongoose.Types.ObjectId;
   referredByName?: string;
   sumsub_id?: string;
-  sumsub_status?: 'pending' | 'approved' | 'rejected' | 'duplicate_documents' | null;
+  sumsub_status?: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub' | null;
+  sumsub_notes?: string | null;
+  admin_status?: 'approved' | 'pending' | 'rejected' | null;
+  admin_notes?: string | null;
   sumsub_verification_date?: Date;
-  sumsub_message?: string | null;
   sumsub_details?: {
-    reason?: string | null;
     documents?: string[];
     nextSteps?: string[];
   };
@@ -130,15 +131,15 @@ const playerSchema: Schema = new Schema(
       type: Number,
       required: true,
       enum: [0, 1, 2],
-      default: 0, // Default to USD
+      default: 0,
     },
     language: { type: String, default: 'en' },
     country: { type: String, ref: 'Country' },
     city: { type: String, ref: 'City' },
     role_id: {
       type: Number,
-      default: 0, // Default to User
-      enum: [0, 1, 2], // 0 = User, 1 = Admin, 2 = Affiliate
+      default: 0,
+      enum: [0, 1, 2],
     },
     reset_password_token: { type: String },
     reset_password_expires: { type: Date },
@@ -175,13 +176,18 @@ const playerSchema: Schema = new Schema(
     sumsub_id: { type: String, default: null },
     sumsub_status: {
       type: String,
-      enum: ['pending', 'approved', 'rejected', 'duplicate_documents', null],
+      enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub', null],
+      default: 'not_started',
+    },
+    sumsub_notes: { type: String, default: null },
+    admin_status: {
+      type: String,
+      enum: ['approved', 'pending', 'rejected', null],
       default: null,
     },
+    admin_notes: { type: String, default: null },
     sumsub_verification_date: { type: Date, default: null },
-    sumsub_message: { type: String, default: null },
     sumsub_details: {
-      reason: { type: String, default: null },
       documents: [{ type: String }],
       nextSteps: [{ type: String }],
     },

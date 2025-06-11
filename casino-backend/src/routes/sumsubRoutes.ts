@@ -5,23 +5,23 @@ import {
   sumsubWebhook,
   getSumsubStatus,
   uploadDocument,
+  approvePlayerKYC,
+  rejectPlayerKYC,
 } from '../controllers/sumsubController';
 import passport from 'passport';
 import multer from 'multer';
 
 const router = Router();
 
-// Multer setup for file uploads
 const storage = multer.memoryStorage();
 const documentUpload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      // Reject file without error
       cb(null, false);
     }
   }
@@ -56,6 +56,18 @@ router.post(
   passport.authenticate('jwt', { session: false }),
   documentUpload.single('document'),
   uploadDocument
+);
+
+router.post(
+  '/approve/:playerId',
+  passport.authenticate('jwt', { session: false }),
+  approvePlayerKYC
+);
+
+router.post(
+  '/reject/:playerId',
+  passport.authenticate('jwt', { session: false }),
+  rejectPlayerKYC
 );
 
 export default router;

@@ -1,0 +1,314 @@
+{
+  "info": {
+    "name": "Sumsub API Collection",
+    "description": "Collection of all Sumsub API endpoints for the casino platform",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Start Sumsub Verification",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/start",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "start"]
+        },
+        "description": "Initiates the Sumsub verification process for a player"
+      }
+    },
+    {
+      "name": "Get Sumsub Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "status"]
+        },
+        "description": "Retrieves the current Sumsub verification status for a player"
+      }
+    },
+    {
+      "name": "Get Applicant Documents (Backend)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/sumsub/documents/{{applicant_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "sumsub", "documents", "{{applicant_id}}"]
+        },
+        "description": "Retrieves all documents for a specific applicant through our backend"
+      }
+    },
+    {
+      "name": "Get Applicant Documents (Direct Sumsub)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-App-Token",
+            "value": "{{sumsub_app_token}}",
+            "type": "text"
+          },
+          {
+            "key": "X-App-Access-Sig",
+            "value": "{{sumsub_signature}}",
+            "type": "text"
+          },
+          {
+            "key": "X-App-Access-Ts",
+            "value": "{{timestamp}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{sumsub_base_url}}/resources/applicants/{{applicant_id}}/documents",
+          "host": ["{{sumsub_base_url}}"],
+          "path": ["resources", "applicants", "{{applicant_id}}", "documents"]
+        },
+        "description": "Retrieves all documents for a specific applicant directly from Sumsub"
+      }
+    },
+    {
+      "name": "Get Applicant Status",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-App-Token",
+            "value": "{{sumsub_app_token}}",
+            "type": "text"
+          },
+          {
+            "key": "X-App-Access-Sig",
+            "value": "{{sumsub_signature}}",
+            "type": "text"
+          },
+          {
+            "key": "X-App-Access-Ts",
+            "value": "{{timestamp}}",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{sumsub_base_url}}/resources/applicants/{{applicant_id}}/status",
+          "host": ["{{sumsub_base_url}}"],
+          "path": ["resources", "applicants", "{{applicant_id}}", "status"]
+        },
+        "description": "Retrieves the current status of an applicant from Sumsub"
+      }
+    },
+    {
+      "name": "Upload Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "/path/to/document"
+            },
+            {
+              "key": "type",
+              "value": "IDENTITY",
+              "type": "text"
+            },
+            {
+              "key": "side",
+              "value": "FRONT",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/upload",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "upload"]
+        },
+        "description": "Uploads a document for Sumsub verification"
+      }
+    },
+    {
+      "name": "Approve Player KYC",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"playerId\": \"{{player_id}}\",\n    \"notes\": \"Optional approval notes\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/approve",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "approve"]
+        },
+        "description": "Approves a player's KYC verification"
+      }
+    },
+    {
+      "name": "Reject Player KYC",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"playerId\": \"{{player_id}}\",\n    \"notes\": \"Rejection reason\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/reject",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "reject"]
+        },
+        "description": "Rejects a player's KYC verification"
+      }
+    },
+    {
+      "name": "Sumsub Webhook",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-Sumsub-Signature",
+            "value": "{{sumsub_webhook_signature}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"type\": \"applicantReviewed\",\n    \"applicantId\": \"{{applicant_id}}\",\n    \"reviewStatus\": \"completed\",\n    \"reviewResult\": {\n        \"reviewAnswer\": \"GREEN\",\n        \"rejectLabels\": []\n    }\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/auth/sumsub/webhook",
+          "host": ["{{base_url}}"],
+          "path": ["api", "auth", "sumsub", "webhook"]
+        },
+        "description": "Webhook endpoint for Sumsub verification status updates"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "sumsub_base_url",
+      "value": "https://api.sumsub.com",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2ODQyOTM2MjcwMjJiNDM1ZWVhMDExMTQiLCJyb2xlIjoxLCJlbWFpbCI6ImFkbWluQHlvcG1haWwuY29tIiwiaWF0IjoxNzQ5NjE0ODY2LCJleHAiOjE3NDk2NDM2NjZ9.N2qACSWLjgENYKou7i6aEEVkT3VkBXiyy5QRWFtHKhw",
+      "type": "string"
+    },
+    {
+      "key": "player_id",
+      "value": "684823341ee67873c7632877",
+      "type": "string"
+    },
+    {
+      "key": "sumsub_webhook_signature",
+      "value": "webhook_signature_here",
+      "type": "string"
+    },
+    {
+      "key": "applicant_id",
+      "value": "684823341ee67873c7632877",
+      "type": "string"
+    },
+    {
+      "key": "sumsub_app_token",
+      "value": "sbx:uY0CgwELmgUAEyl4hNWxLngbEG0d7EKa4aYNYGdXZ7g4HupLY41uZknLG",
+      "type": "string"
+    },
+    {
+      "key": "sumsub_secret_key",
+      "value": "Hej2ch71kG2kTd1iIUDZFNsO5C1lh5Gq",
+      "type": "string"
+    },
+    {
+      "key": "timestamp",
+      "value": "{{$timestamp}}",
+      "type": "string"
+    },
+    {
+      "key": "sumsub_signature",
+      "value": "{{$signature}}",
+      "type": "string"
+    }
+  ]
+} 

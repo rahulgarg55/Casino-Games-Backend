@@ -30,7 +30,7 @@ const notificationSchema = new Schema({
   },
   user_id: {
     type: Schema.Types.ObjectId,
-    ref: 'Player', // Changed to reference 'Player' instead of 'Affiliate'
+    ref: 'Player',
     default: null,
   },
   metadata: {

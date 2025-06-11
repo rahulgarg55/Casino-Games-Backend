@@ -1,13 +1,16 @@
 import { Request, Response } from 'express';
 import Player from '../models/player';
-import { getSumsubApplicantDocuments, approveSumsubApplicant, rejectSumsubApplicant } from '../utils/sumsub';
+import { getSumsubSDKState, approveSumsubApplicant, rejectSumsubApplicant } from '../utils/sumsub';
+import { updateAdminStatus } from '../services/sumsubService';
 import { logger } from '../utils/logger';
+import axios from 'axios';
+import { config } from '../config';
+import { generateSignature } from '../utils/sumsub';
 
 export const getApplicantDocuments = async (req: Request, res: Response) => {
   try {
     const { sumsubId } = req.params;
 
-    // Get the player to verify the sumsubId
     const player = await Player.findOne({ sumsub_id: sumsubId });
     if (!player) {
       return res.status(404).json({
@@ -16,13 +19,23 @@ export const getApplicantDocuments = async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch documents from Sumsub
-    const documents = await getSumsubApplicantDocuments(sumsubId);
+    // Fetch document details from SDK state with corrected signature
+    const sdkState = await getSumsubSDKState(sumsubId);
+    const documentStatus = sdkState.step?.documentStatus;
+    const documents = documentStatus?.imageStatuses?.map((img: any) => ({
+      id: img.imageId.toString(),
+      type: documentStatus.idDocType,
+      side: img.idDocSubType,
+      status: 'uploaded', // Assuming uploaded since present in state
+      fileName: img.imageFileName,
+    })) || [];
 
     return res.status(200).json({
       success: true,
       data: {
         documents,
+        sumsubNotes: player.sumsub_notes,
+        adminNotes: player.admin_notes,
       },
     });
   } catch (error: any) {
@@ -37,8 +50,8 @@ export const getApplicantDocuments = async (req: Request, res: Response) => {
 export const approveApplicant = async (req: Request, res: Response) => {
   try {
     const { sumsubId } = req.params;
+    const { adminNotes } = req.body;
 
-    // Get the player
     const player = await Player.findOne({ sumsub_id: sumsubId });
     if (!player) {
       return res.status(404).json({
@@ -47,13 +60,8 @@ export const approveApplicant = async (req: Request, res: Response) => {
       });
     }
 
-    // Approve in Sumsub
     await approveSumsubApplicant(sumsubId);
-
-    // Update player status
-    player.sumsub_status = 'approved';
-    player.is_verified = 1;
-    await player.save();
+    await updateAdminStatus(player._id.toString(), 'approved', adminNotes || 'Approved by admin');
 
     return res.status(200).json({
       success: true,
@@ -71,8 +79,8 @@ export const approveApplicant = async (req: Request, res: Response) => {
 export const rejectApplicant = async (req: Request, res: Response) => {
   try {
     const { sumsubId } = req.params;
+    const { adminNotes } = req.body;
 
-    // Get the player
     const player = await Player.findOne({ sumsub_id: sumsubId });
     if (!player) {
       return res.status(404).json({
@@ -81,13 +89,14 @@ export const rejectApplicant = async (req: Request, res: Response) => {
       });
     }
 
-    // Reject in Sumsub
     await rejectSumsubApplicant(sumsubId);
-
-    // Update player status
-    player.sumsub_status = 'rejected';
-    player.is_verified = 0;
-    await player.save();
+    await updateAdminStatus(player._id.toString(), 'rejected', adminNotes || 'Rejected by admin', {
+      nextSteps: [
+        'Review the rejection reason',
+        'Correct any issues with your documents',
+        'Resubmit your verification'
+      ]
+    });
 
     return res.status(200).json({
       success: true,
@@ -100,4 +109,48 @@ export const rejectApplicant = async (req: Request, res: Response) => {
       message: error.message || 'Failed to reject KYC',
     });
   }
-}; 
+};
+
+export const getDocumentDownload = async (req: Request, res: Response) => {
+  try {
+    const { sumsubId, documentId } = req.params;
+
+    const player = await Player.findOne({ sumsub_id: sumsubId });
+    if (!player) {
+      return res.status(404).json({
+        success: false,
+        message: 'Player not found',
+      });
+    }
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const method = 'GET';
+    const path = `/resources/applicants/${sumsubId}/documents/${documentId}/download`;
+    const url = `${config.sumsub.baseUrl}${path}`;
+
+    const signature = generateSignature(method, path, '', timestamp);
+
+    const headers = {
+      'X-App-Token': config.sumsub.appToken,
+      'X-App-Access-Sig': signature,
+      'X-App-Access-Ts': timestamp.toString(),
+      'Accept': 'application/octet-stream'
+    };
+
+    const response = await axios.get(url, {
+      headers,
+      responseType: 'stream'
+    });
+
+    res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${documentId}.jpg"`);
+
+    response.data.pipe(res);
+  } catch (error: any) {
+    logger.error('Error downloading document:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to download document',
+    });
+  }
+};
