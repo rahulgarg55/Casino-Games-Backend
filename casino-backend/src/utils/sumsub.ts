@@ -295,7 +295,7 @@ export const uploadDocumentToSumsub = async (
 export const getSumsubApplicantDocuments = async (applicantId: string) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/applicants/${applicantId}/documents`;
+  const path = `/resources/applicants/${applicantId}/one`;
   const url = `${SUMSUB_BASE_URL}${path}`;
 
   const signature = generateSignature(method, path, '', timestamp);
@@ -309,29 +309,26 @@ export const getSumsubApplicantDocuments = async (applicantId: string) => {
 
   try {
     const response = await axios.get(url, { headers });
-
     if (response.status !== 200) {
-      throw new Error(`Failed to fetch documents: ${response.status}`);
+      throw new Error(`Failed to fetch applicant data: ${response.status}`);
     }
 
-    const documents = response.data.documents.map((doc: any) => ({
-      id: doc.id,
+    const idDocs = response.data.idDocs || [];
+    const documents = idDocs.map((doc: any) => ({
+      id: doc.idDocId,
       type: doc.idDocType,
-      side: doc.idDocSubType,
-      status: doc.reviewStatus || 'unknown',
-      url: doc.downloadLink || undefined,
+      side: doc.idDocSubType || 'N/A',
+      status: doc.review?.reviewAnswer || 'unknown',
       createdAt: doc.createdAt,
     }));
 
     return documents;
   } catch (error: any) {
-    const axiosError = error as AxiosError<SumsubErrorResponse>;
     logger.error('Error fetching Sumsub documents', {
       applicantId,
-      error: axiosError.response?.data || axiosError.message,
-      status: axiosError.response?.status
+      error: error.message
     });
-    throw new Error(axiosError.response?.data?.description || 'Failed to fetch documents');
+    throw error;
   }
 };
 
@@ -546,5 +543,36 @@ export const getSumsubDocumentImages = async (
       status: axiosError.response?.status
     });
     throw new Error(axiosError.response?.data?.description || 'Failed to fetch document image from Sumsub');
+  }
+};
+
+export const getApplicantReviewId = async (applicantId: string): Promise<string> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/applicants/${applicantId}/one`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  try {
+    const response = await axios.get(url, { headers });
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch applicant data: ${response.status}`);
+    }
+    const review = response.data.review;
+    if (!review || !review.reviewId) {
+      throw new Error('No review found for applicant');
+    }
+    return review.reviewId;
+  } catch (error: any) {
+    logger.error('Error fetching applicant review ID', { applicantId, error: error.message });
+    throw error;
   }
 };

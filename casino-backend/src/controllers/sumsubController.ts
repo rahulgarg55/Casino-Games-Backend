@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { validateWebhookSignature, generateSumsubWebSDKLink } from '../utils/sumsub';
+import { validateWebhookSignature, generateSumsubWebSDKLink, getApplicantReviewId } from '../utils/sumsub';
 import { sendErrorResponse } from './authController';
 import {
   initiateSumsubVerification,
@@ -477,7 +477,11 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 403, (req as any).__('UNAUTHORIZED_ACCESS'));
     }
 
-    const { buffer, contentType } = await getSumsubDocumentImages(applicantId, imageId);
+    // Fetch the reviewId (inspectionId)
+    const reviewId = await getApplicantReviewId(applicantId);
+
+    // Fetch the image using reviewId as inspectionId
+    const { buffer, contentType } = await getSumsubDocumentImages(reviewId, imageId);
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `inline; filename="document-${imageId}"`);
