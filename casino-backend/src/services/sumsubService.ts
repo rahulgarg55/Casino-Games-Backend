@@ -2,7 +2,6 @@ import {
   generateSumsubAccessToken,
   createSumsubApplicant,
   uploadDocumentToSumsub as uploadToSumsub,
-  getSumsubApplicantDocuments,
 } from '../utils/sumsub';
 import Player from '../models/player';
 import { VERIFICATION } from '../constants';
@@ -118,7 +117,7 @@ export const updateSumsubStatus = async (
   const notification = new Notification({
     type: NotificationType.KYC_UPDATE,
     message: `KYC documents submitted by user ${player.username || player.email} are under review`,
-    user_id: null, // Admin notification, no specific user
+    user_id: null,
     metadata: { sumsub_id: player.sumsub_id, sumsubStatus, sumsubNotes, ...details },
   });
   await notification.save();
@@ -272,5 +271,85 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
       status: axiosError.response?.status
     });
     throw new Error(axiosError.response?.data?.description || 'Failed to fetch applicant status');
+  }
+};
+
+export const getSumsubApplicantDocuments = async (applicantId: string) => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/applicants/${applicantId}/metadata/resources`;
+  const url = `${config.sumsub.baseUrl}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': config.sumsub.appToken,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  try {
+    const response = await axios.get(url, { headers });
+
+    if (response.status !== 200) {
+      throw new Error(`Failed to fetch documents: ${response.status}`);
+    }
+
+    const documents = response.data.items.map((doc: any) => ({
+      id: doc.id,
+      type: doc.idDocDef.idDocType,
+      side: doc.idDocDef.idDocSubType || 'N/A',
+      status: doc.reviewResult?.reviewAnswer || 'unknown',
+      createdAt: doc.addedDate,
+    }));
+
+    return documents;
+  } catch (error: any) {
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error fetching Sumsub documents', {
+      applicantId,
+      error: axiosError.response?.data || axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to fetch documents');
+  }
+};
+
+export const getSumsubDocumentImages = async (
+  applicantId: string,
+  imageId: string
+): Promise<{ buffer: Buffer; contentType: string }> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/inspections/${applicantId}/resources/${imageId}`;
+  const url = `${config.sumsub.baseUrl}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': config.sumsub.appToken,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': '*/*'
+  };
+
+  try {
+    const response = await axios.get(url, {
+      headers,
+      responseType: 'arraybuffer'
+    });
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || 'application/octet-stream'
+    };
+  } catch (error: any) {
+    logger.error('Error fetching document image from Sumsub', {
+      applicantId,
+      imageId,
+      error: error.message
+    });
+    throw error;
   }
 };

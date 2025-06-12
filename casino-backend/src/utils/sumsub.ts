@@ -508,3 +508,43 @@ export const getSumsubSDKState = async (applicantId: string) => {
     throw new Error(axiosError.response?.data?.description || 'Failed to fetch SDK state');
   }
 };
+
+export const getSumsubDocumentImages = async (
+  applicantId: string,
+  imageId: string
+): Promise<{ buffer: Buffer; contentType: string }> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/inspections/${applicantId}/resources/${imageId}`;
+  const url = `${SUMSUB_BASE_URL}${path}`;
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': SUMSUB_API_KEY,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': '*/*'
+  };
+
+  try {
+    const response = await axios.get(url, {
+      headers,
+      responseType: 'arraybuffer'
+    });
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || 'application/octet-stream'
+    };
+  } catch (error: any) {
+    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    logger.error('Error fetching document image from Sumsub', {
+      applicantId,
+      imageId,
+      error: axiosError.message,
+      status: axiosError.response?.status
+    });
+    throw new Error(axiosError.response?.data?.description || 'Failed to fetch document image from Sumsub');
+  }
+};

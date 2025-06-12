@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { validateWebhookSignature, generateSumsubWebSDKLink, getSumsubApplicantDocuments } from '../utils/sumsub';
+import { validateWebhookSignature, generateSumsubWebSDKLink } from '../utils/sumsub';
 import { sendErrorResponse } from './authController';
 import {
   initiateSumsubVerification,
@@ -7,6 +7,7 @@ import {
   updateAdminStatus,
   uploadDocumentToSumsub,
   getSumsubApplicantStatus,
+  getSumsubDocumentImages,
 } from '../services/sumsubService';
 import Player from '../models/player';
 import winston from 'winston';
@@ -444,6 +445,58 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
       res,
       500,
       error.message || (req as any).__('FAILED_KYC_REJECTION')
+    );
+  }
+};
+
+export const getDocumentImage = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id) {
+      logger.error('Authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
+    }
+
+    const { applicantId, imageId } = req.params;
+    if (!applicantId || !imageId) {
+      logger.warn('Missing required parameters', { applicantId, imageId });
+      return sendErrorResponse(res, 400, (req as any).__('MISSING_PARAMETERS'));
+    }
+
+    const player = await Player.findOne({ sumsub_id: applicantId });
+    if (!player) {
+      logger.warn('Player not found', { applicantId });
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+
+    if (req.user.role !== 1 && req.user.id !== player._id.toString()) {
+      logger.warn('Unauthorized access attempt', { 
+        userId: req.user.id, 
+        playerId: player._id,
+        role: req.user.role 
+      });
+      return sendErrorResponse(res, 403, (req as any).__('UNAUTHORIZED_ACCESS'));
+    }
+
+    const { buffer, contentType } = await getSumsubDocumentImages(applicantId, imageId);
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="document-${imageId}"`);
+    res.send(buffer);
+
+    logger.info('Document image retrieved successfully', {
+      userId: req.user.id,
+      applicantId,
+      imageId
+    });
+  } catch (error: any) {
+    logger.error('Error retrieving document image', {
+      userId: req.user?.id,
+      error: error.message
+    });
+    sendErrorResponse(
+      res,
+      500,
+      error.message || (req as any).__('FAILED_TO_RETRIEVE_DOCUMENT')
     );
   }
 };

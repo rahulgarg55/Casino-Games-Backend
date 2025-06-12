@@ -464,7 +464,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
         last_deposit_date: statsInfo?.last_deposit_date || null,
         last_withdrawal_date: statsInfo?.last_withdrawal_date || null,
         referredByName: player.referredByName || 'N/A',
-        verification_status: player.sumsub_status || 'not_started',
+        sumsub_status: player.sumsub_status || 'not_started',
         sumsub_id: player.sumsub_id || null,
       };
     });
