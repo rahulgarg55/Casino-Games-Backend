@@ -36,6 +36,7 @@ export const getAllPlayers = async () => {
         is_2fa_enabled: player.is_2fa_enabled,
         balance: balance?.balance || 0,
         referredByName: player.referredByName,
+        admin_status:player.admin_status
       };
     }),
   );

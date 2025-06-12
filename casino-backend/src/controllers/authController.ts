@@ -392,7 +392,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
     const players = await Player.find({
       role_id: { $ne: 1 }, // Exclude admins (assuming 1 is admin role)
     }).select(
-      'username fullname patronymic photo dob gender email phone_number registration_date last_login status is_verified is_2fa_enabled currency language country city role_id created_at updated_at referredBy referredByName sumsub_id sumsub_status'
+      'username fullname patronymic photo dob gender email phone_number registration_date last_login status is_verified is_2fa_enabled currency language country city role_id created_at updated_at referredBy referredByName sumsub_id sumsub_status admin_status'
     ).lean(); // Use .lean() for plain JavaScript objects for easier manipulation
 
     const playerIds = players.map(player => player._id);
@@ -466,6 +466,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
         referredByName: player.referredByName || 'N/A',
         sumsub_status: player.sumsub_status || 'not_started',
         sumsub_id: player.sumsub_id || null,
+        admin_status: player.admin_status || null
       };
     });
 
