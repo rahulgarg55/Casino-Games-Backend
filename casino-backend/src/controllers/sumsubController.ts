@@ -8,6 +8,7 @@ import {
   uploadDocumentToSumsub,
   getSumsubApplicantStatus,
   getSumsubDocumentImages,
+  getSumsubSDKState,
 } from '../services/sumsubService';
 import Player from '../models/player';
 import winston from 'winston';
@@ -451,56 +452,58 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
 
 export const getDocumentImage = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user?.id) {
-      logger.error('Authentication required', { user: req.user });
-      return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
+    const { applicantId, imageId } = req.params;
+    const { inspectionId } = req.query;
+
+    console.log('Fetching document image:', { applicantId, imageId, inspectionId });
+
+    if (!applicantId || !imageId) {
+      console.log('Missing parameters:', { applicantId, imageId });
+      logger.warn('Missing required parameters', { applicantId, imageId });
+      return sendErrorResponse(res, 400, 'Missing applicantId or imageId');
     }
 
-    const { applicantId, imageId } = req.params;
-    if (!applicantId || !imageId) {
-      logger.warn('Missing required parameters', { applicantId, imageId });
-      return sendErrorResponse(res, 400, (req as any).__('MISSING_PARAMETERS'));
+    if (!inspectionId || typeof inspectionId !== 'string') {
+      console.log('Missing inspectionId:', { inspectionId });
+      logger.warn('Missing inspectionId', { inspectionId });
+      return sendErrorResponse(res, 400, 'Inspection ID is required');
     }
 
     const player = await Player.findOne({ sumsub_id: applicantId });
     if (!player) {
+      console.log('Player not found for applicantId:', applicantId);
       logger.warn('Player not found', { applicantId });
-      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+      return sendErrorResponse(res, 404, 'Player not found');
     }
 
-    if (req.user.role !== 1 && req.user.id !== player._id.toString()) {
-      logger.warn('Unauthorized access attempt', { 
-        userId: req.user.id, 
-        playerId: player._id,
-        role: req.user.role 
-      });
-      return sendErrorResponse(res, 403, (req as any).__('UNAUTHORIZED_ACCESS'));
-    }
-
-    // Fetch the reviewId (inspectionId)
-    const reviewId = await getApplicantReviewId(applicantId);
-
-    // Fetch the image using reviewId as inspectionId
-    const { buffer, contentType } = await getSumsubDocumentImages(reviewId, imageId);
+    console.log('Fetching image from Sumsub:', { applicantId, documentId: imageId, inspectionId });
+    const { buffer, contentType } = await getSumsubDocumentImages(applicantId, imageId, inspectionId);
+    console.log('Successfully retrieved image:', { 
+      bufferSize: buffer.length,
+      contentType 
+    });
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="document-${imageId}"`);
+    res.setHeader('Content-Disposition', `inline; filename="document-${imageId}.jpg"`);
     res.send(buffer);
 
     logger.info('Document image retrieved successfully', {
-      userId: req.user.id,
       applicantId,
-      imageId
+      imageId,
+      inspectionId
     });
   } catch (error: any) {
+    console.error('Error retrieving document image:', error);
     logger.error('Error retrieving document image', {
-      userId: req.user?.id,
+      applicantId: req.params.applicantId,
+      imageId: req.params.imageId,
+      inspectionId: req.query.inspectionId,
       error: error.message
     });
     sendErrorResponse(
       res,
       500,
-      error.message || (req as any).__('FAILED_TO_RETRIEVE_DOCUMENT')
+      error.message || 'Failed to retrieve document image'
     );
   }
 };

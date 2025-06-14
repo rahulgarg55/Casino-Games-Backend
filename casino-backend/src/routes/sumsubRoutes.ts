@@ -9,9 +9,10 @@ import {
   rejectPlayerKYC,
   getDocumentImage,
 } from '../controllers/sumsubController';
-import {getSumsubApplicantDocuments} from '../utils/sumsub';
+import { getSumsubApplicantDocuments } from '../utils/sumsub';
 import passport from 'passport';
 import multer from 'multer';
+import Player from '../models/player';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ const documentUpload = multer({
     } else {
       cb(null, false);
     }
-  }
+  },
 });
 
 router.post(
@@ -41,11 +42,7 @@ router.post(
   startSumsubVerificationWithLink
 );
 
-router.post(
-  '/webhook',
-  express.raw({ type: 'application/json' }),
-  sumsubWebhook
-);
+router.post('/webhook', express.raw({ type: 'application/json' }), sumsubWebhook);
 
 router.get(
   '/status',
@@ -72,32 +69,35 @@ router.post(
   rejectPlayerKYC
 );
 
-router.get(
-  '/documents/:applicantId',
-  passport.authenticate('jwt', { session: false }),
-  async (req, res) => {
-    try {
-      const { applicantId } = req.params;
-      const documents = await getSumsubApplicantDocuments(applicantId);
-      res.set('Cache-Control', 'no-store'); // Prevent caching
-      res.status(200).json({
-        success: true,
-        message: (req as any).__('DOCUMENTS_RETRIEVED'),
-        data: { documents }
-      });
-    } catch (error: any) {
-      res.status(500).json({
+router.get('/documents/:applicantId', async (req, res) => {
+  try {
+    const { applicantId } = req.params;
+    console.log('applicantId', applicantId)
+
+    const player = await Player.findOne({ sumsub_id: applicantId });
+    if (!player) {
+      return res.status(404).json({
         success: false,
-        error: error.message || (req as any).__('FAILED_TO_FETCH_DOCUMENTS')
+        message: 'Player not found',
       });
     }
-  }
-);
 
-router.get(
-  '/documents/:applicantId/images/:imageId',
-  passport.authenticate('jwt', { session: false }),
-  getDocumentImage
-);
+    const documents = await getSumsubApplicantDocuments(applicantId);
+
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({
+      success: true,
+      message: 'DOCUMENTS_RETRIEVED',
+      data: { documents },
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch documents',
+    });
+  }
+});
+
+router.get('/documents/:applicantId/images/:imageId', passport.authenticate('jwt', { session: false }), getDocumentImage);
 
 export default router;

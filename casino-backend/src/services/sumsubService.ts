@@ -25,6 +25,34 @@ const logger = winston.createLogger({
   ]
 });
 
+interface SumsubDocument {
+  id: string;
+  type: string;
+  side: string;
+  status: string;
+  fileName: string;
+  createdAt: string;
+  previewId: string;
+  inspectionId: string;
+  country?: string;
+  fileType?: string;
+  fileSize?: number;
+  resolution?: {
+    width: number;
+    height: number;
+  };
+  reviewResult?: {
+    moderationComment?: string;
+    clientComment?: string;
+    reviewAnswer: string;
+    rejectLabels?: string[];
+    reviewRejectType?: string;
+    buttonIds?: string[];
+  };
+  source?: string;
+  deactivated?: boolean;
+}
+
 export const initiateSumsubVerification = async (playerId: string) => {
   let player = await Player.findById(playerId);
   if (!player) {
@@ -274,11 +302,13 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
   }
 };
 
-export const getSumsubApplicantDocuments = async (applicantId: string) => {
+export const getSumsubSDKState = async (applicantId: string) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/applicants/${applicantId}/metadata/resources`;
+  const path = `/resources/sdk/state?full=true`;
   const url = `${config.sumsub.baseUrl}${path}`;
+
+  console.log('Fetching Sumsub SDK state:', { applicantId, url });
 
   const signature = generateSignature(method, path, '', timestamp);
 
@@ -290,40 +320,104 @@ export const getSumsubApplicantDocuments = async (applicantId: string) => {
   };
 
   try {
+    console.log('Sending request to Sumsub for SDK state');
+    const response = await axios.get(url, { headers });
+    console.log('Received SDK state response:', {
+      status: response.status,
+      hasStep: !!response.data.step,
+      hasDocumentStatus: !!response.data.step?.documentStatus
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.error('Error in getSumsubSDKState:', error);
+    logger.error('Error fetching Sumsub SDK state', {
+      applicantId,
+      error: error.message
+    });
+    throw error;
+  }
+};
+
+export const getSumsubApplicantDocuments = async (applicantId: string): Promise<SumsubDocument[]> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  const path = `/resources/applicants/${applicantId}/metadata/resources`;
+  const url = `${config.sumsub.baseUrl}${path}`;
+
+  console.log('Getting Sumsub applicant documents');
+  console.log('Preparing request:', {
+    url,
+    timestamp
+  });
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': config.sumsub.appToken,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': 'application/json'
+  };
+
+  try {
+    console.log('Sending request to Sumsub for documents');
     const response = await axios.get(url, { headers });
 
-    if (response.status !== 200) {
-      throw new Error(`Failed to fetch documents: ${response.status}`);
+    console.log('Received response from Sumsub:', {
+      status: response.status,
+      hasDocuments: response.data?.items?.length > 0
+    });
+
+    if (!response.data?.items || !Array.isArray(response.data.items)) {
+      console.log('No documents found in response');
+      return [];
     }
 
-    const documents = response.data.items.map((doc: any) => ({
+    return response.data.items.map((doc: any) => ({
       id: doc.id,
-      type: doc.idDocDef.idDocType,
-      side: doc.idDocDef.idDocSubType || 'N/A',
-      status: doc.reviewResult?.reviewAnswer || 'unknown',
+      type: doc.idDocDef?.idDocType || 'UNKNOWN',
+      side: doc.idDocDef?.idDocSubType || 'UNKNOWN',
+      status: doc.reviewResult?.reviewAnswer || 'UNKNOWN',
+      fileName: doc.fileMetadata?.fileName || 'unknown',
       createdAt: doc.addedDate,
+      previewId: doc.previewId,
+      inspectionId: doc.attemptId,
+      country: doc.idDocDef?.country,
+      fileType: doc.fileMetadata?.fileType,
+      fileSize: doc.fileMetadata?.fileSize,
+      resolution: doc.fileMetadata?.resolution,
+      reviewResult: doc.reviewResult,
+      source: doc.source,
+      deactivated: doc.deactivated
     }));
-
-    return documents;
   } catch (error: any) {
-    const axiosError = error as AxiosError<SumsubErrorResponse>;
+    console.error('Error in getSumsubApplicantDocuments:', error);
     logger.error('Error fetching Sumsub documents', {
       applicantId,
-      error: axiosError.response?.data || axiosError.message,
-      status: axiosError.response?.status
+      error: error.message
     });
-    throw new Error(axiosError.response?.data?.description || 'Failed to fetch documents');
+    throw error;
   }
 };
 
 export const getSumsubDocumentImages = async (
   applicantId: string,
-  imageId: string
+  documentId: string,
+  inspectionId: string
 ): Promise<{ buffer: Buffer; contentType: string }> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/inspections/${applicantId}/resources/${imageId}`;
+  const path = `/resources/inspections/${inspectionId}/resources/${documentId}`;
   const url = `${config.sumsub.baseUrl}${path}`;
+
+  console.log('Preparing Sumsub document image request:', {
+    applicantId,
+    documentId,
+    inspectionId,
+    url,
+    timestamp
+  });
 
   const signature = generateSignature(method, path, '', timestamp);
 
@@ -335,9 +429,16 @@ export const getSumsubDocumentImages = async (
   };
 
   try {
+    console.log('Sending request to Sumsub for document image');
     const response = await axios.get(url, {
       headers,
       responseType: 'arraybuffer'
+    });
+
+    console.log('Received response from Sumsub:', {
+      status: response.status,
+      contentType: response.headers['content-type'],
+      bufferSize: response.data.length
     });
 
     return {
@@ -345,9 +446,11 @@ export const getSumsubDocumentImages = async (
       contentType: response.headers['content-type'] || 'application/octet-stream'
     };
   } catch (error: any) {
+    console.error('Error in getSumsubDocumentImages:', error);
     logger.error('Error fetching document image from Sumsub', {
       applicantId,
-      imageId,
+      documentId,
+      inspectionId,
       error: error.message
     });
     throw error;

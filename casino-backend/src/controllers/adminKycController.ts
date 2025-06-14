@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import Player from '../models/player';
-import { getSumsubSDKState, approveSumsubApplicant, rejectSumsubApplicant } from '../utils/sumsub';
+import { getSumsubSDKState, approveSumsubApplicant, rejectSumsubApplicant, getApplicantReviewId } from '../utils/sumsub';
 import { updateAdminStatus } from '../services/sumsubService';
 import { logger } from '../utils/logger';
 import axios from 'axios';
@@ -19,19 +19,20 @@ export const getApplicantDocuments = async (req: Request, res: Response) => {
       });
     }
 
-    // Fetch document details from SDK state with corrected signature
+    // Fetch document details from SDK state
     const sdkState = await getSumsubSDKState(sumsubId);
     const documentStatus = sdkState.step?.documentStatus;
     const documents = documentStatus?.imageStatuses?.map((img: any) => ({
       id: img.imageId.toString(),
-      type: documentStatus.idDocType,
-      side: img.idDocSubType,
-      status: 'uploaded', // Assuming uploaded since present in state
-      fileName: img.imageFileName,
+      type: documentStatus.idDocType || 'UNKNOWN',
+      side: img.idDocSubType || 'FRONT',
+      status: 'uploaded',
+      createdAt: new Date().toISOString(),
     })) || [];
 
     return res.status(200).json({
       success: true,
+      message: 'DOCUMENTS_RETRIEVED',
       data: {
         documents,
         sumsubNotes: player.sumsub_notes,
@@ -61,7 +62,9 @@ export const approveApplicant = async (req: Request, res: Response) => {
     }
 
     await approveSumsubApplicant(sumsubId);
-    await updateAdminStatus(player._id.toString(), 'approved', adminNotes || 'Approved by admin');
+    await updateAdminStatus(player._id.toString(), 'approved', adminNotes || 'Approved by admin', {
+      documents: player.sumsub_details?.documents || [],
+    });
 
     return res.status(200).json({
       success: true,
@@ -91,11 +94,12 @@ export const rejectApplicant = async (req: Request, res: Response) => {
 
     await rejectSumsubApplicant(sumsubId);
     await updateAdminStatus(player._id.toString(), 'rejected', adminNotes || 'Rejected by admin', {
+      documents: player.sumsub_details?.documents || [],
       nextSteps: [
         'Review the rejection reason',
         'Correct any issues with your documents',
-        'Resubmit your verification'
-      ]
+        'Resubmit your verification',
+      ],
     });
 
     return res.status(200).json({
@@ -123,9 +127,17 @@ export const getDocumentDownload = async (req: Request, res: Response) => {
       });
     }
 
+    const reviewId = await getApplicantReviewId(sumsubId);
+    if (!reviewId) {
+      return res.status(404).json({
+        success: false,
+        message: 'No review found for applicant',
+      });
+    }
+
     const timestamp = Math.floor(Date.now() / 1000);
     const method = 'GET';
-    const path = `/resources/applicants/${sumsubId}/documents/${documentId}/download`;
+    const path = `/resources/inspections/${reviewId}/resources/${documentId}`;
     const url = `${config.sumsub.baseUrl}${path}`;
 
     const signature = generateSignature(method, path, '', timestamp);
@@ -134,16 +146,16 @@ export const getDocumentDownload = async (req: Request, res: Response) => {
       'X-App-Token': config.sumsub.appToken,
       'X-App-Access-Sig': signature,
       'X-App-Access-Ts': timestamp.toString(),
-      'Accept': 'application/octet-stream'
+      'Accept': 'application/octet-stream',
     };
 
     const response = await axios.get(url, {
       headers,
-      responseType: 'stream'
+      responseType: 'stream',
     });
 
     res.setHeader('Content-Type', response.headers['content-type'] || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${documentId}.jpg"`);
+    res.setHeader('Content-Disposition', `attachment; filename="document-${documentId}.jpg"`);
 
     response.data.pipe(res);
   } catch (error: any) {
