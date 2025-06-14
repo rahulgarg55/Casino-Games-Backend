@@ -18,6 +18,8 @@ export const generateTokenResponse = (user: IPlayer) => {
     sub: user._id,
     role: user.role_id,
     email: user.email,
+    username:user.username,
+    gender:user.gender
   };
 
   const token = jwt.sign(payload, process.env.JWT_SECRET, {
