@@ -8,6 +8,7 @@ import {
   approvePlayerKYC,
   rejectPlayerKYC,
   getDocumentImage,
+  getPendingKYCs,
 } from '../controllers/sumsubController';
 import { getSumsubApplicantDocuments } from '../utils/sumsub';
 import passport from 'passport';
@@ -99,5 +100,11 @@ router.get('/documents/:applicantId', async (req, res) => {
 });
 
 router.get('/documents/:applicantId/images/:imageId', passport.authenticate('jwt', { session: false }), getDocumentImage);
+
+router.get(
+  '/pending-kycs',
+  passport.authenticate('jwt', { session: false }),
+  getPendingKYCs
+);
 
 export default router;

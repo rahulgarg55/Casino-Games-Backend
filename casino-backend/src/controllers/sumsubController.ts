@@ -507,3 +507,66 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
     );
   }
 };
+
+export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
+  try {
+    if (!req.user?.id || req.user?.role !== 1) {
+      logger.error('Admin authentication required', { user: req.user });
+      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
+    }
+
+    const { page = 1, limit = 10, status } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+
+    const query: any = {
+      sumsub_id: { $exists: true, $ne: null }
+    };
+
+    if (status) {
+      query.sumsub_status = status;
+    } else {
+      query.sumsub_status = { $in: ['not_started', 'in_review'] };
+    }
+
+    const [players, total] = await Promise.all([
+      Player.find(query)
+        .select('username email phone_number sumsub_status sumsub_verification_date sumsub_notes sumsub_details')
+        .sort({ sumsub_verification_date: -1 })
+        .skip(skip)
+        .limit(Number(limit)),
+      Player.countDocuments(query)
+    ]);
+
+    logger.info('Pending KYCs fetched', { 
+      adminId: req.user.id, 
+      count: players.length,
+      total,
+      page,
+      limit
+    });
+
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('PENDING_KYCS_FETCHED'),
+      data: {
+        players,
+        pagination: {
+          total,
+          page: Number(page),
+          limit: Number(limit),
+          pages: Math.ceil(total / Number(limit))
+        }
+      }
+    });
+  } catch (error: any) {
+    logger.error('Error fetching pending KYCs', {
+      adminId: req.user?.id,
+      error: error.message
+    });
+    sendErrorResponse(
+      res,
+      500,
+      error.message || (req as any).__('FAILED_TO_FETCH_KYCS')
+    );
+  }
+};
