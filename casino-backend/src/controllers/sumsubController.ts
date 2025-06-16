@@ -349,11 +349,6 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
 
 export const approvePlayerKYC = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user?.id || req.user?.role !== 1) {
-      logger.error('Admin authentication required', { user: req.user });
-      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
-    }
-
     const { playerId } = req.params;
     const { adminNotes } = req.body;
     const player = await Player.findById(playerId);
@@ -371,7 +366,7 @@ export const approvePlayerKYC = async (req: CustomRequest, res: Response) => {
       documents: player.sumsub_details?.documents || []
     });
 
-    logger.info('Player KYC approved by admin', { playerId, adminId: req.user.id, adminNotes });
+    logger.info('Player KYC approved', { playerId, adminNotes });
 
     res.status(200).json({
       success: true,
@@ -385,7 +380,6 @@ export const approvePlayerKYC = async (req: CustomRequest, res: Response) => {
   } catch (error: any) {
     logger.error('KYC approval error', {
       playerId: req.params.playerId,
-      adminId: req.user?.id,
       error: error.message
     });
     sendErrorResponse(
@@ -398,11 +392,6 @@ export const approvePlayerKYC = async (req: CustomRequest, res: Response) => {
 
 export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user?.id || req.user?.role !== 1) {
-      logger.error('Admin authentication required', { user: req.user });
-      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
-    }
-
     const { playerId } = req.params;
     const { adminNotes } = req.body;
     const player = await Player.findById(playerId);
@@ -425,7 +414,7 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
       ]
     });
 
-    logger.info('Player KYC rejected by admin', { playerId, adminId: req.user.id, adminNotes });
+    logger.info('Player KYC rejected', { playerId, adminNotes });
 
     res.status(200).json({
       success: true,
@@ -439,7 +428,6 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
   } catch (error: any) {
     logger.error('KYC rejection error', {
       playerId: req.params.playerId,
-      adminId: req.user?.id,
       error: error.message
     });
     sendErrorResponse(
@@ -510,11 +498,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
 
 export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
   try {
-    if (!req.user?.id || req.user?.role !== 1) {
-      logger.error('Admin authentication required', { user: req.user });
-      return sendErrorResponse(res, 401, (req as any).__('ADMIN_AUTHENTICATION_REQUIRED'));
-    }
-
     const { page = 1, limit = 10, status } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
@@ -538,7 +521,6 @@ export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
     ]);
 
     logger.info('Pending KYCs fetched', { 
-      adminId: req.user.id, 
       count: players.length,
       total,
       page,
@@ -560,7 +542,6 @@ export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
     });
   } catch (error: any) {
     logger.error('Error fetching pending KYCs', {
-      adminId: req.user?.id,
       error: error.message
     });
     sendErrorResponse(

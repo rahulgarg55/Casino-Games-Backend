@@ -41,8 +41,11 @@ passport.use(
 
       console.log('Player authenticated:', player._id);
       return done(null, {
-        id: player._id,
-        role: player.role_id,
+        id: payload.sub,
+        role: payload.role,
+        email: payload.email,
+        username: payload.username,
+        gender: payload.gender
       });
     } catch (error) {
       console.log('Error in JWT strategy:', error);

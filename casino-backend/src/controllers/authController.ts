@@ -1034,34 +1034,37 @@ export const verifyEmail = async (req: Request, res: Response) => {
   }
 
   try {
+    // First find the player with the token
     const player = await Player.findOne({
       verification_token: token,
-      verification_token_expires: { $gt: new Date() },
-      //   $or: [
-      //     { new_email: { $exists: false } },
-      //     { new_email: null },
-      //     { new_email: { $exists: true, $ne: null } },
-      //   ],
-      // });
-
-      // email: { $exists: true, $ne: null },
+      verification_token_expires: { $gt: new Date() }
     });
 
     if (!player) {
+      console.log('No player found with token or token expired');
       return sendErrorResponse(res, 400, (req as any).__('INVALID_EXPRIRE_TOKEN'));
     }
-    if (player.new_email) {
-      player.email = player.new_email;
-      player.new_email = undefined;
+
+    // Update the player's verification status
+    const updatedPlayer = await Player.findByIdAndUpdate(
+      player._id,
+      {
+        $set: {
+          is_verified: VERIFICATION.VERIFIED,
+          email_verified: true,
+          verification_token: undefined,
+          verification_token_expires: undefined,
+          refreshToken: undefined,
+          ...(player.new_email ? { email: player.new_email, new_email: undefined } : {})
+        }
+      },
+      { new: true }
+    );
+
+    if (!updatedPlayer) {
+      console.error('Failed to update player verification status');
+      return sendErrorResponse(res, 500, (req as any).__('FAILED_EMAIL_VERIFIED'));
     }
-
-    player.is_verified = VERIFICATION.VERIFIED;
-    player.email_verified = true;
-    player.verification_token = undefined;
-    player.verification_token_expires = undefined;
-    player.refreshToken = undefined;
-
-    await player.save();
 
     res.status(200).json({
       success: true,
@@ -1069,6 +1072,7 @@ export const verifyEmail = async (req: Request, res: Response) => {
       redirectUrl: `${process.env.CLIENT_URL}/login`,
     });
   } catch (error) {
+    console.error('Error in verifyEmail:', error);
     sendErrorResponse(
       res,
       400,

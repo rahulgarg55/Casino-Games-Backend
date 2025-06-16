@@ -107,7 +107,11 @@ const playerSchema: Schema = new Schema(
       },
     },
     country_code: { type: String, default: '+1' },
-    password_hash: { type: String, required: true },
+    password_hash: { 
+      type: String, 
+      required: true,
+      select: true
+    },
     registration_date: { type: Date, default: Date.now },
     last_login: { type: Date },
     status: {
@@ -176,7 +180,7 @@ const playerSchema: Schema = new Schema(
     sumsub_id: { type: String, default: null },
     sumsub_status: {
       type: String,
-      enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub', null],
+      enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub','duplicate_documents', null],
       default: 'not_started',
     },
     sumsub_notes: { type: String, default: null },

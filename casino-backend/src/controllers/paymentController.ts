@@ -488,12 +488,20 @@ export const createPaymentIntent = async (
       return;
     }
 
-    // Validate email format
+    // Validate email format with stricter regex
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     if (!player.email || !emailRegex.test(player.email)) {
       res.status(400).json({ 
         success: false, 
-        error: 'Invalid email format. Please update your email address before making a payment.' 
+        error: 'Invalid email format. Please update your email address to a valid format before making a payment.' 
+      });
+      return;
+    }
+
+    if (player.email.includes('+@') || player.email.startsWith('@') || player.email.endsWith('@')) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid email format. Please update your email address to a valid format before making a payment.' 
       });
       return;
     }
