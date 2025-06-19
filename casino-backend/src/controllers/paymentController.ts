@@ -10,6 +10,7 @@ import { sendErrorResponse } from './authController';
 import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
+import { PlatformFeeService } from '../services/platformFeeService';
 
 interface CustomRequest extends Request {
   user?: {
@@ -735,39 +736,52 @@ async function handlePaymentIntentSucceeded(
         transaction.player_id.toString(),
         transaction.amount,
       );
-    } else if (transaction.transaction_type === 'win') {
-      const player = await Player.findById(transaction.player_id);
-      if (player && player.referredBy) {
-        const affiliate = await Affiliate.findById(player.referredBy);
-        if (affiliate) {
-          // Calculate 2% commission
-          const commission = transaction.amount * 0.02;
-          transaction.affiliateId = affiliate._id;
-          transaction.affiliateCommission = commission;
-          await transaction.save();
+    }
 
-          affiliate.totalEarnings = (affiliate.totalEarnings || 0) + commission;
-          affiliate.pendingEarnings =
-            (affiliate.pendingEarnings || 0) + commission;
-          await affiliate.save();
-
-          const notification = new Notification({
-            type: NotificationType.AFFILIATE_COMMISSION,
-            message: `Earned ${commission.toFixed(2)} ${transaction.currency} commission from player ${player.username || 'Anonymous'}'s win`,
-            user_id: affiliate._id,
-            metadata: {
-              playerId: player._id,
-              transactionId: transaction._id,
-              amount: commission,
-              currency: transaction.currency,
-            },
-          });
-          await notification.save();
-
-          logger.info(
-            `Affiliate ${affiliate.email} earned ${commission} commission from player ${player._id}`,
+    // Handle affiliate commission with platform fee
+    const player = await Player.findById(transaction.player_id);
+    if (player && player.referredBy) {
+      const affiliate = await Affiliate.findById(player.referredBy);
+      if (affiliate) {
+        // Calculate platform fee for affiliate commission
+        const platformFeeService = PlatformFeeService.getInstance();
+        const { netAmount: netCommission, feeAmount: platformFee } = 
+          await platformFeeService.calculateAndDeductFee(
+            player._id.toString(),
+            transaction.amount * 0.02 // 2% commission
           );
-        }
+
+        transaction.affiliateId = affiliate._id;
+        transaction.affiliateCommission = netCommission;
+        transaction.metadata = {
+          ...transaction.metadata,
+          original_commission: transaction.amount * 0.02,
+          platform_fee: platformFee,
+          fee_percentage: 2
+        };
+        await transaction.save();
+
+        affiliate.totalEarnings = (affiliate.totalEarnings || 0) + netCommission;
+        affiliate.pendingEarnings = (affiliate.pendingEarnings || 0) + netCommission;
+        await affiliate.save();
+
+        const notification = new Notification({
+          type: NotificationType.AFFILIATE_COMMISSION,
+          message: `Earned ${netCommission.toFixed(2)} ${transaction.currency} commission from player ${player.username || 'Anonymous'}'s win (after platform fee)`,
+          user_id: affiliate._id,
+          metadata: {
+            playerId: player._id,
+            transactionId: transaction._id,
+            amount: netCommission,
+            platformFee: platformFee,
+            currency: transaction.currency,
+          },
+        });
+        await notification.save();
+
+        logger.info(
+          `Affiliate ${affiliate.email} earned ${netCommission} commission (after platform fee) from player ${player._id}`,
+        );
       }
     }
 

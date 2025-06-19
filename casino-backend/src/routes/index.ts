@@ -6,6 +6,7 @@ import affiliateRouter from './affiliateRoutes';
 import adminRouter from './adminRoutes';
 import paymentRouter from './paymentRoutes';
 import sumsubRouter from './sumsubRoutes';
+import platformFeeRoutes from './platformFeeRoutes';
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use('/api/affiliate', affiliateRouter);
 router.use('/api/admin', adminRouter);
 router.use('/api/payment', paymentRouter);
 router.use('/api/sumsub', sumsubRouter);
+router.use('/platform-fee', platformFeeRoutes);
 
 export default router;

@@ -2689,7 +2689,7 @@ export const getLanguages = async (req: Request, res: Response): Promise<void> =
 };
 export const saveBannerConfig = async (req: CustomRequest, res: Response) => {
   try {
-    const { title, subtitle, buttonText, hours, minutes, seconds } = req.body;
+    const { title, subtitle, buttonText, hours, minutes, seconds, startTime } = req.body;
 
     console.log('req.body :>> ', req.body);
 
@@ -2733,6 +2733,7 @@ export const saveBannerConfig = async (req: CustomRequest, res: Response) => {
         subtitle: subtitle.trim(),
         buttonText: buttonText.trim(),
         countdown,
+        startTime: startTime || new Date().toISOString(), // Use provided startTime or current time
         updatedAt: new Date(),
       },
       { upsert: true, new: true, runValidators: true }

@@ -26,6 +26,7 @@ import {
   getSumsubStatus,
   uploadDocument,
 } from '../controllers/sumsubController';
+import * as notificationController from '../controllers/notificationController';
 
 const router = Router();
 
@@ -867,5 +868,15 @@ router.post(
     }
   },
 );
+
+// Notification APIs
+router.post('/notifications/:notificationId/mark-read', passport.authenticate('jwt', { session: false }), notificationController.markNotificationRead);
+router.post('/notifications/:notificationId/mark-unread', passport.authenticate('jwt', { session: false }), notificationController.markNotificationUnread);
+router.post('/notifications/mark-bulk-read', passport.authenticate('jwt', { session: false }), notificationController.markBulkNotificationsRead);
+router.post('/notifications/mark-bulk-unread', passport.authenticate('jwt', { session: false }), notificationController.markBulkNotificationsUnread);
+router.delete('/notifications/bulk-delete', passport.authenticate('jwt', { session: false }), notificationController.bulkDeleteNotifications);
+router.get('/notifications', passport.authenticate('jwt', { session: false }), notificationController.getNotifications);
+router.get('/notifications/:notificationId', passport.authenticate('jwt', { session: false }), notificationController.getNotificationDetails);
+router.post('/notifications/mark-all-read', passport.authenticate('jwt', { session: false }), notificationController.markAllNotificationsRead);
 
 export default router;

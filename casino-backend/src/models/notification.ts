@@ -15,6 +15,7 @@ export interface INotification extends Document {
   message: string;
   user_id: mongoose.Types.ObjectId | null;
   metadata?: Record<string, any>;
+  isUnRead: boolean;
   created_at: Date;
 }
 
@@ -36,6 +37,10 @@ const notificationSchema = new Schema({
   metadata: {
     type: Schema.Types.Mixed,
     default: {},
+  },
+  isUnRead: {
+    type: Boolean,
+    default: true,
   },
   created_at: {
     type: Date,

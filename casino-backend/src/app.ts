@@ -16,6 +16,11 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { I18n } from 'i18n';
 import adminKycRoutes from './routes/adminKycRoutes';
+import metricsRoutes from './routes/metricsRoutes';
+import authRoutes from './routes/authRoutes';
+import sumsubRoutes from './routes/sumsubRoutes';
+import platformFeeRoutes from './routes/platformFeeRoutes';
+import { PlatformFeeService } from './services/platformFeeService';
 
 const translationPath = path.resolve(process.cwd(), 'src/translation');
 
@@ -130,7 +135,7 @@ app.use(
       secure: process.env.NODE_ENV === 'production',
       maxAge: 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: 'strict'
+      sameSite: 'lax'
     },
   }),
 );
@@ -155,10 +160,20 @@ app.post(
 // Admin KYC routes
 app.use('/api/auth/admin/kyc', adminKycRoutes);
 
+// Mount routes
+app.use('/api/auth', authRoutes);
+app.use('/api/sumsub', sumsubRoutes);
+app.use('/api/metrics', metricsRoutes);
+app.use('/api/platform-fee', platformFeeRoutes);
+
 const initializeApp = async () => {
   try {
     await connectDB();
     logger.info('Database connected successfully');
+
+    // Initialize platform fee service after database connection
+    await PlatformFeeService.getInstance().initialize();
+    logger.info('Platform fee service initialized');
 
     await paymentController.seedPaymentConfigs();
     logger.info('Payment configurations seeded successfully');
@@ -178,9 +193,22 @@ app.use(
 );
 
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.log('======err====', err);
+  console.error('Error:', err);
   logger.error(err.message, { stack: err.stack });
-  res.status(500).json({ error: 'Something went wrong!' });
+  
+  if (err.name === 'AuthenticationError') {
+    return res.status(401).json({ 
+      success: false, 
+      error: 'Authentication failed',
+      details: err.message 
+    });
+  }
+  
+  res.status(500).json({ 
+    success: false, 
+    error: 'Something went wrong!',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 export default app;

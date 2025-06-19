@@ -7,6 +7,7 @@ export interface IBannerConfig extends Document {
   countdown: string;
   updatedAt: Date;
   createdAt: Date;
+  startTime?: string;
 }
 
 const bannerConfigSchema: Schema = new Schema(
@@ -39,6 +40,7 @@ const bannerConfigSchema: Schema = new Schema(
       type: Date,
       default: Date.now,
     },
+    startTime: { type: String },
   },
   { timestamps: true }
 );

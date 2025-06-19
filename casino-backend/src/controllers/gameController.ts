@@ -4,6 +4,7 @@ import cloudinary from '../utils/cloudinary';
 import axios from 'axios';
 import Player from '../models/player';
 import Transaction from '../models/transaction';
+import {PlatformFeeService} from '../services/platformFeeService';
 
 const RGS_API_URL =
   process.env.RGS_API_URL || 'https://test-api.progaindia.com/v1/';
@@ -265,29 +266,11 @@ export const creditPlayerBalance = async (req: Request, res: Response) => {
       });
     }
 
-    const player = await Player.findById(playerId);
-
-    if (!player) {
-      throw new Error((req as any).__('PLAYER_NOT_FOUND'));
-    }
-
-    player.balance += amount;
-    await player.save();
-
-    const transaction = new Transaction({
-      player_id: playerId,
-      amount,
-      currency: player.currency,
-      transaction_type: 'credit',
-      game_round_id: gameRoundId,
-      status: 'completed',
-    });
-
-    await transaction.save();
+    const result = await gameService.processGameWin(playerId, amount, gameRoundId);
 
     res.status(200).json({
       success: true,
-      newBalance: player.balance,
+      ...result
     });
   } catch (error) {
     res.status(400).json({

@@ -26,11 +26,18 @@ export interface ITransaction extends Document {
   error?: string;
   created_at: Date;
   completed_at?: Date;
-  metadata?: Record<string, any>;
+  metadata?: {
+    original_amount?: number;
+    platform_fee?: number;
+    fee_percentage?: number;
+    [key: string]: any;
+  };
   external_reference?: string;
   stripe_charge_id?: string;
   affiliateId?: mongoose.Types.ObjectId; // Affiliate who referred the player
   affiliateCommission?: number; // Commission earned by the affiliate (e.g., 2% of win)
+  platform_fee?: number;
+  fee_percentage?: number;
 }
 
 const transactionSchema: Schema = new Schema(
@@ -102,6 +109,16 @@ const transactionSchema: Schema = new Schema(
     affiliateCommission: {
       type: Number,
       default: 0,
+      min: 0,
+    },
+    platform_fee: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    fee_percentage: {
+      type: Number,
+      default: 2,
       min: 0,
     },
   },
