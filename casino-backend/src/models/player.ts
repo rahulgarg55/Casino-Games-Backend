@@ -47,6 +47,7 @@ export interface IPlayer extends Document {
   referredBy?: mongoose.Types.ObjectId;
   referredByName?: string;
   sumsub_id?: string;
+  sumsub_inspection_id?: string;
   sumsub_status?: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub' | null;
   sumsub_notes?: string | null;
   admin_status?: 'approved' | 'pending' | 'rejected' | null;
@@ -178,6 +179,7 @@ const playerSchema: Schema = new Schema(
     referredBy: { type: Schema.Types.ObjectId, ref: 'Affiliate', default: null },
     referredByName: { type: String, default: null },
     sumsub_id: { type: String, default: null },
+    sumsub_inspection_id: { type: String, default: null },
     sumsub_status: {
       type: String,
       enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub','duplicate_documents', null],

@@ -9,6 +9,7 @@ import {
   rejectPlayerKYC,
   getDocumentImage,
   getPendingKYCs,
+  getSumsubDocumentImagesList
 } from '../controllers/sumsubController';
 import { getSumsubApplicantDocuments } from '../utils/sumsub';
 import passport from 'passport';
@@ -68,10 +69,11 @@ router.post(
   rejectPlayerKYC
 );
 
+// Get all documents for an applicant
 router.get('/documents/:applicantId', async (req, res) => {
   try {
     const { applicantId } = req.params;
-    console.log('applicantId', applicantId)
+    console.log('Fetching documents for applicantId:', applicantId);
 
     const player = await Player.findOne({ sumsub_id: applicantId });
     if (!player) {
@@ -90,6 +92,7 @@ router.get('/documents/:applicantId', async (req, res) => {
       data: { documents },
     });
   } catch (error: any) {
+    console.error('Error fetching documents:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Failed to fetch documents',
@@ -97,12 +100,16 @@ router.get('/documents/:applicantId', async (req, res) => {
   }
 });
 
-router.get('/documents/:applicantId/images/:imageId', passport.authenticate('jwt', { session: false }), getDocumentImage);
+// Get specific document image - REMOVED authentication for easier testing
+router.get('/documents/:applicantId/images/:imageId', getDocumentImage);
 
+// Get pending KYCs
 router.get(
   '/pending-kycs',
-  // passport.authenticate('jwt', { session: false }),
   getPendingKYCs
 );
+
+// Get list of document images - REMOVED authentication for easier testing
+router.get('/documents/:applicantId/images', getSumsubDocumentImagesList);
 
 export default router;

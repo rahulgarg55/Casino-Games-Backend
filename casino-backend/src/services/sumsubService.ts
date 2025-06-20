@@ -126,7 +126,7 @@ export const updateSumsubStatus = async (
   playerId: string,
   sumsubStatus: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub',
   sumsubNotes?: string,
-  details: { documents?: string[]; nextSteps?: string[] } = {}
+  details: { documents?: string[]; nextSteps?: string[]; inspectionId?: string } = {}
 ) => {
   const player = await Player.findById(playerId);
   if (!player) {
@@ -138,6 +138,11 @@ export const updateSumsubStatus = async (
   player.sumsub_notes = sumsubNotes || player.sumsub_notes;
   player.sumsub_verification_date = new Date();
   player.sumsub_details = { ...player.sumsub_details, ...details };
+
+  if (details.inspectionId && !player.sumsub_inspection_id) {
+    player.sumsub_inspection_id = details.inspectionId;
+    logger.info('Stored inspection ID for player', { playerId, inspectionId: details.inspectionId });
+  }
 
   await player.save();
   logger.info('Player Sumsub status updated', { playerId, sumsubStatus, sumsubNotes, details });
@@ -212,7 +217,8 @@ export const uploadDocumentToSumsub = async (
     logger.info('Document uploaded successfully', {
       applicantId,
       documentId: result.idDocId,
-      status: result.status
+      status: result.status,
+      inspectionId: result.inspectionId
     });
 
     return result;
@@ -252,7 +258,7 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
     const { reviewStatus, reviewResult } = response.data;
     let sumsubStatus: 'not_started' | 'in_review' | 'approved_sumsub' | 'rejected_sumsub';
     let sumsubNotes: string | undefined;
-    let details: { documents?: string[]; nextSteps?: string[] } = {};
+    let details: { documents?: string[]; nextSteps?: string[]; inspectionId?: string } = {};
 
     switch (reviewStatus) {
       case 'init':
@@ -279,6 +285,14 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
     try {
       const documents = await getSumsubApplicantDocuments(applicantId);
       details.documents = documents.map((doc: any) => doc.id);
+      
+      if (documents.length > 0 && documents[0].inspectionId) {
+        details.inspectionId = documents[0].inspectionId;
+        logger.info('Captured inspection ID from documents', { 
+          applicantId, 
+          inspectionId: details.inspectionId 
+        });
+      }
     } catch (error: any) {
       logger.warn('Failed to fetch document details', { applicantId, error: error.message });
     }
@@ -305,7 +319,7 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
 export const getSumsubSDKState = async (applicantId: string) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/sdk/state?full=true`;
+  const path = `/resources/sdk/state?full=true&externalUserId=${applicantId}`;
   const url = `${config.sumsub.baseUrl}${path}`;
 
   console.log('Fetching Sumsub SDK state:', { applicantId, url });
@@ -325,8 +339,31 @@ export const getSumsubSDKState = async (applicantId: string) => {
     console.log('Received SDK state response:', {
       status: response.status,
       hasStep: !!response.data.step,
-      hasDocumentStatus: !!response.data.step?.documentStatus
+      hasDocumentStatus: !!response.data.step?.documentStatus,
+      inspectionId: response.data.step?.documentStatus?.attemptId
     });
+
+    const inspectionId = response.data.step?.documentStatus?.attemptId;
+    if (inspectionId) {
+      try {
+        const player = await Player.findOne({ sumsub_id: applicantId });
+        if (player && !player.sumsub_inspection_id) {
+          player.sumsub_inspection_id = inspectionId;
+          await player.save();
+          logger.info('Updated player with inspection ID from SDK state', { 
+            applicantId, 
+            playerId: player._id, 
+            inspectionId 
+          });
+        }
+      } catch (error: any) {
+        logger.warn('Failed to update player with inspection ID', { 
+          applicantId, 
+          inspectionId, 
+          error: error.message 
+        });
+      }
+    }
 
     return response.data;
   } catch (error: any) {
@@ -374,7 +411,7 @@ export const getSumsubApplicantDocuments = async (applicantId: string): Promise<
       return [];
     }
 
-    return response.data.items.map((doc: any) => ({
+    const documents = response.data.items.map((doc: any) => ({
       id: doc.id,
       type: doc.idDocDef?.idDocType || 'UNKNOWN',
       side: doc.idDocDef?.idDocSubType || 'UNKNOWN',
@@ -391,6 +428,29 @@ export const getSumsubApplicantDocuments = async (applicantId: string): Promise<
       source: doc.source,
       deactivated: doc.deactivated
     }));
+
+    if (documents.length > 0 && documents[0].inspectionId) {
+      try {
+        const player = await Player.findOne({ sumsub_id: applicantId });
+        if (player && !player.sumsub_inspection_id) {
+          player.sumsub_inspection_id = documents[0].inspectionId;
+          await player.save();
+          logger.info('Updated player with inspection ID from documents', { 
+            applicantId, 
+            playerId: player._id, 
+            inspectionId: documents[0].inspectionId 
+          });
+        }
+      } catch (error: any) {
+        logger.warn('Failed to update player with inspection ID from documents', { 
+          applicantId, 
+          inspectionId: documents[0].inspectionId, 
+          error: error.message 
+        });
+      }
+    }
+
+    return documents;
   } catch (error: any) {
     console.error('Error in getSumsubApplicantDocuments:', error);
     logger.error('Error fetching Sumsub documents', {
@@ -408,16 +468,10 @@ export const getSumsubDocumentImages = async (
 ): Promise<{ buffer: Buffer; contentType: string }> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/inspections/${inspectionId}/resources/${documentId}`;
+  const path = `/resources/applicants/${applicantId}/info/idDoc/${documentId}/content?inspectionId=${inspectionId}`;
   const url = `${config.sumsub.baseUrl}${path}`;
 
-  console.log('Preparing Sumsub document image request:', {
-    applicantId,
-    documentId,
-    inspectionId,
-    url,
-    timestamp
-  });
+  logger.info('Fetching Sumsub document image', { url, applicantId, documentId, inspectionId });
 
   const signature = generateSignature(method, path, '', timestamp);
 
@@ -429,29 +483,173 @@ export const getSumsubDocumentImages = async (
   };
 
   try {
-    console.log('Sending request to Sumsub for document image');
     const response = await axios.get(url, {
       headers,
       responseType: 'arraybuffer'
     });
 
-    console.log('Received response from Sumsub:', {
+    logger.info('Successfully fetched image', {
       status: response.status,
       contentType: response.headers['content-type'],
-      bufferSize: response.data.length
+      size: response.data.byteLength
     });
 
     return {
       buffer: Buffer.from(response.data),
-      contentType: response.headers['content-type'] || 'application/octet-stream'
+      contentType: response.headers['content-type'] || 'image/jpeg'
     };
   } catch (error: any) {
-    console.error('Error in getSumsubDocumentImages:', error);
+    if (error.response && error.response.status === 404) {
+      logger.error('Sumsub returned 404 for document image', {
+        url,
+        status: error.response.status,
+        headers: error.response.headers,
+        data: error.response.data
+      });
+    }
     logger.error('Error fetching document image from Sumsub', {
       applicantId,
       documentId,
       inspectionId,
-      error: error.message
+      error: error.message,
+      status: error.response?.status,
+      responseData: error.response?.data
+    });
+    throw error;
+  }
+};
+
+export const captureInspectionId = async (applicantId: string): Promise<string | null> => {
+  try {
+    logger.info('Attempting to capture inspection ID', { applicantId });
+    
+    const documents = await getSumsubApplicantDocuments(applicantId);
+    if (documents.length > 0 && documents[0].inspectionId) {
+      logger.info('Found inspection ID from documents', { 
+        applicantId, 
+        inspectionId: documents[0].inspectionId 
+      });
+      return documents[0].inspectionId;
+    }
+
+    const sdkState = await getSumsubSDKState(applicantId);
+    const inspectionId = sdkState.step?.documentStatus?.attemptId;
+    if (inspectionId) {
+      logger.info('Found inspection ID from SDK state', { 
+        applicantId, 
+        inspectionId 
+      });
+      return inspectionId;
+    }
+
+    logger.warn('No inspection ID found for applicant', { applicantId });
+    return null;
+  } catch (error: any) {
+    logger.error('Error capturing inspection ID', { 
+      applicantId, 
+      error: error.message 
+    });
+    return null;
+  }
+};
+
+export const getSumsubDocumentImage = async (
+  applicantId: string,
+  documentId: string
+): Promise<{ buffer: Buffer; contentType: string }> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  // Use the correct endpoint for getting document images
+  const path = `/resources/applicants/${applicantId}/info/idDoc/${documentId}/image`;
+  const url = `${config.sumsub.baseUrl}${path}`;
+
+  console.log('Fetching document image:', { applicantId, documentId, url });
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': config.sumsub.appToken,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': '*/*'
+  };
+
+  try {
+    const response = await axios.get(url, {
+      headers,
+      responseType: 'arraybuffer'
+    });
+
+    console.log('Successfully fetched image:', {
+      status: response.status,
+      contentType: response.headers['content-type'],
+      size: response.data.byteLength
+    });
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || 'image/jpeg'
+    };
+  } catch (error: any) {
+    console.error('Error fetching document image:', error.response?.data || error.message);
+    logger.error('Error fetching document image from Sumsub', {
+      applicantId,
+      documentId,
+      error: error.message,
+      status: error.response?.status,
+      responseData: error.response?.data
+    });
+    throw error;
+  }
+};
+
+export const getSumsubInspectionImage = async (
+  applicantId: string,
+  inspectionId: string,
+  imageId: string
+): Promise<{ buffer: Buffer; contentType: string }> => {
+  const timestamp = Math.floor(Date.now() / 1000);
+  const method = 'GET';
+  // This endpoint is for WebSDK uploaded images
+  const path = `/resources/applicants/${applicantId}/info/inspections/${inspectionId}/images/${imageId}`;
+  const url = `${config.sumsub.baseUrl}${path}`;
+
+  console.log('Fetching inspection image:', { applicantId, inspectionId, imageId, url });
+
+  const signature = generateSignature(method, path, '', timestamp);
+
+  const headers = {
+    'X-App-Token': config.sumsub.appToken,
+    'X-App-Access-Sig': signature,
+    'X-App-Access-Ts': timestamp.toString(),
+    'Accept': '*/*'
+  };
+
+  try {
+    const response = await axios.get(url, {
+      headers,
+      responseType: 'arraybuffer'
+    });
+
+    console.log('Successfully fetched inspection image:', {
+      status: response.status,
+      contentType: response.headers['content-type'],
+      size: response.data.byteLength
+    });
+
+    return {
+      buffer: Buffer.from(response.data),
+      contentType: response.headers['content-type'] || 'image/jpeg'
+    };
+  } catch (error: any) {
+    console.error('Error fetching inspection image:', error.response?.data || error.message);
+    logger.error('Error fetching inspection image from Sumsub', {
+      applicantId,
+      inspectionId,
+      imageId,
+      error: error.message,
+      status: error.response?.status,
+      responseData: error.response?.data
     });
     throw error;
   }

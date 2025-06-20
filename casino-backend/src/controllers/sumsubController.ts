@@ -9,6 +9,9 @@ import {
   getSumsubApplicantStatus,
   getSumsubDocumentImages,
   getSumsubSDKState,
+  getSumsubApplicantDocuments,
+  getSumsubInspectionImage,
+  getSumsubDocumentImage
 } from '../services/sumsubService';
 import Player from '../models/player';
 import winston from 'winston';
@@ -313,6 +316,11 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       documentSide
     );
 
+    if (uploadResult.inspectionId) {
+      player.sumsub_inspection_id = uploadResult.inspectionId;
+      await player.save();
+    }
+
     await updateSumsubStatus(player._id.toString(), 'in_review', null, {
       documents: [uploadResult.idDocId]
     });
@@ -438,23 +446,18 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
   }
 };
 
+// **Updated Function: Removed inspectionId Dependency**
 export const getDocumentImage = async (req: CustomRequest, res: Response) => {
   try {
-    const { applicantId, imageId } = req.params;
-    const { inspectionId } = req.query;
+    const applicantId = req.params.applicantId as string;
+    const imageId = req.params.imageId as string;
 
-    console.log('Fetching document image:', { applicantId, imageId, inspectionId });
+    console.log('Fetching document image:', { applicantId, imageId });
 
     if (!applicantId || !imageId) {
       console.log('Missing parameters:', { applicantId, imageId });
       logger.warn('Missing required parameters', { applicantId, imageId });
       return sendErrorResponse(res, 400, 'Missing applicantId or imageId');
-    }
-
-    if (!inspectionId || typeof inspectionId !== 'string') {
-      console.log('Missing inspectionId:', { inspectionId });
-      logger.warn('Missing inspectionId', { inspectionId });
-      return sendErrorResponse(res, 400, 'Inspection ID is required');
     }
 
     const player = await Player.findOne({ sumsub_id: applicantId });
@@ -464,29 +467,97 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 404, 'Player not found');
     }
 
-    console.log('Fetching image from Sumsub:', { applicantId, documentId: imageId, inspectionId });
-    const { buffer, contentType } = await getSumsubDocumentImages(applicantId, imageId, inspectionId);
-    console.log('Successfully retrieved image:', { 
-      bufferSize: buffer.length,
-      contentType 
-    });
+    try {
+      // First, try to get the image as a document image
+      console.log('Attempting to fetch as document image...');
+      const { buffer, contentType } = await getSumsubDocumentImage(applicantId, imageId);
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Disposition', `inline; filename="document-${imageId}.jpg"`);
+      res.send(buffer);
 
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="document-${imageId}.jpg"`);
-    res.send(buffer);
+      logger.info('Document image retrieved successfully', {
+        applicantId,
+        imageId,
+        method: 'document'
+      });
+      return;
+    } catch (docError: any) {
+      console.log('Failed to fetch as document image, trying inspection image...');
+      
+      // If document image fails, try inspection image
+      if (player.sumsub_inspection_id) {
+        try {
+          const { buffer, contentType } = await getSumsubInspectionImage(
+            applicantId, 
+            player.sumsub_inspection_id, 
+            imageId
+          );
+          
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `inline; filename="inspection-${imageId}.jpg"`);
+          res.send(buffer);
 
-    logger.info('Document image retrieved successfully', {
-      applicantId,
-      imageId,
-      inspectionId
-    });
+          logger.info('Inspection image retrieved successfully', {
+            applicantId,
+            imageId,
+            inspectionId: player.sumsub_inspection_id,
+            method: 'inspection'
+          });
+          return;
+        } catch (inspectionError: any) {
+          console.log('Failed to fetch as inspection image as well');
+        }
+      }
+
+      // If both methods fail, try to get inspection ID from SDK state
+      try {
+        console.log('Attempting to get inspection ID from SDK state...');
+        const sdkState = await getSumsubSDKState(applicantId);
+        const inspectionId = sdkState.step?.documentStatus?.attemptId;
+        
+        if (inspectionId) {
+          console.log('Found inspection ID from SDK state:', inspectionId);
+          
+          // Update player with inspection ID
+          if (!player.sumsub_inspection_id) {
+            player.sumsub_inspection_id = inspectionId;
+            await player.save();
+          }
+          
+          const { buffer, contentType } = await getSumsubInspectionImage(
+            applicantId, 
+            inspectionId, 
+            imageId
+          );
+          
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Content-Disposition', `inline; filename="inspection-${imageId}.jpg"`);
+          res.send(buffer);
+
+          logger.info('Image retrieved using SDK state inspection ID', {
+            applicantId,
+            imageId,
+            inspectionId,
+            method: 'sdk-state'
+          });
+          return;
+        }
+      } catch (sdkError: any) {
+        console.log('Failed to get inspection ID from SDK state');
+      }
+
+      // If all methods fail, throw the original error
+      throw docError;
+    }
   } catch (error: any) {
     console.error('Error retrieving document image:', error);
     logger.error('Error retrieving document image', {
       applicantId: req.params.applicantId,
       imageId: req.params.imageId,
-      inspectionId: req.query.inspectionId,
-      error: error.message
+      error: error.message,
+      status: error.response?.status,
+      responseData: error.response?.data
     });
     sendErrorResponse(
       res,
@@ -549,5 +620,95 @@ export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
       500,
       error.message || (req as any).__('FAILED_TO_FETCH_KYCS')
     );
+  }
+};
+
+export const getSumsubDocumentImagesList = async (req: CustomRequest, res: Response) => {
+  try {
+    const { applicantId } = req.params;
+    if (!applicantId) {
+      return res.status(400).json({ success: false, message: 'Missing applicantId' });
+    }
+
+    const player = await Player.findOne({ sumsub_id: applicantId });
+    if (!player) {
+      return res.status(404).json({ success: false, message: 'Player not found' });
+    }
+
+    console.log('Getting document images list for:', applicantId);
+
+    // Try to get images from SDK state first
+    try {
+      const sdkState = await getSumsubSDKState(applicantId);
+      console.log('SDK State:', JSON.stringify(sdkState, null, 2));
+      
+      const documentStatus = sdkState.step?.documentStatus;
+      if (documentStatus && documentStatus.imageStatuses && documentStatus.attemptId) {
+        const inspectionId = documentStatus.attemptId;
+        
+        // Update player with inspection ID if not already stored
+        if (!player.sumsub_inspection_id) {
+          player.sumsub_inspection_id = inspectionId;
+          await player.save();
+          console.log('Updated player with inspection ID:', inspectionId);
+        }
+        
+        const images = documentStatus.imageStatuses.map((img: any) => ({
+          imageId: img.imageId,
+          idDocSubType: img.idDocSubType,
+          imageFileName: img.imageFileName,
+          inspectionId,
+          url: `/sumsub/documents/${applicantId}/images/${img.imageId}`,
+          source: 'websdk'
+        }));
+
+        console.log('Found WebSDK images:', images);
+        return res.status(200).json({ success: true, data: { images, source: 'websdk' } });
+      }
+    } catch (sdkError: any) {
+      console.log('Failed to get SDK state:', sdkError.message);
+    }
+
+    // Fallback to getting documents via API
+    try {
+      const documents = await getSumsubApplicantDocuments(applicantId);
+      console.log('Found documents:', documents);
+      
+      if (documents && documents.length > 0) {
+        const images = documents.map((doc: any) => ({
+          imageId: doc.id,
+          idDocSubType: doc.side,
+          imageFileName: doc.fileName,
+          inspectionId: doc.inspectionId,
+          url: `/sumsub/documents/${applicantId}/images/${doc.id}`,
+          source: 'api'
+        }));
+
+        console.log('Mapped document images:', images);
+        return res.status(200).json({ success: true, data: { images, source: 'api' } });
+      }
+    } catch (docError: any) {
+      console.log('Failed to get documents:', docError.message);
+    }
+
+    return res.status(404).json({ 
+      success: false, 
+      message: 'No document images found',
+      debug: {
+        hasPlayer: !!player,
+        hasInspectionId: !!player.sumsub_inspection_id,
+        sumsubId: player.sumsub_id
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching document images list:', error);
+    logger.error('Error fetching Sumsub document images list', { 
+      applicantId: req.params.applicantId,
+      error: error.message 
+    });
+    return res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to fetch document images' 
+    });
   }
 };
