@@ -392,7 +392,7 @@ export const getAllPlayers = async (req: Request, res: Response) => {
     const players = await Player.find({
       role_id: { $ne: 1 }, // Exclude admins (assuming 1 is admin role)
     }).select(
-      'username fullname patronymic photo dob gender email phone_number registration_date last_login status is_verified is_2fa_enabled currency language country city role_id created_at updated_at referredBy referredByName sumsub_id sumsub_status admin_status'
+      'username fullname patronymic photo dob gender email phone_number registration_date last_login status is_verified is_2fa_enabled currency language country city role_id created_at updated_at referredBy referredByName sumsub_id sumsub_status admin_status sumsub_notes'
     ).lean(); // Use .lean() for plain JavaScript objects for easier manipulation
 
     const playerIds = players.map(player => player._id);
@@ -466,7 +466,8 @@ export const getAllPlayers = async (req: Request, res: Response) => {
         referredByName: player.referredByName || 'N/A',
         sumsub_status: player.sumsub_status || 'not_started',
         sumsub_id: player.sumsub_id || null,
-        admin_status: player.admin_status || null
+        admin_status: player.admin_status || null,
+        sumsub_notes: player.sumsub_notes || null
       };
     });
 
@@ -574,6 +575,8 @@ export const getPlayerDetails = async (req: Request, res: Response) => {
       last_deposit_date: lastDepositDate,
       last_withdrawal_date: lastWithdrawalDate,
       is_2fa: player.is_2fa_enabled,
+      username:player.username,
+      sumsub_notes:player.sumsub_notes,      
     };
 
     res.status(200).json({
@@ -969,10 +972,10 @@ export const googleCallback = (req: Request, res: Response) => {
         `${process.env.CLIENT_URL}/login?error=${encodeURIComponent(errorMessage)}`,
       );
     }
-
-    res.redirect(
+      
+      res.redirect(
       `${process.env.CLIENT_URL}/login?token=${user.token}&expiresIn=${user.expiresIn}`,
-    );
+      );
   })(req, res);
 };
 

@@ -37,7 +37,8 @@ export const getAllPlayers = async () => {
         balance: balance?.balance || 0,
         referredByName: player.referredByName,
         admin_status:player.admin_status,
-        sumsub_inspection_id:player.sumsub_inspection_id
+        sumsub_inspection_id:player.sumsub_inspection_id,
+        sumsub_notes: player.sumsub_notes
       };
     }),
   );
