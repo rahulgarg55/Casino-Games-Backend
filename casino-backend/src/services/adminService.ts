@@ -38,7 +38,8 @@ export const getAllPlayers = async () => {
         referredByName: player.referredByName,
         admin_status:player.admin_status,
         sumsub_inspection_id:player.sumsub_inspection_id,
-        sumsub_notes: player.sumsub_notes
+        sumsub_notes: player.sumsub_notes,
+        sumsub_attempts: player.sumsub_attempts
       };
     }),
   );
@@ -127,6 +128,7 @@ export const getPlayerDetails = async (userId: string) => {
     last_deposit_date: lastDepositDate,
     last_withdrawal_date: lastWithdrawalDate,
     is_2fa: player.is_2fa_enabled,
+    sumsub_attempts:player.sumsub_attempts
   };
 };
 

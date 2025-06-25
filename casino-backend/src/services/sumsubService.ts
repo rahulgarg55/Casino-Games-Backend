@@ -63,6 +63,10 @@ export const initiateSumsubVerification = async (playerId: string) => {
     logger.error('Player email is required for Sumsub verification', { playerId });
     throw new Error('Player email is required for Sumsub verification');
   }
+  if (player.sumsub_attempts <= 0) {
+    logger.error('No verification attempts remaining', { playerId });
+    throw new Error('No verification attempts remaining');
+  }
 
   const externalUserId = playerId;
 
@@ -77,19 +81,35 @@ export const initiateSumsubVerification = async (playerId: string) => {
       player.sumsub_id = applicantId;
       player.sumsub_status = 'not_started';
       await player.save();
-      logger.info('Sumsub applicant created and player updated', { playerId, applicantId });
+      logger.info('Sumsub applicant created and player updated', { playerId, applicantId, attempts: player.sumsub_attempts });
     } catch (error: any) {
-      const match = /already exists: ([a-z0-9]+)/i.exec(error.message);
-      if (match) {
-        player.sumsub_id = match[1];
-        player.sumsub_status = 'not_started';
+      if (error.message.includes('already exists')) {
+        const match = /already exists: ([a-z0-9]+)/i.exec(error.message);
+        if (match) {
+          player.sumsub_id = match[1];
+          player.sumsub_status = 'not_started';
+          await player.save();
+          logger.info('Sumsub applicant already exists, updated player', { playerId, sumsubId: match[1], attempts: player.sumsub_attempts });
+        } else {
+          logger.error('Sumsub applicant creation error', { playerId, error: error.message });
+          throw error;
+        }
+      } else if (error.message.includes('duplicate documents')) {
+        player.sumsub_status = 'rejected_sumsub';
+        player.sumsub_notes = 'Duplicate documents detected';
         await player.save();
-        logger.info('Sumsub applicant already exists, updated player', { playerId, sumsubId: match[1] });
+        logger.error('Duplicate documents detected during applicant creation', { playerId, attempts: player.sumsub_attempts });
+        throw new Error('Duplicate documents detected');
       } else {
         logger.error('Sumsub applicant creation error', { playerId, error: error.message });
         throw error;
       }
     }
+  } else {
+    player.sumsub_attempts = player.sumsub_attempts - 1;
+    player.sumsub_last_attempt_date = new Date();
+    await player.save();
+    logger.info('Decremented verification attempts', { playerId, attempts: player.sumsub_attempts });
   }
 
   player = await Player.findById(playerId);
@@ -139,19 +159,26 @@ export const updateSumsubStatus = async (
   player.sumsub_verification_date = new Date();
   player.sumsub_details = { ...player.sumsub_details, ...details };
 
+  if (sumsubStatus === 'in_review' && player.sumsub_status !== 'in_review') {
+    if (player.sumsub_attempts > 0) {
+      player.sumsub_attempts -= 1;
+      player.sumsub_last_attempt_date = new Date();
+    }
+  }
+
   if (details.inspectionId && !player.sumsub_inspection_id) {
     player.sumsub_inspection_id = details.inspectionId;
     logger.info('Stored inspection ID for player', { playerId, inspectionId: details.inspectionId });
   }
 
   await player.save();
-  logger.info('Player Sumsub status updated', { playerId, sumsubStatus, sumsubNotes, details });
+  logger.info('Player Sumsub status updated', { playerId, sumsubStatus, sumsubNotes, details, attempts: player.sumsub_attempts });
 
   const notification = new Notification({
     type: NotificationType.KYC_UPDATE,
     message: `KYC documents submitted by user ${player.username || player.email} are under review`,
     user_id: null,
-    metadata: { sumsub_id: player.sumsub_id, sumsubStatus, sumsubNotes, ...details },
+    metadata: { sumsub_id: player.sumsub_id, sumsubStatus, sumsubNotes, attempts: player.sumsub_attempts, ...details },
   });
   await notification.save();
 
@@ -184,7 +211,7 @@ export const updateAdminStatus = async (
     type: NotificationType.KYC_UPDATE,
     message: `KYC status updated to ${adminStatus} for user ${player.username || player.email}`,
     user_id: player._id,
-    metadata: { sumsub_id: player.sumsub_id, adminStatus, adminNotes, ...details },
+    metadata: { sumsub_id: player.sumsub_id, adminStatus, adminNotes, attempts: player.sumsub_attempts, ...details },
   });
   await notification.save();
 
@@ -223,6 +250,18 @@ export const uploadDocumentToSumsub = async (
 
     return result;
   } catch (error: any) {
+    if (error.message.includes('duplicate documents')) {
+      const player = await Player.findOne({ sumsub_id: applicantId });
+      if (player) {
+        player.sumsub_status = 'rejected_sumsub';
+        player.sumsub_notes = 'Duplicate documents detected';
+        player.sumsub_attempts = player.sumsub_attempts > 0 ? player.sumsub_attempts - 1 : 0;
+        player.sumsub_last_attempt_date = new Date();
+        await player.save();
+        logger.error('Duplicate documents detected during upload', { applicantId, attempts: player.sumsub_attempts });
+      }
+      throw new Error('Duplicate documents detected');
+    }
     logger.error('Failed to upload document to Sumsub', {
       applicantId,
       error: error.message
@@ -271,6 +310,9 @@ export const getSumsubApplicantStatus = async (applicantId: string) => {
         sumsubStatus = reviewResult?.reviewAnswer === 'GREEN' ? 'approved_sumsub' : 'rejected_sumsub';
         if (reviewResult?.reviewAnswer !== 'GREEN') {
           sumsubNotes = reviewResult?.rejectLabels?.join(', ') || 'Review failed';
+          if (sumsubNotes.includes('duplicate')) {
+            sumsubNotes = 'Duplicate documents detected';
+          }
           details.nextSteps = [
             'Review the rejection reasons',
             'Correct any issues with your documents',
@@ -559,7 +601,6 @@ export const getSumsubDocumentImage = async (
 ): Promise<{ buffer: Buffer; contentType: string }> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  // Use the correct endpoint for getting document images
   const path = `/resources/applicants/${applicantId}/info/idDoc/${documentId}/image`;
   const url = `${config.sumsub.baseUrl}${path}`;
 
@@ -610,7 +651,6 @@ export const getSumsubInspectionImage = async (
 ): Promise<{ buffer: Buffer; contentType: string }> => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  // This endpoint is for WebSDK uploaded images
   const path = `/resources/applicants/${applicantId}/info/inspections/${inspectionId}/images/${imageId}`;
   const url = `${config.sumsub.baseUrl}${path}`;
 

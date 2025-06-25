@@ -53,7 +53,7 @@ export const startSumsubVerification = async (
     logger.info('Verification started', { userId: req.user.id, token: tokenResponse.token });
     res.status(200).json({
       success: true,
-      message: (req as any).__('SUB_VERIFICATION'),
+      message: (req as any).__('SUBMITTED_VERIFICATION'),
       data: {
         accessToken: tokenResponse.token,
         externalUserId: tokenResponse.userId,
@@ -64,11 +64,17 @@ export const startSumsubVerification = async (
       userId: req.user?.id,
       error: error.message,
     });
-    sendErrorResponse(
-      res,
-      400,
-      error.message || (req as any).__('FAILED_SUB_VERIFICATION')
-    );
+    if (error.message === 'No verification attempts remaining') {
+      sendErrorResponse(res, 403, 'No verification attempts remaining');
+    } else if (error.message.includes('duplicate documents')) {
+      sendErrorResponse(res, 400, 'Duplicate documents detected');
+    } else {
+      sendErrorResponse(
+        res,
+        400,
+        error.message || (req as any).__('FAILED_SUB_VERIFICATION')
+      );
+    }
   }
 };
 
@@ -82,8 +88,6 @@ export const startSumsubVerificationWithLink = async (
       return sendErrorResponse(res, 401, (req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
-    logger.info('Initiating Sumsub verification with WebSDK link', { userId: req.user.id });
-    
     const player = await Player.findById(req.user.id);
     if (!player) {
       logger.error('Player not found', { userId: req.user.id });
@@ -95,13 +99,18 @@ export const startSumsubVerificationWithLink = async (
       return sendErrorResponse(res, 400, (req as any).__('EMAIL_REQUIRED'));
     }
 
+    if (player.sumsub_attempts <= 0) {
+      logger.error('No verification attempts remaining', { userId: req.user.id });
+      return sendErrorResponse(res, 403, 'No verification attempts remaining');
+    }
+
     const { url } = await generateSumsubWebSDKLink(
       req.user.id,
       player.email,
       player.phone_number
     );
 
-    logger.info('Verification link generated', { userId: req.user.id, url });
+    logger.info('Verification link generated', { userId: req.user.id, url, attempts: player.sumsub_attempts });
     
     res.status(200).json({
       success: true,
@@ -116,11 +125,15 @@ export const startSumsubVerificationWithLink = async (
       userId: req.user?.id,
       error: error.message,
     });
-    sendErrorResponse(
-      res,
-      400,
-      error.message || (req as any).__('FAILED_SUB_VERIFICATION')
-    );
+    if (error.message.includes('duplicate documents')) {
+      sendErrorResponse(res, 400, 'Duplicate documents detected');
+    } else {
+      sendErrorResponse(
+        res,
+        400,
+        error.message || (req as any).__('FAILED_SUB_VERIFICATION')
+      );
+    }
   }
 };
 
@@ -175,6 +188,9 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
         sumsubStatus = reviewResult?.reviewAnswer === 'GREEN' ? 'approved_sumsub' : 'rejected_sumsub';
         if (reviewResult?.reviewAnswer !== 'GREEN') {
           sumsubNotes = reviewResult?.rejectLabels?.join(', ') || 'Review failed';
+          if (sumsubNotes.includes('duplicate')) {
+            sumsubNotes = 'Duplicate documents detected';
+          }
           details.nextSteps = [
             'Review the rejection reasons',
             'Correct any issues with your documents',
@@ -191,7 +207,7 @@ export const sumsubWebhook = async (req: Request, res: Response) => {
     }
 
     await updateSumsubStatus(player._id.toString(), sumsubStatus, sumsubNotes, details);
-    logger.info('Status updated', { playerId: player._id, sumsubStatus, sumsubNotes, details });
+    logger.info('Status updated', { playerId: player._id, sumsubStatus, sumsubNotes, details, attempts: player.sumsub_attempts });
 
     res.status(200).json({
       success: true,
@@ -228,6 +244,8 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
     let adminNotes = player.admin_notes;
     let lastUpdated = player.sumsub_verification_date;
     let details = player.sumsub_details || {};
+    let attempts = player.sumsub_attempts;
+    let lastAttemptDate = player.sumsub_last_attempt_date;
 
     if (player.sumsub_id) {
       try {
@@ -261,7 +279,9 @@ export const getSumsubStatus = async (req: CustomRequest, res: Response) => {
         adminStatus,
         adminNotes,
         lastUpdated: lastUpdated?.toISOString(),
-        details
+        details,
+        attempts,
+        lastAttemptDate: lastAttemptDate?.toISOString()
       },
     });
   } catch (error: any) {
@@ -306,6 +326,11 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       return sendErrorResponse(res, 400, (req as any).__('SUMSUB_ID_NOT_FOUND'));
     }
 
+    if (player.sumsub_attempts <= 0) {
+      logger.error('No verification attempts remaining', { userId: req.user.id });
+      return sendErrorResponse(res, 403, 'No verification attempts remaining');
+    }
+
     const documentType = req.body.documentType || 'IDENTITY';
     const documentSide = req.body.documentSide || 'FRONT';
 
@@ -329,7 +354,8 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       userId: req.user.id,
       documentType,
       documentSide,
-      sumsubId: player.sumsub_id
+      sumsubId: player.sumsub_id,
+      attempts: player.sumsub_attempts
     });
 
     res.status(200).json({
@@ -339,7 +365,8 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
         documentId: uploadResult.idDocId,
         documentType,
         documentSide,
-        status: uploadResult.status
+        status: uploadResult.status,
+        attempts: player.sumsub_attempts
       }
     });
   } catch (error: any) {
@@ -347,11 +374,15 @@ export const uploadDocument = async (req: CustomRequest, res: Response) => {
       userId: req.user?.id,
       error: error.message
     });
-    sendErrorResponse(
-      res,
-      500,
-      error.message || (req as any).__('FAILED_DOCUMENT_UPLOAD')
-    );
+    if (error.message.includes('duplicate documents')) {
+      sendErrorResponse(res, 400, 'Duplicate documents detected');
+    } else {
+      sendErrorResponse(
+        res,
+        500,
+        error.message || (req as any).__('FAILED_DOCUMENT_UPLOAD')
+      );
+    }
   }
 };
 
@@ -446,7 +477,6 @@ export const rejectPlayerKYC = async (req: CustomRequest, res: Response) => {
   }
 };
 
-// **Updated Function: Removed inspectionId Dependency**
 export const getDocumentImage = async (req: CustomRequest, res: Response) => {
   try {
     const applicantId = req.params.applicantId as string;
@@ -468,7 +498,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
     }
 
     try {
-      // First, try to get the image as a document image
       console.log('Attempting to fetch as document image...');
       const { buffer, contentType } = await getSumsubDocumentImage(applicantId, imageId);
       
@@ -485,7 +514,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
     } catch (docError: any) {
       console.log('Failed to fetch as document image, trying inspection image...');
       
-      // If document image fails, try inspection image
       if (player.sumsub_inspection_id) {
         try {
           const { buffer, contentType } = await getSumsubInspectionImage(
@@ -510,7 +538,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
         }
       }
 
-      // If both methods fail, try to get inspection ID from SDK state
       try {
         console.log('Attempting to get inspection ID from SDK state...');
         const sdkState = await getSumsubSDKState(applicantId);
@@ -519,7 +546,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
         if (inspectionId) {
           console.log('Found inspection ID from SDK state:', inspectionId);
           
-          // Update player with inspection ID
           if (!player.sumsub_inspection_id) {
             player.sumsub_inspection_id = inspectionId;
             await player.save();
@@ -547,7 +573,6 @@ export const getDocumentImage = async (req: CustomRequest, res: Response) => {
         console.log('Failed to get inspection ID from SDK state');
       }
 
-      // If all methods fail, throw the original error
       throw docError;
     }
   } catch (error: any) {
@@ -584,7 +609,7 @@ export const getPendingKYCs = async (req: CustomRequest, res: Response) => {
 
     const [players, total] = await Promise.all([
       Player.find(query)
-        .select('username email phone_number sumsub_status sumsub_verification_date sumsub_notes sumsub_details')
+        .select('username email phone_number sumsub_status sumsub_verification_date sumsub_notes sumsub_details sumsub_attempts sumsub_last_attempt_date')
         .sort({ sumsub_verification_date: -1 })
         .skip(skip)
         .limit(Number(limit)),
@@ -637,7 +662,6 @@ export const getSumsubDocumentImagesList = async (req: CustomRequest, res: Respo
 
     console.log('Getting document images list for:', applicantId);
 
-    // Try to get images from SDK state first
     try {
       const sdkState = await getSumsubSDKState(applicantId);
       console.log('SDK State:', JSON.stringify(sdkState, null, 2));
@@ -646,7 +670,6 @@ export const getSumsubDocumentImagesList = async (req: CustomRequest, res: Respo
       if (documentStatus && documentStatus.imageStatuses && documentStatus.attemptId) {
         const inspectionId = documentStatus.attemptId;
         
-        // Update player with inspection ID if not already stored
         if (!player.sumsub_inspection_id) {
           player.sumsub_inspection_id = inspectionId;
           await player.save();
@@ -669,7 +692,6 @@ export const getSumsubDocumentImagesList = async (req: CustomRequest, res: Respo
       console.log('Failed to get SDK state:', sdkError.message);
     }
 
-    // Fallback to getting documents via API
     try {
       const documents = await getSumsubApplicantDocuments(applicantId);
       console.log('Found documents:', documents);

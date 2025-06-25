@@ -59,6 +59,8 @@ export interface IPlayer extends Document {
   };
   new_email?: string;
   full_phone_number?: string;
+  sumsub_attempts?: number;
+  sumsub_last_attempt_date?: Date;
 }
 
 const playerSchema: Schema = new Schema(
@@ -182,7 +184,7 @@ const playerSchema: Schema = new Schema(
     sumsub_inspection_id: { type: String, default: null },
     sumsub_status: {
       type: String,
-      enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub','duplicate_documents', null],
+      enum: ['not_started', 'in_review', 'approved_sumsub', 'rejected_sumsub', null],
       default: 'not_started',
     },
     sumsub_notes: { type: String, default: null },
@@ -204,6 +206,16 @@ const playerSchema: Schema = new Schema(
         message: 'Invalid email format',
       },
     },
+    sumsub_attempts: {
+      type: Number,
+      default: 3,
+      min: 0,
+      max: 3
+    },
+    sumsub_last_attempt_date: {
+      type: Date,
+      default: null
+    }
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

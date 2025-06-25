@@ -11,6 +11,7 @@ import { IPlayer } from '../models/player';
 import { logger } from '../utils/logger';
 import Stripe from 'stripe';
 import { PlatformFeeService } from '../services/platformFeeService';
+import PlayerBalance from '../models/playerBalance';
 
 interface CustomRequest extends Request {
   user?: {
@@ -52,21 +53,24 @@ async function updatePlayerBalance(
   amount: number,
 ): Promise<number> {
   try {
-    const player = await Player.findById(playerId);
-    if (!player) {
-      throw new Error('Player not found');
+    let playerBalance = await PlayerBalance.findOne({ player_id: playerId });
+    if (!playerBalance) {
+      // If not found, create a new PlayerBalance document
+      playerBalance = new PlayerBalance({
+        player_id: playerId,
+        balance: 0,
+        currency: 0, // Default to USD, or fetch from Player if needed
+        is_deleted: 0,
+      });
     }
-
-    const newBalance = (player.balance || 0) + amount;
+    const newBalance = (playerBalance.balance || 0) + amount;
     if (newBalance < 0) {
       throw new Error('Insufficient balance');
     }
-
-    player.balance = newBalance;
-    await player.save();
-
-    logger.info(`Updated balance for player ${playerId}: ${player.balance}`);
-    return player.balance;
+    playerBalance.balance = newBalance;
+    await playerBalance.save();
+    logger.info(`Updated PlayerBalance for player ${playerId}: ${playerBalance.balance}`);
+    return playerBalance.balance;
   } catch (error: any) {
     logger.error('Error updating player balance:', {
       playerId,

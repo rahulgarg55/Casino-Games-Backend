@@ -98,6 +98,7 @@
 						"accessTokens"
 					],
 					"query": [
+					
 						{
 							"key": "userId",
 							"value": "{{externalUserId}}"
