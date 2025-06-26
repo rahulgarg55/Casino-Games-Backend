@@ -154,12 +154,13 @@ export const updateSumsubStatus = async (
     throw new Error('Player not found');
   }
 
+  const previousStatus = player.sumsub_status;
   player.sumsub_status = sumsubStatus;
   player.sumsub_notes = sumsubNotes || player.sumsub_notes;
   player.sumsub_verification_date = new Date();
   player.sumsub_details = { ...player.sumsub_details, ...details };
 
-  if (sumsubStatus === 'in_review' && player.sumsub_status !== 'in_review') {
+  if (sumsubStatus === 'in_review' && previousStatus !== 'in_review') {
     if (player.sumsub_attempts > 0) {
       player.sumsub_attempts -= 1;
       player.sumsub_last_attempt_date = new Date();
