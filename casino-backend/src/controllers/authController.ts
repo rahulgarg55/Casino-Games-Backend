@@ -24,6 +24,7 @@ import {
   sendVerificationEmail,
   sendStatusUpdateEmail,
 } from '../utils/sendEmail';
+import {sendSmsVerification} from "../utils/sendSms";
 import bcrypt from 'bcryptjs';
 import moment from 'moment';
 import { messages } from '../utils/messages';
@@ -1143,26 +1144,26 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
   }
 };
 
-export const verifyPhone = async (req: Request, res: Response) => {
-  try {
-    const { phone_number, code } = req.body;
-    if (!phone_number || !code) {
-      return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
-    }
+// export const verifyPhone = async (req: Request, res: Response) => {
+//   try {
+//     const { phone_number, code } = req.body;
+//     if (!phone_number || !code) {
+//       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
+//     }
 
-    await authService.verifyPhoneNumber(phone_number, code,req);
-    res.status(200).json({
-      success: true,
-      message: (req as any).__('PHONE_VERIFIED'),
-    });
-  } catch (error) {
-    sendErrorResponse(
-      res,
-      400,
-      error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION'),
-    );
-  }
-};
+//     await authService.verifyPhoneNumber(phone_number, code,req);
+//     res.status(200).json({
+//       success: true,
+//       message: (req as any).__('PHONE_VERIFIED'),
+//     });
+//   } catch (error) {
+//     sendErrorResponse(
+//       res,
+//       400,
+//       error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION'),
+//     );
+//   }
+// };
 
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
@@ -1187,6 +1188,72 @@ export const verifyOTP = async (req: Request, res: Response) => {
       res,
       401,
       error instanceof Error ? error.message : (req as any).__('INVALID_OTP'),
+    );
+  }
+};
+
+export const verifyPhone = async (req: Request, res: Response) => {
+  try {
+    const { phone_number, code } = req.body;
+    if (!phone_number || !code) {
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
+    }
+    const player = await authService.verifyPhoneNumber(phone_number, code, req);
+    const tokenData = generateTokenResponse(player);
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('PHONE_VERIFIED'),
+      data: {
+        token: tokenData.token,
+        expiresIn: tokenData.expiresIn,
+        user: {
+          id: player._id,
+          username: player.username,
+          email: player.email,
+          phone_number: player.phone_number,
+          role_id: player.role_id,
+          status: player.status,
+          is_verified: player.is_verified,
+          is_2fa_enabled: player.is_2fa_enabled,
+        },
+      },
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION')
+    );
+  }
+};
+
+export const resendSmsCode = async (req: Request, res: Response) => {
+  try {
+    const { phone_number } = req.body;
+    if (!phone_number) {
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_REQUIRED'));
+    }
+    const player = await Player.findOne({ phone_number });
+    if (!player) {
+      return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
+    }
+    if (player.is_verified === VERIFICATION.VERIFIED) {
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_ALREADY_VERIFIED'));
+    }
+    const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
+    player.sms_code = smsCode;
+    player.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
+    await player.save();
+    await sendSmsVerification(phone_number, smsCode);
+    res.status(200).json({
+      success: true,
+      message: (req as any).__('SMS_CODE_RESENT'),
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : (req as any).__('FAILED_TO_RESEND_SMS')
     );
   }
 };

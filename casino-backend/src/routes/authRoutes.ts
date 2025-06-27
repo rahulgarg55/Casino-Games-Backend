@@ -266,6 +266,13 @@ router.post(
   authController.resendVerificationEmail,
 );
 
+router.post(
+  '/resend-sms-code',
+  body('phone_number').matches(/^\+?[1-9]\d{1,14}$/),
+  validateRequest,
+  authController.resendSmsCode
+);
+
 router.get('/notifications', authController.getAdminNotifications);
 
 router.post(

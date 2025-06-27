@@ -151,7 +151,7 @@ const playerSchema: Schema = new Schema(
     reset_password_token: { type: String },
     reset_password_expires: { type: Date },
     verification_token: { type: String },
-    verification_token_expires: { type: Date },
+    verification_token_expires: { Date },
     sms_code: { type: String, select: false },
     sms_code_expires: { type: Date, select: false },
     payment_methods: [{ type: mongoose.Schema.Types.ObjectId, ref: 'PaymentMethod' }],

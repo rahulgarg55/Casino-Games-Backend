@@ -28,6 +28,8 @@ import { session } from 'passport';
 import { Affiliate, IAffiliate } from '../models/affiliate';
 // import { Affiliate } from '../models/affiliate';
 import Role from '../models/role';
+import { logger } from '../utils/logger';
+
 interface RegistrationData {
   username?: string;
   email?: string;
@@ -191,6 +193,13 @@ export const register = async (data: RegistrationData, req: any) => {
   }
 
   try {
+    if (email) {
+      await sendVerificationEmail(email, verificationToken);
+    } else if (phone_number) {
+      logger.info(`[Register] Player registered with phone. Attempting to send verification SMS to ${phone_number}`);
+      await sendSmsVerification(phone_number, smsCode);
+    }
+
     const player = new Player(playerData);
     await player.save();
 
@@ -225,12 +234,6 @@ export const register = async (data: RegistrationData, req: any) => {
       },
     });
     await notification.save();
-
-    if (email) {
-      await sendVerificationEmail(email, verificationToken);
-    } else if (phone_number) {
-      await sendSmsVerification(phone_number, smsCode);
-    }
 
     const tokenData = generateTokenResponse(player);
     return {
@@ -317,21 +320,18 @@ export const affiliateRegister = async (data: RegistrationData) => {
     },
   };
 };
-export const verifyPhoneNumber = async (phoneNumber: string, code: string,req:any) => {
+export const verifyPhoneNumber = async (phoneNumber: string, code: string, req: any) => {
   const player = await Player.findOne({
     phone_number: phoneNumber,
     sms_code: code,
     sms_code_expires: { $gt: new Date() },
   });
-  if (!player) {
-    throw new Error((req as any).__('INVALID_CODE'));
-  }
+  if (!player) throw new Error((req as any).__('INVALID_CODE'));
   player.is_verified = VERIFICATION.VERIFIED;
   player.sms_code = undefined;
   player.sms_code_expires = undefined;
   await player.save();
-
-  return { message: 'Phone number verified successfully' };
+  return player; // Return player object for token generation
 };
 
 const generateOTP = (): string => {
@@ -775,19 +775,33 @@ const sendOTPByEmail = async (to: string, otp: string) => {
   await sgMail.send(msg);
 };
 
-// Send OTP via SMS (Twilio)
 const sendOTPBySMS = async (to: string, otp: string) => {
-  const twilio = (await import('twilio')).default;
-  const twilioClient = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN,
-  );
+  logger.info(`[2FA] Attempting to send OTP via SMS to ${to}`);
+  try {
+    const twilio = (await import('twilio')).default;
+    const twilioClient = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN,
+    );
+    
+    const from = process.env.TWILIO_PHONE_NUMBER;
+    if (!from) {
+      logger.error('[2FA] Twilio "From" number is not configured.');
+      throw new Error('Twilio "From" number is not configured.');
+    }
 
-  await twilioClient.messages.create({
-    body: `Your OTP is: ${otp}. It expires in 10 minutes.`,
-    from: process.env.TWILIO_PHONE_NUMBER,
-    to,
-  });
+    logger.info('[2FA] Sending SMS with details:', { from, to });
+
+    const message = await twilioClient.messages.create({
+      body: `Your 2FA OTP is: ${otp}. It expires in 10 minutes.`,
+      from,
+      to,
+    });
+    logger.info('[2FA] OTP SMS sent successfully. Full response:', message);
+  } catch (error: any) {
+    logger.error('[2FA] Failed to send OTP SMS. Full error:', error);
+    throw new Error(`[2FA] Failed to send OTP SMS: ${error.message}`);
+  }
 };
 
 export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
