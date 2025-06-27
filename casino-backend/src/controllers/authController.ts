@@ -39,6 +39,7 @@ import {
 import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
 import Languages from '../models/languages';
+import { formatE164PhoneNumber } from '../utils/sendSms';
 
 interface CustomRequest extends Request {
   user?: {
@@ -1144,27 +1145,6 @@ export const resendVerificationEmail = async (req: Request, res: Response) => {
   }
 };
 
-// export const verifyPhone = async (req: Request, res: Response) => {
-//   try {
-//     const { phone_number, code } = req.body;
-//     if (!phone_number || !code) {
-//       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
-//     }
-
-//     await authService.verifyPhoneNumber(phone_number, code,req);
-//     res.status(200).json({
-//       success: true,
-//       message: (req as any).__('PHONE_VERIFIED'),
-//     });
-//   } catch (error) {
-//     sendErrorResponse(
-//       res,
-//       400,
-//       error instanceof Error ? error.message : (req as any).__('FAILED_PHONE_VERIFICATION'),
-//     );
-//   }
-// };
-
 export const verifyOTP = async (req: Request, res: Response) => {
   try {
     const { playerId, otp } = req.body;
@@ -1194,11 +1174,12 @@ export const verifyOTP = async (req: Request, res: Response) => {
 
 export const verifyPhone = async (req: Request, res: Response) => {
   try {
-    const { phone_number, code } = req.body;
-    if (!phone_number || !code) {
+    const { phone_number, country_code, code } = req.body;
+    if (!phone_number || !country_code || !code) {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
     }
-    const player = await authService.verifyPhoneNumber(phone_number, code, req);
+    const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
+    const player = await authService.verifyPhoneNumber(e164PhoneNumber, code, req);
     const tokenData = generateTokenResponse(player);
     res.status(200).json({
       success: true,
@@ -1229,11 +1210,12 @@ export const verifyPhone = async (req: Request, res: Response) => {
 
 export const resendSmsCode = async (req: Request, res: Response) => {
   try {
-    const { phone_number } = req.body;
-    if (!phone_number) {
+    const { phone_number, country_code } = req.body;
+    if (!phone_number || !country_code) {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_REQUIRED'));
     }
-    const player = await Player.findOne({ phone_number });
+    const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
+    const player = await Player.findOne({ phone_number: e164PhoneNumber });
     if (!player) {
       return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
@@ -1244,7 +1226,7 @@ export const resendSmsCode = async (req: Request, res: Response) => {
     player.sms_code = smsCode;
     player.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
     await player.save();
-    await sendSmsVerification(phone_number, smsCode);
+    await sendSmsVerification(e164PhoneNumber, smsCode);
     res.status(200).json({
       success: true,
       message: (req as any).__('SMS_CODE_RESENT'),

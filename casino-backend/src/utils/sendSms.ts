@@ -8,6 +8,18 @@ const client = twilio(
   process.env.TWILIO_AUTH_TOKEN,
 );
 
+/**
+ * Formats a phone number to E.164 using country code and phone number.
+ * If the phone number already starts with '+', returns as is.
+ */
+export function formatE164PhoneNumber(countryCode: string, phoneNumber: string): string {
+  if (!countryCode || !phoneNumber) throw new Error('Country code and phone number are required');
+  const cleanCountry = countryCode.startsWith('+') ? countryCode : `+${countryCode}`;
+  const cleanPhone = phoneNumber.replace(/^\+/, '');
+  if (phoneNumber.startsWith('+')) return phoneNumber;
+  return `${cleanCountry}${cleanPhone}`;
+}
+
 export const sendSmsVerification = async (
   phoneNumber: string,
   code: string,
@@ -45,7 +57,9 @@ export const sendSmsVerification = async (
     }
 
     const from = process.env.TWILIO_PHONE_NUMBER;
-    const to = phoneNumber; // Assuming phone number is already in E.164 format
+    const to = formatE164PhoneNumber('+1', phoneNumber);
+
+    logger.info('[Twilio] Formatted E.164 phone number:', { to });
 
     logger.info('[Twilio] Sending SMS with details:', { from, to });
 

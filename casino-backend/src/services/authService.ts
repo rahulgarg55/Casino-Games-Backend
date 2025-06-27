@@ -15,7 +15,7 @@ import {
 } from '../utils/auth';
 import cloudinary from '../utils/cloudinary';
 import { sendVerificationEmail } from '../utils/sendEmail';
-import { sendSmsVerification } from '../utils/sendSms';
+import { sendSmsVerification, formatE164PhoneNumber } from '../utils/sendSms';
 import Notification, { NotificationType } from '../models/notification';
 import {
   generateSumsubAccessToken,
@@ -34,6 +34,7 @@ interface RegistrationData {
   username?: string;
   email?: string;
   phone_number?: string;
+  country_code?: string;
   password: string;
   fullname?: string;
   patronymic?: string;
@@ -152,7 +153,10 @@ export const register = async (data: RegistrationData, req: any) => {
   };
 
   if (phone_number) {
-    playerData.phone_number = phone_number;
+    // Combine country_code and phone_number for E.164
+    const countryCode = data.country_code || req.body.country_code || '+1';
+    const e164PhoneNumber = formatE164PhoneNumber(countryCode, phone_number);
+    playerData.phone_number = e164PhoneNumber;
     playerData.sms_code = smsCode;
     playerData.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
   }
@@ -196,8 +200,8 @@ export const register = async (data: RegistrationData, req: any) => {
     if (email) {
       await sendVerificationEmail(email, verificationToken);
     } else if (phone_number) {
-      logger.info(`[Register] Player registered with phone. Attempting to send verification SMS to ${phone_number}`);
-      await sendSmsVerification(phone_number, smsCode);
+      logger.info(`[Register] Player registered with phone. Attempting to send verification SMS to ${playerData.phone_number}`);
+      await sendSmsVerification(playerData.phone_number, smsCode);
     }
 
     const player = new Player(playerData);

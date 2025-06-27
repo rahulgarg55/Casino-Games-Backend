@@ -102,6 +102,7 @@ const playerSchema: Schema = new Schema(
       type: String,
       unique: true,
       sparse: true,
+      // Should always be stored in E.164 format (e.g., +919876543210)
       validate: {
         validator: function (v: string | null | undefined): boolean {
           return v === null || v === undefined || /^\+?[1-9]\d{1,14}$/.test(v);
