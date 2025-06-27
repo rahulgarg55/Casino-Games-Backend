@@ -51,6 +51,7 @@ interface RegistrationData {
 interface LoginData {
   email?: string;
   phone_number?: string;
+  country_code?: string;
   password: string;
   role_id: number;
 }
@@ -343,11 +344,13 @@ const generateOTP = (): string => {
 };
 
 export const login = async (data: LoginData,req:any) => {
-  const { email, phone_number, password, role_id = 0 } = data;
+  let { email, phone_number, password, role_id = 0, country_code } = data;
 
-  if (!email && !phone_number) {
-    throw new Error((req as any).__('INVALID_REQUEST'));
+  // If phone_number and country_code are provided, format to E.164
+  if (phone_number && country_code) {
+    phone_number = formatE164PhoneNumber(country_code, phone_number);
   }
+
   const query = {
     role_id,
     $or: [
