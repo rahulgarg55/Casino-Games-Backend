@@ -145,25 +145,19 @@ export const generateSumsubAccessToken = async (
 
 export const createSumsubApplicant = async (
   playerId: string,
-  email: string,
+  email: string | undefined,
   externalUserId: string,
   phone?: string,
 ): Promise<string> => {
-  if (!validateEmail(email)) {
-    logger.error('Invalid email provided', { playerId, email });
-    throw new Error('Invalid email address provided');
-  }
-
+  // No email validation: allow phone-only
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
   const levelName = 'id-only';
   const path = `/resources/applicants?levelName=${levelName}`;
   const url = `${SUMSUB_BASE_URL}${path}`;
 
-  const bodyObj = {
+  const bodyObj: any = {
     externalUserId,
-    email,
-    phone: phone || undefined,
     requiredIdDocs: {
       docSets: [{
         idDocSetType: 'IDENTITY',
@@ -171,6 +165,8 @@ export const createSumsubApplicant = async (
       }],
     },
   };
+  if (email) bodyObj.email = email;
+  if (phone) bodyObj.phone = phone;
 
   const body = JSON.stringify(bodyObj);
   const signature = generateSignature(method, path, body, timestamp);
@@ -187,6 +183,7 @@ export const createSumsubApplicant = async (
     playerId,
     externalUserId,
     email,
+    phone,
     signature,
     timestamp,
     bodyObj,

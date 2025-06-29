@@ -59,9 +59,9 @@ export const initiateSumsubVerification = async (playerId: string) => {
     logger.error('Player not found', { playerId });
     throw new Error('Player not found');
   }
-  if (!player.email) {
-    logger.error('Player email is required for Sumsub verification', { playerId });
-    throw new Error('Player email is required for Sumsub verification');
+  if (!player.email && !player.phone_number) {
+    logger.error('Player email or phone number is required for Sumsub verification', { playerId });
+    throw new Error('Player email or phone number is required for Sumsub verification');
   }
   if (player.sumsub_attempts <= 0) {
     logger.error('No verification attempts remaining', { playerId });
@@ -74,9 +74,9 @@ export const initiateSumsubVerification = async (playerId: string) => {
     try {
       const applicantId = await createSumsubApplicant(
         playerId,
-        player.email,
+        player.email || undefined,
         externalUserId,
-        player.phone_number
+        player.phone_number || undefined
       );
       player.sumsub_id = applicantId;
       player.sumsub_status = 'not_started';
@@ -122,24 +122,11 @@ export const initiateSumsubVerification = async (playerId: string) => {
     playerId,
     sumsubId: player.sumsub_id,
     email: player.email,
+    phone_number: player.phone_number,
     externalUserId,
   });
 
-  try {
-    return await generateSumsubAccessToken(
-      playerId,
-      player.sumsub_id,
-      player.email,
-      'id-only'
-    );
-  } catch (error: any) {
-    logger.error('Failed to generate access token', {
-      playerId,
-      sumsubId: player.sumsub_id,
-      error: error.message
-    });
-    throw error;
-  }
+  return generateSumsubAccessToken(playerId, player.sumsub_id, player.email || '', 'id-only');
 };
 
 export const updateSumsubStatus = async (
