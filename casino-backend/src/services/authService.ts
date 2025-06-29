@@ -108,9 +108,15 @@ export const register = async (data: RegistrationData, req: any) => {
     );
   }
 
+  let e164PhoneNumber: string | undefined;
+  if (phone_number) {
+    const countryCode = data.country_code || req.body.country_code || '+1';
+    e164PhoneNumber = formatE164PhoneNumber(countryCode, phone_number);
+  }
+
   const query: any[] = [];
   if (email) query.push({ email });
-  if (phone_number) query.push({ phone_number });
+  if (e164PhoneNumber) query.push({ phone_number: e164PhoneNumber }); // Use E.164 formatted number
   if (username) query.push({ username });
 
   const existingUser = await Player.findOne({ $or: query });
@@ -121,7 +127,7 @@ export const register = async (data: RegistrationData, req: any) => {
     if (existingUser.email === email) {
       throw new Error('Email is already registered');
     }
-    if (existingUser.phone_number === phone_number) {
+    if (existingUser.phone_number === e164PhoneNumber) {
       throw new Error('Phone number is already registered');
     }
   }
@@ -154,7 +160,6 @@ export const register = async (data: RegistrationData, req: any) => {
   };
 
   if (phone_number) {
-    // Combine country_code and phone_number for E.164
     const countryCode = data.country_code || req.body.country_code || '+1';
     const e164PhoneNumber = formatE164PhoneNumber(countryCode, phone_number);
     playerData.phone_number = e164PhoneNumber;
@@ -336,7 +341,7 @@ export const verifyPhoneNumber = async (phoneNumber: string, code: string, req: 
   player.sms_code = undefined;
   player.sms_code_expires = undefined;
   await player.save();
-  return player; // Return player object for token generation
+  return player;
 };
 
 const generateOTP = (): string => {
