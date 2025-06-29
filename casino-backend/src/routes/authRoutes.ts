@@ -250,6 +250,14 @@ router.post(
 );
 
 router.post(
+  '/check-phone-exists',
+  body('phone_number').isString().notEmpty(),
+  body('country_code').isString().notEmpty(),
+  validateRequest,
+  authController.checkPhoneExists,
+);
+
+router.post(
   '/upload-photo',
   verifyToken,
   upload.single('photo'),

@@ -1208,6 +1208,42 @@ export const verifyPhone = async (req: Request, res: Response) => {
   }
 };
 
+export const checkPhoneExists = async (req: Request, res: Response) => {
+  try {
+    const { phone_number, country_code } = req.body;
+    if (!phone_number || !country_code) {
+      return res.status(400).json({
+        success: false,
+        error: 'PHONE_AND_COUNTRY_CODE_REQUIRED',
+      });
+    }
+   
+    const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
+
+    
+    const player = await Player.findOne({ phone_number: e164PhoneNumber });
+
+    if (player) {
+      return res.status(200).json({
+        success: true,
+        exists: true,
+        message: 'Phone number already registered',
+      });
+    } else {
+      return res.status(200).json({
+        success: true,
+        exists: false,
+        message: 'Phone number is available',
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Server error',
+    });
+  }
+};
+
 export const resendSmsCode = async (req: Request, res: Response) => {
   try {
     const { phone_number, country_code } = req.body;

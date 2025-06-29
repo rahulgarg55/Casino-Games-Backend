@@ -338,6 +338,7 @@ export const verifyPhoneNumber = async (phoneNumber: string, code: string, req: 
   });
   if (!player) throw new Error((req as any).__('INVALID_CODE'));
   player.is_verified = VERIFICATION.VERIFIED;
+  player.phone_verified = true;
   player.sms_code = undefined;
   player.sms_code_expires = undefined;
   await player.save();
@@ -1001,6 +1002,7 @@ export const updateProfile = async (
       updates.phone_verified = data.phone_number
         ? false
         : player.phone_verified;
+        updates.is_verified = 0;
     }
   }
 
