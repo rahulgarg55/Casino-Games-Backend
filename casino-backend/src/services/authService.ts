@@ -122,7 +122,7 @@ export const register = async (data: RegistrationData, req: any) => {
   const existingUser = await Player.findOne({ $or: query });
   if (existingUser) {
     if (existingUser.username === username) {
-      throw new Error('Username is already taken');
+      throw new Error('User already exists');
     }
     if (existingUser.email === email) {
       throw new Error('Email is already registered');
@@ -330,7 +330,7 @@ export const affiliateRegister = async (data: RegistrationData) => {
     },
   };
 };
-export const verifyPhoneNumber = async (phoneNumber: string, code: string, req: any) => {
+export const verifyPhoneNumber = async (phoneNumber: string, code: string, countryCode: string, req: any) => {
   const player = await Player.findOne({
     phone_number: phoneNumber,
     sms_code: code,
@@ -339,6 +339,7 @@ export const verifyPhoneNumber = async (phoneNumber: string, code: string, req: 
   if (!player) throw new Error((req as any).__('INVALID_CODE'));
   player.is_verified = VERIFICATION.VERIFIED;
   player.phone_verified = true;
+  player.country_code = countryCode;
   player.sms_code = undefined;
   player.sms_code_expires = undefined;
   await player.save();

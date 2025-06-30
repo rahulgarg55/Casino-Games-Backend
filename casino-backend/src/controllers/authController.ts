@@ -113,7 +113,7 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('Username is already taken')) {
+      if (error.message.includes('User already exists')) {
         sendErrorResponse(res, 409, [
           { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
         ]);
@@ -1179,8 +1179,7 @@ export const verifyPhone = async (req: Request, res: Response) => {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
     }
     const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
-    const player = await authService.verifyPhoneNumber(e164PhoneNumber, code, req);
-    const tokenData = generateTokenResponse(player);
+    const player = await authService.verifyPhoneNumber(e164PhoneNumber, code, country_code, req);    const tokenData = generateTokenResponse(player);
     res.status(200).json({
       success: true,
       message: (req as any).__('PHONE_VERIFIED'),
@@ -1192,6 +1191,7 @@ export const verifyPhone = async (req: Request, res: Response) => {
           username: player.username,
           email: player.email,
           phone_number: player.phone_number,
+          country_code: player.country_code,
           role_id: player.role_id,
           status: player.status,
           is_verified: player.is_verified,
