@@ -115,6 +115,7 @@ export const register = async (req: Request, res: Response) => {
     if (error instanceof Error) {
       if (
         error.message.includes('User already exists') ||
+        error.message.includes('Username is already taken') ||
         error.message.includes('Email is already registered') ||
         error.message.includes('Phone number is already registered')
       ) {
@@ -1765,20 +1766,12 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (error.message.includes('Username is already taken')) {
+      if (error.message.includes('User already exists') ||
+        error.message.includes('Username is already taken') ||
+        error.message.includes('Email is already registered') ||
+        error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
           { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
-        ]);
-      } else if (error.message.includes('Email is already registered')) {
-        sendErrorResponse(res, 409, [
-          { param: 'email',message: (req as any).__('EMIAL_ALREADY_REGISTER')},
-        ]);
-      } else if (error.message.includes('Phone number is already registered')) {
-        sendErrorResponse(res, 409, [
-          {
-            param: 'phone_number',
-            message:  (req as any).__('PHONE_ALREADY_REGISTER'),
-          },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);

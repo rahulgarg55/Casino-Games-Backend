@@ -105,12 +105,8 @@ export const initiateSumsubVerification = async (playerId: string) => {
         throw error;
       }
     }
-  } else {
-    player.sumsub_attempts = player.sumsub_attempts - 1;
-    player.sumsub_last_attempt_date = new Date();
-    await player.save();
-    logger.info('Decremented verification attempts', { playerId, attempts: player.sumsub_attempts });
   }
+  // Do NOT decrement attempts here! Attempts are only decremented in updateSumsubStatus when status transitions to 'in_review'.
 
   player = await Player.findById(playerId);
   if (!player?.sumsub_id) {
@@ -147,6 +143,7 @@ export const updateSumsubStatus = async (
   player.sumsub_verification_date = new Date();
   player.sumsub_details = { ...player.sumsub_details, ...details };
 
+  // Only decrement attempts when status transitions to 'in_review' (i.e., after real document submission)
   if (sumsubStatus === 'in_review' && previousStatus !== 'in_review') {
     if (player.sumsub_attempts > 0) {
       player.sumsub_attempts -= 1;

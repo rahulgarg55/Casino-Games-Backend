@@ -110,7 +110,7 @@ const playerSchema: Schema = new Schema(
         message: 'Invalid phone number format',
       },
     },
-    country_code: { type: String, default: '+1' },
+    country_code: { type: String, default: '+91' },
     password_hash: { 
       type: String, 
       required: true,

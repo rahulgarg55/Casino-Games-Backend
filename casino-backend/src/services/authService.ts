@@ -110,7 +110,7 @@ export const register = async (data: RegistrationData, req: any) => {
 
   let e164PhoneNumber: string | undefined;
   if (phone_number) {
-    const countryCode = data.country_code || req.body.country_code || '+1';
+    const countryCode = data.country_code || req.body.country_code || '+91';
     e164PhoneNumber = formatE164PhoneNumber(countryCode, phone_number);
   }
 
@@ -160,7 +160,7 @@ export const register = async (data: RegistrationData, req: any) => {
   };
 
   if (phone_number) {
-    const countryCode = data.country_code || req.body.country_code || '+1';
+    const countryCode = data.country_code || req.body.country_code || '+91';
     const e164PhoneNumber = formatE164PhoneNumber(countryCode, phone_number);
     playerData.phone_number = e164PhoneNumber;
     playerData.sms_code = smsCode;

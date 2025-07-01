@@ -57,7 +57,7 @@ export const sendSmsVerification = async (
     }
 
     const from = process.env.TWILIO_PHONE_NUMBER;
-    const to = formatE164PhoneNumber('+1', phoneNumber);
+    const to = formatE164PhoneNumber('+91', phoneNumber);
 
     logger.info('[Twilio] Formatted E.164 phone number:', { to });
 
