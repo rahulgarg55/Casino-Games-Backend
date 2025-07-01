@@ -72,7 +72,7 @@ export const generateSignature = (
 export const generateSumsubAccessToken = async (
   playerId: string,
   applicantId: string,
-  email: string,
+  email?: string, // Made email optional
   levelName: string = 'id-only',
   retries: number = 3,
   delayMs: number = 1000,
@@ -81,6 +81,12 @@ export const generateSumsubAccessToken = async (
   if (!email && !phone) {
     logger.error('No email or phone provided', { playerId });
     throw new Error('No email or phone number provided');
+  }
+
+  // Only validate email if it’s provided
+  if (email && !validateEmail(email)) {
+    logger.error('Invalid email provided', { playerId, email });
+    throw new Error('Invalid email address provided');
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
@@ -152,7 +158,6 @@ export const createSumsubApplicant = async (
   externalUserId: string,
   phone?: string,
 ): Promise<string> => {
-  // No email validation: allow phone-only
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'POST';
   const levelName = 'id-only';
@@ -472,10 +477,10 @@ export const generateSumsubWebSDKLink = async (
 export const getSumsubSDKState = async (applicantId: string) => {
   const timestamp = Math.floor(Date.now() / 1000);
   const method = 'GET';
-  const path = `/resources/sdk/state?full=true&applicantId=${applicantId}`; // Include full query in path
+  const path = `/resources/sdk/state?full=true&applicantId=${applicantId}`;
   const url = `${SUMSUB_BASE_URL}${path}`;
 
-  const signature = generateSignature(method, path, '', timestamp); // Use full path for signature
+  const signature = generateSignature(method, path, '', timestamp);
 
   const headers = {
     'X-App-Token': SUMSUB_API_KEY,

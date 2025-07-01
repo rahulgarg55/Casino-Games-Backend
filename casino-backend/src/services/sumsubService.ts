@@ -122,7 +122,15 @@ export const initiateSumsubVerification = async (playerId: string) => {
     externalUserId,
   });
 
-  return generateSumsubAccessToken(playerId, player.sumsub_id, player.email || '', 'id-only');
+  return generateSumsubAccessToken(
+    playerId,
+    player.sumsub_id,
+    player.email || '',
+    'id-only',
+    3,
+    1000,
+    player.phone_number || undefined
+  );
 };
 
 export const updateSumsubStatus = async (
