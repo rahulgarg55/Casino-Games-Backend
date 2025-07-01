@@ -76,10 +76,11 @@ export const generateSumsubAccessToken = async (
   levelName: string = 'id-only',
   retries: number = 3,
   delayMs: number = 1000,
+  phone?: string
 ): Promise<SumsubTokenResponse> => {
-  if (!validateEmail(email)) {
-    logger.error('Invalid email provided', { playerId, email });
-    throw new Error('Invalid email address provided');
+  if (!email && !phone) {
+    logger.error('No email or phone provided', { playerId });
+    throw new Error('No email or phone number provided');
   }
 
   const timestamp = Math.floor(Date.now() / 1000);
@@ -87,11 +88,13 @@ export const generateSumsubAccessToken = async (
   const path = '/resources/accessTokens/sdk';
   const url = `${SUMSUB_BASE_URL}${path}`;
 
-  const bodyObj = {
+  const bodyObj: any = {
     userId: playerId,
     ttlInSecs: 3600,
     levelName,
   };
+  if (email) bodyObj.email = email;
+  if (phone) bodyObj.phone = phone;
   const body = JSON.stringify(bodyObj);
   const signature = generateSignature(method, path, body, timestamp);
 
