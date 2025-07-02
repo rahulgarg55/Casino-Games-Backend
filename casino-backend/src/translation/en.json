@@ -63,9 +63,9 @@
 	"INVALID_OTP": "Invalid OTP",
 	"OTP_EXPIRED": "Invalid or expired OTP",
 	"2FA_VERIFIED": "2FA verification successful",
-	"2FA_NOT_INITIATED": "2FA not initiated",
+	"2FA_NOT_INITIATED": "2FA not initiated.",
 	"TOGGLE_2FA_REQUIRED_FIELD": "Enabled, method, and password are required",
-	"FAILED_TOGGLE_2FA": "Failed to toggle 2FA",
+	"FAILED_TOGGLE_2FA": "Failed to toggle 2FA.",
 	"PASSWORD_REQUIRED_FOR_TOGGLE": "Password is required to toggle 2FA",
 	"EMAIL_REQUIRED": "Email is required",
 	"EMAIL_ALREADY_VERIFIED": "Email is already verified",
@@ -192,5 +192,12 @@
 	"SUBMITTED_VERIFICATION": "SUBMITTED_VERIFICATION",
 	"PHONE_REQUIRED": "PHONE_REQUIRED",
 	"PHONE_ALREADY_VERIFIED": "PHONE_ALREADY_VERIFIED",
-	"SMS_CODE_RESENT": "SMS_CODE_RESENT"
+	"SMS_CODE_RESENT": "SMS code resent successfully.",
+	"NO_ACCOUNT_WITH_PHONE": "No account found with this phone number.",
+	"2FA_NOT_INITATED": "2FA not initiated.",
+	"FAILED_TOOGLE_2FA": "Failed to toggle 2FA.",
+	"PLAYER_DELETED_FAILDED": "Failed to delete player.",
+	"FAILED_TO_RESEND_SMS": "Failed to resend SMS.",
+	"COIKIE_CONSENT_UPDATED": "Cookie consent updated successfully.",
+	"FAILDE_TO_UPDATE_AFFILIATE_STATUS": "Failed to update affiliate status."
 }
