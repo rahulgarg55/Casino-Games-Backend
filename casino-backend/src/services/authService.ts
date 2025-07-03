@@ -825,7 +825,6 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     throw new Error((req as any).__('INVALID_REQUEST'));
   }
 
-  // Always format phone_number to E.164 if present
   let e164PhoneNumber: string | undefined;
   if (phone_number) {
     const code = country_code || req.body?.country_code || '+91';
@@ -834,7 +833,6 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     if (!phoneExists) {
       throw new Error((req as any).__('NO_ACCOUNT_WITH_PHONE'));
     }
-    data.phone_number = e164PhoneNumber;
     phone_number = e164PhoneNumber;
   }
 
@@ -845,20 +843,27 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     }
   }
 
-  const player = await Player.findOne({ $or: [{ email }, { phone_number }] });
-  if (!player) {
-    throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL'));
+  // Construct query based on provided input
+  let query;
+  if (email) {
+    query = { email };
+  } else if (phone_number) {
+    query = { phone_number };
+  } else {
+    throw new Error((req as any).__('INVALID_REQUEST'));
   }
 
-  // If phone_number is provided and email is NOT provided, send OTP via SMS
+  const player = await Player.findOne(query);
+  if (!player) {
+    throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL_OR_PHONE'));
+  }
+
   if (phone_number && !email) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     player.reset_password_otp = otp;
-    player.reset_password_otp_expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    player.reset_password_otp_expires = new Date(Date.now() + 10 * 60 * 1000);
     await player.save();
-    // Log the updated player document for debugging
-    const updatedPlayer = await Player.findById(player._id);
-    console.log('[forgotPassword] Updated player after OTP save:', updatedPlayer);
+    console.log('[forgotPassword] Updated player after OTP save:', player);
     try {
       await sendSmsVerification(phone_number, otp, 'reset_password');
       console.log(`Password reset OTP sent to ${phone_number}`);
@@ -871,20 +876,14 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     }
   }
 
-  // If email is provided, send reset email as before
+  // Email reset logic remains unchanged
   const token = crypto.randomBytes(20).toString('hex');
   player.reset_password_token = token;
-  player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
-
+  player.reset_password_expires = new Date(Date.now() + 3600000);
   await player.save();
-  const recipient = email || player.email || phone_number || player.phone_number;
-  if (!recipient) {
-    throw new Error('No valid recipient found for password reset');
-  }
-
   try {
     await sendResetEmail(email || phone_number!, token);
-    console.log(`Password reset email sent to ${recipient}`);
+    console.log(`Password reset email sent to ${email || phone_number}`);
   } catch (error) {
     player.reset_password_token = undefined;
     player.reset_password_expires = undefined;

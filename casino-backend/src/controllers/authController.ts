@@ -1208,7 +1208,23 @@ export const verifyPhone = async (req: Request, res: Response) => {
       player.reset_password_otp = undefined;
       player.reset_password_otp_expires = undefined;
       await player.save();
-      return res.status(200).json({ success: true, message: "OTP verified" });
+        const tokenData = generateTokenResponse(player);
+        console.log('tokenData', tokenData);
+      return res.status(200).json({ success: true, message: "OTP verified ",data: {
+        token: tokenData.token,
+        expiresIn: tokenData.expiresIn,
+        user: {
+          id: player._id,
+          username: player.username,
+          email: player.email,
+          phone_number: player.phone_number,
+          country_code: player.country_code,
+          role_id: player.role_id,
+          status: player.status,
+          is_verified: player.is_verified,
+          is_2fa_enabled: player.is_2fa_enabled,
+        },
+      }, });
     } else {
       logger.info('[verifyPhone] Registration flow', { e164PhoneNumber, code });
       console.log('[verifyPhone] Registration flow', { e164PhoneNumber, code });
