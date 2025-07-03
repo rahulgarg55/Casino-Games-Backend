@@ -64,6 +64,7 @@ interface AffiliateLoginData {
 interface ForgotPasswordData {
   email?: string;
   phone_number?: string;
+  country_code?: string;
 }
 
 interface ResetPasswordData {
@@ -819,24 +820,28 @@ const sendOTPBySMS = async (to: string, otp: string) => {
 };
 
 export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
-  const { email, phone_number } = data;
+  let { email, phone_number, country_code } = data;
   if (!email && !phone_number) {
     throw new Error((req as any).__('INVALID_REQUEST'));
+  }
+
+  // Always format phone_number to E.164 if present
+  let e164PhoneNumber: string | undefined;
+  if (phone_number) {
+    const code = country_code || req.body?.country_code || '+91';
+    e164PhoneNumber = formatE164PhoneNumber(code, phone_number);
+    const phoneExists = await Player.findOne({ phone_number: e164PhoneNumber });
+    if (!phoneExists) {
+      throw new Error((req as any).__('NO_ACCOUNT_WITH_PHONE'));
+    }
+    data.phone_number = e164PhoneNumber;
+    phone_number = e164PhoneNumber;
   }
 
   if (email) {
     const emailExists = await Player.findOne({ email });
     if (!emailExists) {
-      console.log(`Password reset attempt for non-existent email: ${email}`);
       throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL'));
-    }
-  }
-
-  if (phone_number) {
-    const phoneExists = await Player.findOne({ phone_number });
-    if (!phoneExists) {
-      console.log(`Password reset attempt for non-existent phone: ${phone_number}`);
-      throw new Error((req as any).__('NO_ACCOUNT_WITH_PHONE'));
     }
   }
 
@@ -845,11 +850,28 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     throw new Error((req as any).__('NO_ACCOUNT_WITH_EMAIL'));
   }
 
-  // if (player.reset_password_token && player.reset_password_expires && player.reset_password_expires > new Date()) {
-  //   const timeLeft = Math.ceil((player.reset_password_expires.getTime() - Date.now()) / 60000); // in minutes
-  //   throw new Error((req as any).__('RESET_LINK_ALREADY_SENT', { timeLeft }));
-  // }
+  // If phone_number is provided and email is NOT provided, send OTP via SMS
+  if (phone_number && !email) {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    player.reset_password_otp = otp;
+    player.reset_password_otp_expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    await player.save();
+    // Log the updated player document for debugging
+    const updatedPlayer = await Player.findById(player._id);
+    console.log('[forgotPassword] Updated player after OTP save:', updatedPlayer);
+    try {
+      await sendSmsVerification(phone_number, otp, 'reset_password');
+      console.log(`Password reset OTP sent to ${phone_number}`);
+      return;
+    } catch (error) {
+      player.reset_password_otp = undefined;
+      player.reset_password_otp_expires = undefined;
+      await player.save();
+      throw new Error((req as any).__('FAILED_TO_SEND_RESET_EMAIL'));
+    }
+  }
 
+  // If email is provided, send reset email as before
   const token = crypto.randomBytes(20).toString('hex');
   player.reset_password_token = token;
   player.reset_password_expires = new Date(Date.now() + 3600000); // 1 hour
@@ -867,7 +889,6 @@ export const forgotPassword = async (data: ForgotPasswordData, req: any) => {
     player.reset_password_token = undefined;
     player.reset_password_expires = undefined;
     await player.save();
-    console.error('Failed to send reset email:', error);
     throw new Error((req as any).__('FAILED_TO_SEND_RESET_EMAIL'));
   }
 };

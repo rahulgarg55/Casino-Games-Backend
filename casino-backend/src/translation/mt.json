@@ -107,8 +107,8 @@
   "MISSING_WEBHOOK_SIGNATURE": "Firma tal-webhook nieqsa",
   "INVALID_WEBHOOK_SIGNATURE": "Firma tal-webhook invalidu",
   "INVALID_WEBHOOK_PAYLOAD": "Payload tal-webhook invalidu",
-  "VERIFICATION_EMAIL_SENT": "Email ta’ verifika ntbagħtet lill-indirizz il-ġdid tiegħek. Jekk jogħġbok ivverifika biex tlesti l-aġġornament.",
-"PROFILE_UPDATED": "Il-profil ġie aġġornat b’suċċess"
-
+  "VERIFICATION_EMAIL_SENT": "Email ta' verifika ntbagħtet lill-indirizz il-ġdid tiegħek. Jekk jogħġbok ivverifika biex tlesti l-aġġornament.",
+  "PROFILE_UPDATED": "Il-profil ġie aġġornat b'suċċess",
+  "PASSWORD_OTP_SENT_PHONE": "OTP tar-reset tal-password intbagħat lit-telefon tiegħek."
 }
  

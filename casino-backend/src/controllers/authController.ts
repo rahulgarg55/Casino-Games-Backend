@@ -40,6 +40,7 @@ import { validateWebhookSignature } from '../utils/sumsub';
 const allowedStatuses = ['Active', 'Inactive', 'Banned'] as const;
 import Languages from '../models/languages';
 import { formatE164PhoneNumber } from '../utils/sendSms';
+import { logger } from '../utils/logger';
 
 interface CustomRequest extends Request {
   user?: {
@@ -280,7 +281,8 @@ export const toggle2FA = async (req: CustomRequest, res: Response) => {
 
 export const forgotPassword = async (req: Request, res: Response) => {
   try {
-    const { email, phone_number } = req.body;
+    const { email, phone_number, country_code } = req.body;
+    logger.info('[forgotPassword] Request received', { email, phone_number, country_code });
     if (!email && !phone_number) {
       return sendErrorResponse(
         res,
@@ -288,13 +290,23 @@ export const forgotPassword = async (req: Request, res: Response) => {
         (req as any).__('PLEASE_PROVIDE_EMAIL_OR_PHONE')
       );
     }
-    await authService.forgotPassword({ email, phone_number},req);
+    await authService.forgotPassword({ ...req.body }, req);
 
+    if (phone_number && !email) {
+      logger.info('[forgotPassword] OTP sent to phone', { phone_number, country_code });
+      return res.status(200).json({
+        success: true,
+        message: (req as any).__('PASSWORD_OTP_SENT_PHONE'),
+      });
+    }
+    logger.info('[forgotPassword] Reset link sent to email', { email });
     res.status(200).json({
       success: true,
       message: (req as any).__('PASSWORD_LINK_SENT'),
     });
   } catch (error) {
+    logger.error('[forgotPassword] Error', { error });
+    console.error('[forgotPassword] Error:', error instanceof Error ? error.stack || error.message : error);
     sendErrorResponse(
       res,
       400,
@@ -1168,32 +1180,63 @@ export const verifyOTP = async (req: Request, res: Response) => {
 
 export const verifyPhone = async (req: Request, res: Response) => {
   try {
-    const { phone_number, country_code, code } = req.body;
+    const { phone_number, country_code, code, isPasswordReset } = req.body;
+    logger.info('[verifyPhone] Request received', { phone_number, country_code, code, isPasswordReset });
+    console.log('[verifyPhone] Request received', { phone_number, country_code, code, isPasswordReset });
     if (!phone_number || !country_code || !code) {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
     }
     const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
-    const player = await authService.verifyPhoneNumber(e164PhoneNumber, code, country_code, req);    const tokenData = generateTokenResponse(player);
-    res.status(200).json({
-      success: true,
-      message: (req as any).__('PHONE_VERIFIED'),
-      data: {
-        token: tokenData.token,
-        expiresIn: tokenData.expiresIn,
-        user: {
-          id: player._id,
-          username: player.username,
-          email: player.email,
-          phone_number: player.phone_number,
-          country_code: player.country_code,
-          role_id: player.role_id,
-          status: player.status,
-          is_verified: player.is_verified,
-          is_2fa_enabled: player.is_2fa_enabled,
+    console.log('[verifyPhone] Formatted E.164 phone number:', e164PhoneNumber);
+    if (isPasswordReset) {
+      logger.info('[verifyPhone] Password reset flow', { e164PhoneNumber, code });
+      console.log('[verifyPhone] Password reset flow', { e164PhoneNumber, code });
+      console.log('[verifyPhone] Query:', {
+        phone_number: e164PhoneNumber,
+        reset_password_otp: code,
+        reset_password_otp_expires: { $gt: new Date() }
+      });
+      const player = await Player.findOne({
+        phone_number: e164PhoneNumber,
+        reset_password_otp: code,
+        reset_password_otp_expires: { $gt: new Date() }
+      });
+      console.log('[verifyPhone] Player found:', player);
+      logger.info('[verifyPhone] Player found for password reset', { playerId: player?._id });
+      console.log('[verifyPhone] Player found for password reset:', player ? player._id : null);
+      if (!player) throw new Error((req as any).__('INVALID_CODE'));
+      player.reset_password_otp = undefined;
+      player.reset_password_otp_expires = undefined;
+      await player.save();
+      return res.status(200).json({ success: true, message: "OTP verified" });
+    } else {
+      logger.info('[verifyPhone] Registration flow', { e164PhoneNumber, code });
+      console.log('[verifyPhone] Registration flow', { e164PhoneNumber, code });
+      const player = await authService.verifyPhoneNumber(e164PhoneNumber, code, country_code, req);
+      const tokenData = generateTokenResponse(player);
+      res.status(200).json({
+        success: true,
+        message: (req as any).__('PHONE_VERIFIED'),
+        data: {
+          token: tokenData.token,
+          expiresIn: tokenData.expiresIn,
+          user: {
+            id: player._id,
+            username: player.username,
+            email: player.email,
+            phone_number: player.phone_number,
+            country_code: player.country_code,
+            role_id: player.role_id,
+            status: player.status,
+            is_verified: player.is_verified,
+            is_2fa_enabled: player.is_2fa_enabled,
+          },
         },
-      },
-    });
+      });
+    }
   } catch (error) {
+    logger.error('[verifyPhone] Error', { error });
+    console.error('[verifyPhone] Error:', error instanceof Error ? error.stack || error.message : error);
     sendErrorResponse(
       res,
       400,
@@ -1205,6 +1248,7 @@ export const verifyPhone = async (req: Request, res: Response) => {
 export const checkPhoneExists = async (req: Request, res: Response) => {
   try {
     const { phone_number, country_code } = req.body;
+    console.log('[checkPhoneExists] Request received', { phone_number, country_code });
     if (!phone_number || !country_code) {
       return res.status(400).json({
         success: false,
@@ -1213,9 +1257,10 @@ export const checkPhoneExists = async (req: Request, res: Response) => {
     }
    
     const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
-
+    console.log('[checkPhoneExists] Formatted E.164 phone number:', e164PhoneNumber);
     
     const player = await Player.findOne({ phone_number: e164PhoneNumber });
+    console.log('[checkPhoneExists] Player found:', !!player);
 
     if (player) {
       return res.status(200).json({
@@ -1231,6 +1276,7 @@ export const checkPhoneExists = async (req: Request, res: Response) => {
       });
     }
   } catch (error) {
+    console.error('[checkPhoneExists] Error:', error instanceof Error ? error.stack || error.message : error);
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Server error',
@@ -1240,28 +1286,54 @@ export const checkPhoneExists = async (req: Request, res: Response) => {
 
 export const resendSmsCode = async (req: Request, res: Response) => {
   try {
-    const { phone_number, country_code } = req.body;
+    const { phone_number, country_code, isPasswordReset } = req.body;
+    logger.info('[resendSmsCode] Request received', { phone_number, country_code, isPasswordReset });
+    console.log('[resendSmsCode] Request received', { phone_number, country_code, isPasswordReset });
     if (!phone_number || !country_code) {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_REQUIRED'));
     }
     const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
+    console.log('[resendSmsCode] Formatted E.164 phone number:', e164PhoneNumber);
     const player = await Player.findOne({ phone_number: e164PhoneNumber });
+    console.log('[resendSmsCode] Player found:', !!player);
     if (!player) {
+      logger.warn('[resendSmsCode] Player not found', { e164PhoneNumber });
+      console.log('[resendSmsCode] Player not found', { e164PhoneNumber });
       return sendErrorResponse(res, 404, (req as any).__('PLAYER_NOT_FOUND'));
     }
-    if (player.is_verified === VERIFICATION.VERIFIED) {
-      return sendErrorResponse(res, 400, (req as any).__('PHONE_ALREADY_VERIFIED'));
+    if (isPasswordReset) {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      player.reset_password_otp = otp;
+      player.reset_password_otp_expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await player.save();
+      await sendSmsVerification(e164PhoneNumber, otp, 'reset_password');
+      logger.info('[resendSmsCode] Password reset OTP resent', { e164PhoneNumber });
+      console.log('[resendSmsCode] Password reset OTP resent', { e164PhoneNumber });
+      return res.status(200).json({
+        success: true,
+        message: (req as any).__('SMS_CODE_RESENT'),
+      });
+    } else {
+      if (player.is_verified === VERIFICATION.VERIFIED) {
+        logger.warn('[resendSmsCode] Phone already verified', { e164PhoneNumber });
+        console.log('[resendSmsCode] Phone already verified', { e164PhoneNumber });
+        return sendErrorResponse(res, 400, (req as any).__('PHONE_ALREADY_VERIFIED'));
+      }
+      const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
+      player.sms_code = smsCode;
+      player.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
+      await player.save();
+      await sendSmsVerification(e164PhoneNumber, smsCode);
+      logger.info('[resendSmsCode] Registration OTP resent', { e164PhoneNumber });
+      console.log('[resendSmsCode] Registration OTP resent', { e164PhoneNumber });
+      return res.status(200).json({
+        success: true,
+        message: (req as any).__('SMS_CODE_RESENT'),
+      });
     }
-    const smsCode = Math.floor(100000 + Math.random() * 900000).toString();
-    player.sms_code = smsCode;
-    player.sms_code_expires = new Date(Date.now() + 600000); // 10 minutes
-    await player.save();
-    await sendSmsVerification(e164PhoneNumber, smsCode);
-    res.status(200).json({
-      success: true,
-      message: (req as any).__('SMS_CODE_RESENT'),
-    });
   } catch (error) {
+    logger.error('[resendSmsCode] Error', { error });
+    console.error('[resendSmsCode] Error:', error instanceof Error ? error.stack || error.message : error);
     sendErrorResponse(
       res,
       400,

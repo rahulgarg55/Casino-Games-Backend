@@ -243,7 +243,7 @@ router.get('/verify-email', validateRequest, authController.verifyEmail);
 
 router.post(
   '/verify-phone',
-  body('phone_number').matches(/^\+?[1-9]\d{1,14}$/),
+  body('phone_number').isString().notEmpty(),
   body('code').isLength({ min: 6, max: 6 }),
   validateRequest,
   authController.verifyPhone,

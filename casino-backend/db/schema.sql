@@ -182,6 +182,22 @@ CREATE TABLE gender(
     PRIMARY KEY(gender_id)
 );
 
+CREATE TABLE admins(
+    admin_id CHAR(36) NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    fullname VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    status VARCHAR(50) NULL DEFAULT 'active',
+    role_id TINYINT NOT NULL DEFAULT 1, -- 1 = Admin
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(admin_id)
+);
+
+ALTER TABLE admins ADD UNIQUE admins_username_unique(username);
+ALTER TABLE admins ADD UNIQUE admins_email_unique(email);
+
 ALTER TABLE game_sessions ADD CONSTRAINT game_sessions_player_id_foreign FOREIGN KEY(player_id) REFERENCES players(player_id);
 ALTER TABLE players ADD CONSTRAINT players_country_foreign FOREIGN KEY(country) REFERENCES countries(country_id);
 ALTER TABLE transactions ADD CONSTRAINT transactions_game_session_id_foreign FOREIGN KEY(game_session_id) REFERENCES game_sessions(session_id);

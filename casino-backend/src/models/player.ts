@@ -61,6 +61,8 @@ export interface IPlayer extends Document {
   full_phone_number?: string;
   sumsub_attempts?: number;
   sumsub_last_attempt_date?: Date;
+  reset_password_otp?: string;
+  reset_password_otp_expires?: Date;
 }
 
 const playerSchema: Schema = new Schema(
@@ -216,7 +218,9 @@ const playerSchema: Schema = new Schema(
     sumsub_last_attempt_date: {
       type: Date,
       default: null
-    }
+    },
+    reset_password_otp: { type: String },
+    reset_password_otp_expires: { type: Date },
   },
   {
     timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },

@@ -23,8 +23,9 @@ export function formatE164PhoneNumber(countryCode: string, phoneNumber: string):
 export const sendSmsVerification = async (
   phoneNumber: string,
   code: string,
+  context: 'registration' | 'reset_password' = 'registration'
 ) => {
-  logger.info('[Twilio] Attempting to send SMS.', { phoneNumber, code });
+  logger.info('[Twilio] Attempting to send SMS.', { phoneNumber, code, context });
 
   // Log Twilio env variables (masking sensitive info)
   logger.info('[Twilio] Using credentials:', {
@@ -33,15 +34,18 @@ export const sendSmsVerification = async (
     TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN ? '***' : 'MISSING',
   });
 
-  console.log('TWILIO_AUTH_TOKEN actual value:', process.env.TWILIO_AUTH_TOKEN);
+  let messageBody = '';
+  if (context === 'reset_password') {
+    messageBody = `Your Basta Casino password reset code is: ${code}. Valid for 10 minutes.`;
+  } else {
+    messageBody = `Your Basta Casino verification code is: ${code}. Valid for 10 minutes.`;
+  }
 
   try {
     if (!phoneNumber) {
       logger.error('[Twilio] Error: Phone number is required.');
       throw new Error('Phone number is required');
     }
-
-    // const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
     if (
       !process.env.TWILIO_ACCOUNT_SID ||
@@ -64,7 +68,7 @@ export const sendSmsVerification = async (
     logger.info('[Twilio] Sending SMS with details:', { from, to });
 
     const message = await client.messages.create({
-      body: `Your Basta Casino verification code is: ${code}. Valid for 10 minutes.`,
+      body: messageBody,
       from,
       to,
       // Optional: Add statusCallback to track delivery status
@@ -101,5 +105,32 @@ export const sendSmsVerification = async (
     });
 
     throw new Error(`[Twilio] Failed to send SMS verification code: ${error.message}`);
+  }
+};
+
+export const sendResetSms = async (phoneNumber: string, resetUrl: string) => {
+  logger.info('[Twilio] Attempting to send password reset SMS.', { phoneNumber, resetUrl });
+  try {
+    if (!phoneNumber) {
+      logger.error('[Twilio] Error: Phone number is required.');
+      throw new Error('Phone number is required');
+    }
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
+      logger.error('[Twilio] Error: Twilio credentials are not properly configured.');
+      throw new Error('Twilio credentials are not properly configured');
+    }
+    const from = process.env.TWILIO_PHONE_NUMBER;
+    const to = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+    const message = await client.messages.create({
+      body: `Reset your Basta Casino password: ${resetUrl} (valid for 1 hour)`,
+      from,
+      to,
+      statusCallback: process.env.SMS_STATUS_WEBHOOK_URL,
+    });
+    logger.info('[Twilio] Password reset SMS sent successfully. Full response:', message);
+    return message.sid;
+  } catch (error: any) {
+    logger.error('[Twilio] Failed to send password reset SMS:', error);
+    throw new Error(`[Twilio] Failed to send password reset SMS: ${error.message}`);
   }
 };

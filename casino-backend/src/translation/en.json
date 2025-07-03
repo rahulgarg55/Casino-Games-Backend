@@ -200,5 +200,6 @@
 	"FAILED_TO_RESEND_SMS": "Failed to resend SMS.",
 	"COIKIE_CONSENT_UPDATED": "Cookie consent updated successfully.",
 	"FAILDE_TO_UPDATE_AFFILIATE_STATUS": "Failed to update affiliate status.",
-	"PASSWORD_CODE_SENT_PHONE": "Password reset code has been sent to your phone."
+	"PASSWORD_CODE_SENT_PHONE": "Password reset code has been sent to your phone.",
+	"PASSWORD_OTP_SENT_PHONE": "Password reset OTP has been sent to your phone."
 }
