@@ -372,8 +372,7 @@ router.get(
   }),
   (req, res) => {
     const tokenResponse = generateTokenResponse(req.user as IPlayer);
-    res.redirect(`${process.env.CLIENT_URL}?token=${tokenResponse.token}`);
-  },
+    res.redirect(`${process.env.CLIENT_URL}/google-callback?token=${tokenResponse.token}`);  },
 );
 
 router.get(
