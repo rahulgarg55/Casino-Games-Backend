@@ -190,6 +190,7 @@ router.post(
   validateRequest,
   authController.resetPassword,
 );
+router.post('/reset-password-phone', authController.resetPasswordPhone);
 router.get('/profile', verifyToken, authController.viewProfile);
 
 router.get('/players', authController.getAllPlayers);

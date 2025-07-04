@@ -4,8 +4,7 @@
 	"USER_PROFILE_FOUND": "User profile retrieved successfully",
 	"USER_PROFILE_FAILED": "Failed to retrieve profile",
 	"USER_REGISTER": "User registered successfully",
-	"USER_NAME_ALREADY": "Username is already taken",
-	"USER_ALREADY_EXIST": "User already registered",
+	"USER_ALREADY_EXIST": "User already exists",
 	"EMAIL_ALREADY_REGISTER": "Email is already registered",
 	"PHONE_ALREADY_REGISTER": "Phone number is already registered",
 	"INVALID_REQUEST": "Invalid request. Please check your input",
@@ -201,5 +200,6 @@
 	"COIKIE_CONSENT_UPDATED": "Cookie consent updated successfully.",
 	"FAILDE_TO_UPDATE_AFFILIATE_STATUS": "Failed to update affiliate status.",
 	"PASSWORD_CODE_SENT_PHONE": "Password reset code has been sent to your phone.",
-	"PASSWORD_OTP_SENT_PHONE": "Password reset OTP has been sent to your phone."
+	"PASSWORD_OTP_SENT_PHONE": "Password reset OTP has been sent to your phone.",
+	"PHONE_COUNTRY_PASSWORD_REQUIRED": "Phone number, country code, and password are required"
 }

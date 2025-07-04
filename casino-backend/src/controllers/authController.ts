@@ -121,7 +121,7 @@ export const register = async (req: Request, res: Response) => {
         error.message.includes('Phone number is already registered')
       ) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
+          { param: 'username', message: (req as any).__('USER_ALREADY_EXIST') },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
@@ -1181,7 +1181,7 @@ export const verifyOTP = async (req: Request, res: Response) => {
 export const verifyPhone = async (req: Request, res: Response) => {
   try {
     const { phone_number, country_code, code, isPasswordReset } = req.body;
-    logger.info('[verifyPhone] Request received', { phone_number, country_code, code, isPasswordReset });
+    logger.info('[Twilio] [verifyPhone] Request received', { phone_number, country_code, code, isPasswordReset });
     console.log('[verifyPhone] Request received', { phone_number, country_code, code, isPasswordReset });
     if (!phone_number || !country_code || !code) {
       return sendErrorResponse(res, 400, (req as any).__('PHONE_AND_CODE_REQUIRED'));
@@ -1251,8 +1251,8 @@ export const verifyPhone = async (req: Request, res: Response) => {
       });
     }
   } catch (error) {
-    logger.error('[verifyPhone] Error', { error });
-    console.error('[verifyPhone] Error:', error instanceof Error ? error.stack || error.message : error);
+    logger.error('[Twilio] [verifyPhone] Error', { error });
+    console.error('[Twilio] [verifyPhone] Error:', error instanceof Error ? error.stack || error.message : error);
     sendErrorResponse(
       res,
       400,
@@ -1750,6 +1750,8 @@ export const startSumsubVerification = async (
       return sendErrorResponse(res, 401,(req as any).__('AUTHENTICATION_REQUIRED'));
     }
 
+    logger.info('[Sumsub] [startSumsubVerification] Initiating Sumsub verification for user', { userId: req.user?.id });
+
     const tokenResponse = await initiateSumsubVerification(req.user.id);
 
     res.status(200).json({
@@ -1761,6 +1763,7 @@ export const startSumsubVerification = async (
       },
     });
   } catch (error) {
+    logger.error('[Sumsub] [startSumsubVerification] Error:', error);
     console.error('Sumsub verification error:', error);
     sendErrorResponse(
       res,
@@ -1859,7 +1862,7 @@ export const addAffliateUsers = async (req: Request, res: Response) => {
         error.message.includes('Email is already registered') ||
         error.message.includes('Phone number is already registered')) {
         sendErrorResponse(res, 409, [
-          { param: 'username', message: (req as any).__('USER_NAME_ALREADY') },
+          { param: 'username', message: (req as any).__('USER_ALREADY_EXIST') },
         ]);
       } else {
         sendErrorResponse(res, 400, error.message);
@@ -2933,5 +2936,35 @@ export const getBannerConfig = async (req: CustomRequest, res: Response) => {
       message: 'Server error',
       error: error instanceof Error ? error.message : 'Unknown error',
     });
+  }
+};
+
+export const resetPasswordPhone = async (req: Request, res: Response) => {
+  try {
+    const { phone_number, country_code, password } = req.body;
+    if (!phone_number || !country_code || !password) {
+      return sendErrorResponse(res, 400, (req as any).__('PHONE_COUNTRY_PASSWORD_REQUIRED'));
+    }
+    const e164PhoneNumber = formatE164PhoneNumber(country_code, phone_number);
+    const player = await Player.findOne({ phone_number: e164PhoneNumber });
+    if (!player) {
+      return sendErrorResponse(res, 404, 'User not found');
+    }
+    console.log('player', player);
+    const hashedPassword = await bcrypt.hash(password, 12);
+    player.password_hash = hashedPassword;
+    player.reset_password_otp = undefined;
+    player.reset_password_otp_expires = undefined;
+    await player.save();
+    res.status(200).json({
+      success: true,
+      message: 'Password updated successfully',
+    });
+  } catch (error) {
+    sendErrorResponse(
+      res,
+      400,
+      error instanceof Error ? error.message : 'Failed to reset password'
+    );
   }
 };

@@ -791,7 +791,7 @@ const sendOTPByEmail = async (to: string, otp: string) => {
 };
 
 const sendOTPBySMS = async (to: string, otp: string) => {
-  logger.info(`[2FA] Attempting to send OTP via SMS to ${to}`);
+  logger.info(`[Twilio] [sendSmsVerification] Attempting to send OTP via SMS to ${to}`);
   try {
     const twilio = (await import('twilio')).default;
     const twilioClient = twilio(
@@ -801,21 +801,21 @@ const sendOTPBySMS = async (to: string, otp: string) => {
     
     const from = process.env.TWILIO_PHONE_NUMBER;
     if (!from) {
-      logger.error('[2FA] Twilio "From" number is not configured.');
+      logger.error('[Twilio] Twilio "From" number is not configured.');
       throw new Error('Twilio "From" number is not configured.');
     }
 
-    logger.info('[2FA] Sending SMS with details:', { from, to });
+    logger.info('[Twilio] Sending SMS with details:', { from, to });
 
     const message = await twilioClient.messages.create({
       body: `Your 2FA OTP is: ${otp}. It expires in 10 minutes.`,
       from,
       to,
     });
-    logger.info('[2FA] OTP SMS sent successfully. Full response:', message);
+    logger.info('[Twilio] OTP SMS sent successfully. Full response:', message);
   } catch (error: any) {
-    logger.error('[2FA] Failed to send OTP SMS. Full error:', error);
-    throw new Error(`[2FA] Failed to send OTP SMS: ${error.message}`);
+    logger.error('[Twilio] Failed to send OTP SMS. Full error:', error);
+    throw new Error(`[Twilio] Failed to send OTP SMS: ${error.message}`);
   }
 };
 
@@ -1157,6 +1157,7 @@ export const initiateSumsubVerification = async (
     await player.save();
   }
 
+  logger.info('[Sumsub] [initiateSumsubVerification] Initiating Sumsub verification for player', { playerId });
   return generateSumsubAccessToken(playerId, playerId, 'basic-kyc');
 };
 
