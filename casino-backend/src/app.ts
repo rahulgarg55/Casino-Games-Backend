@@ -21,6 +21,16 @@ import authRoutes from './routes/authRoutes';
 import sumsubRoutes from './routes/sumsubRoutes';
 import platformFeeRoutes from './routes/platformFeeRoutes';
 import { PlatformFeeService } from './services/platformFeeService';
+import xss from 'xss-clean';
+import mongoSanitize from 'express-mongo-sanitize';
+import rateLimit from 'express-rate-limit';
+import hpp from 'hpp';
+import csurf from 'csurf';
+import client from 'prom-client';
+// express-validator is used in routes, so just add a comment for interview notes
+// Example usage in a route:
+// import { body, validationResult } from 'express-validator';
+// app.post('/register', [body('email').isEmail()], (req, res) => { ... });
 
 const translationPath = path.resolve(process.cwd(), 'src/translation');
 
@@ -34,6 +44,20 @@ dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1);
+
+// Development-only heapdump route
+if (process.env.NODE_ENV !== 'production') {
+  // Dynamically require heapdump to avoid issues in production
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const heapdump = require('heapdump');
+  app.get('/debug/heapdump', (req, res) => {
+    const filename = path.join(__dirname, `../heapdump-${Date.now()}.heapsnapshot`);
+    heapdump.writeSnapshot(filename, (err: Error | null, filename: string) => {
+      if (err) return res.status(500).send('Heapdump failed');
+      res.send(`Heapdump written to ${filename}`);
+    });
+  });
+}
 
 const logLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
 const logger = winston.createLogger({
@@ -101,6 +125,18 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Security: Sanitize user input against XSS
+app.use(xss());
+// Security: Prevent MongoDB operator injection
+app.use(mongoSanitize());
+// Security: Rate limiting to prevent brute-force attacks
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+}));
+
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -140,6 +176,12 @@ app.use(
   }),
 );
 
+// Security: Prevent HTTP Parameter Pollution
+app.use(hpp());
+
+// Security: CSRF protection for forms and state-changing requests
+app.use(csurf());
+
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -156,6 +198,39 @@ app.post(
   express.raw({ type: 'application/json' }),
   sumsubWebhook,
 );
+
+// Prometheus metrics setup
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+// HTTP request duration histogram
+const httpRequestDurationMicroseconds = new client.Histogram({
+  name: 'http_request_duration_ms',
+  help: 'Duration of HTTP requests in ms',
+  labelNames: ['method', 'route', 'code'],
+  buckets: [50, 100, 200, 300, 400, 500, 1000]
+});
+register.registerMetric(httpRequestDurationMicroseconds);
+
+// Middleware to measure request durations
+app.use((req, res, next) => {
+  const end = httpRequestDurationMicroseconds.startTimer();
+  res.on('finish', () => {
+    end({ method: req.method, route: req.route?.path || req.path, code: res.statusCode });
+  });
+  next();
+});
+
+// Expose /metrics endpoint for Prometheus
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
+// Health check endpoint for testing and monitoring
+app.get('/api/health', (req: Request, res: Response) => {
+  res.status(200).json({ status: 'ok', message: 'API is healthy' });
+});
 
 // Admin KYC routes
 app.use('/api/auth/admin/kyc', adminKycRoutes);

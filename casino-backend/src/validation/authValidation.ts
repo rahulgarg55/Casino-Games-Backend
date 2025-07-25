@@ -1,5 +1,6 @@
 import { body, validationResult } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
+import Joi from 'joi';
 
 export const validateStripeConfig = [
   body('stripeWebhookSecret')
@@ -68,3 +69,8 @@ export const affiliateloginValidation = [
     .withMessage('Valid email is required'),
   body('password').notEmpty().withMessage('Password is required'),
 ];
+
+export const loginSchema = Joi.object({
+  username: Joi.string().alphanum().min(3).max(30).required(),
+  password: Joi.string().min(8).required(),
+});

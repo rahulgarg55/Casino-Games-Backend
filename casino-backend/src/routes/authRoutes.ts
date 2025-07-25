@@ -27,6 +27,8 @@ import {
   uploadDocument,
 } from '../controllers/sumsubController';
 import * as notificationController from '../controllers/notificationController';
+import { loginSchema } from '../validation/authValidation';
+import { validateBody } from '../middlewares/validateRequest';
 
 const router = Router();
 
@@ -155,7 +157,7 @@ router.post(
 
 router.post('/affiliate/register', authController.affiliateRegister);
 
-router.post('/login', loginValidation, validateRequest, authController.login);
+router.post('/login', validateBody(loginSchema), authController.login);
 
 router.post(
   '/affiliate/login',

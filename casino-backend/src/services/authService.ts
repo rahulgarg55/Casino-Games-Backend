@@ -180,81 +180,86 @@ export const register = async (data: RegistrationData, req: any) => {
 
   // Handle referral code from body or query params
   let finalReferralCode = referralCode || req.query.ref;
-  if (finalReferralCode) {
-    const referringAffiliate = await Affiliate.findOne({
-      referralCode: finalReferralCode,
-    });
-    if (!referringAffiliate) {
-      throw new Error((req as any).__('INVALID_REFERRAL'));
-    }
 
-    if (referringAffiliate.status !== STATUS.ACTIVE) {
-      throw new Error((req as any).__('AFFILIATE_NOT_VERFIFIED_YET'));
-    }
-
-    playerData.referredBy = referringAffiliate._id;
-    playerData.referredByName = `${referringAffiliate.firstname} ${referringAffiliate.lastname}`;
-    
-    // Increment totalClicks for the affiliate
-    await Affiliate.findByIdAndUpdate(
-      referringAffiliate._id,
-      { $inc: { totalClicks: 1 } },
-      { new: true }
-    );
+  // Send verification email/SMS before DB transaction (optional, can be moved inside if you want atomicity)
+  if (email) {
+    await sendVerificationEmail(email, verificationToken);
+  } else if (phone_number) {
+    logger.info(`[Register] Player registered with phone. Attempting to send verification SMS to ${playerData.phone_number}`);
+    await sendSmsVerification(playerData.phone_number, smsCode);
   }
 
+  const session = await mongoose.startSession();
   try {
-    if (email) {
-      await sendVerificationEmail(email, verificationToken);
-    } else if (phone_number) {
-      logger.info(`[Register] Player registered with phone. Attempting to send verification SMS to ${playerData.phone_number}`);
-      await sendSmsVerification(playerData.phone_number, smsCode);
-    }
+    let result;
+    await session.withTransaction(async () => {
+      // If referral, validate and update affiliate
+      if (finalReferralCode) {
+        const referringAffiliate = await Affiliate.findOne({
+          referralCode: finalReferralCode,
+        }).session(session);
+        if (!referringAffiliate) {
+          throw new Error((req as any).__('INVALID_REFERRAL'));
+        }
+        if (referringAffiliate.status !== STATUS.ACTIVE) {
+          throw new Error((req as any).__('AFFILIATE_NOT_VERFIFIED_YET'));
+        }
+        playerData.referredBy = referringAffiliate._id;
+        playerData.referredByName = `${referringAffiliate.firstname} ${referringAffiliate.lastname}`;
+        // Increment totalClicks for the affiliate
+        await Affiliate.findByIdAndUpdate(
+          referringAffiliate._id,
+          { $inc: { totalClicks: 1 } },
+          { new: true, session }
+        );
+      }
 
-    const player = new Player(playerData);
-    await player.save();
+      const player = new Player(playerData);
+      await player.save({ session });
 
-    const playerBalance = new PlayerBalance({
-      player_id: player._id,
-      balance: 0,
-      currency: currency,
-      is_deleted: 0,
+      const playerBalance = new PlayerBalance({
+        player_id: player._id,
+        balance: 0,
+        currency: currency,
+        is_deleted: 0,
+      });
+      await playerBalance.save({ session });
+
+      // Increment totalSignups if referred
+      if (finalReferralCode && playerData.referredBy) {
+        await Affiliate.findByIdAndUpdate(
+          playerData.referredBy,
+          { $inc: { totalSignups: 1 } },
+          { new: true, session }
+        );
+      }
+
+      const notification = new Notification({
+        type: NotificationType.USER_REGISTERED,
+        message: `New user ${username || email || phone_number} has registered`,
+        user_id: player._id,
+        metadata: {
+          username,
+          email,
+          phone_number,
+          country,
+          registration_date: new Date(),
+          referralCode: finalReferralCode || null,
+        },
+      });
+      await notification.save({ session });
+
+      const tokenData = generateTokenResponse(player);
+      result = {
+        player,
+        balance: playerBalance,
+        token: tokenData.token,
+        expiresIn: tokenData.expiresIn,
+      };
     });
-    await playerBalance.save();
-
-    // Increment totalSignups if referred
-    if (finalReferralCode && playerData.referredBy) {
-      await Affiliate.findByIdAndUpdate(
-        playerData.referredBy,
-        { $inc: { totalSignups: 1 } },
-        { new: true }
-      );
-    }
-
-    const notification = new Notification({
-      type: NotificationType.USER_REGISTERED,
-      message: `New user ${username || email || phone_number} has registered`,
-      user_id: player._id,
-      metadata: {
-        username,
-        email,
-        phone_number,
-        country,
-        registration_date: new Date(),
-        referralCode: finalReferralCode || null,
-      },
-    });
-    await notification.save();
-
-    const tokenData = generateTokenResponse(player);
-    return {
-      player,
-      balance: playerBalance,
-      token: tokenData.token,
-      expiresIn: tokenData.expiresIn,
-    };
-  } catch (error) {
-    throw error;
+    return result;
+  } finally {
+    session.endSession();
   }
 };
 export const affiliateRegister = async (data: RegistrationData) => {

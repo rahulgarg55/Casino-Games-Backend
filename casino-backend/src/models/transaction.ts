@@ -131,7 +131,7 @@ const transactionSchema: Schema = new Schema(
       virtuals: true,
       transform: (doc, ret) => {
         delete ret.__v;
-        ret.id = ret._id;
+        (ret as any).id = ret._id;
         delete ret._id;
         return ret;
       },
