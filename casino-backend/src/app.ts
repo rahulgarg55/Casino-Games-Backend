@@ -26,7 +26,8 @@ import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 import csurf from 'csurf';
-import client from 'prom-client';
+// @ts-ignore
+import * as client from 'prom-client';
 // express-validator is used in routes, so just add a comment for interview notes
 // Example usage in a route:
 // import { body, validationResult } from 'express-validator';

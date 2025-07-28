@@ -3,6 +3,8 @@ import { PlatformFeeService } from './platformFeeService';
 import Player from '../models/player';
 import Transaction from '../models/transaction';
 import { logger } from '../utils/logger';
+import PlayerBalance from '../models/playerBalance';
+import GameSession from '../models/gameSession';
 
 interface GameFilters {
   provider?: string;
@@ -113,4 +115,40 @@ export const processGameWin = async (playerId: string, amount: number, gameRound
     });
     throw error;
   }
+};
+
+// Parallel database operations using Promise.all
+export const getGameDashboardData = async (userId: string) => {
+  const [user, activeGames, userBalance, recentTransactions] = await Promise.all([
+    Player.findById(userId).select('-password_hash'),
+    Game.find({ isActive: true }).limit(10),
+    PlayerBalance.findOne({ player_id: userId }),
+    Transaction.find({ player_id: userId })
+      .sort({ created_at: -1 })
+      .limit(5)
+  ]);
+
+  return {
+    user,
+    activeGames,
+    balance: userBalance?.balance || 0,
+    recentTransactions
+  };
+};
+
+// Parallel processing for multiple game sessions
+export const processMultipleGameSessions = async (sessionIds: string[]) => {
+  const sessionPromises = sessionIds.map(async (sessionId) => {
+    const session = await GameSession.findById(sessionId);
+    if (!session) return null;
+    
+    const [player, game] = await Promise.all([
+      Player.findById(session.player_id),
+      Game.findById(session.game_id)
+    ]);
+    
+    return { session, player, game };
+  });
+
+  return await Promise.all(sessionPromises);
 };
